@@ -76,6 +76,10 @@ Return a single JSON object with exactly these fields:
 
 Use `needs_research: true` when the task depends on external facts you cannot verify locally — unknown API behaviour, undocumented endpoints, third-party SDK details, or anything the local KB does not cover. List the specific questions as entries in `open_issues`. The engine will dispatch a research agent to answer them and re-run you with the findings before review.
 
+When the task begins with "Rework required", apply only the listed fixes. Do not rewrite or modify code or sections not mentioned in the review feedback. Verify each specific item from the review after applying the fix and include results in `checks_run`.
+
+When re-run with research findings, the research artifact is injected as a "Research Artifact Summary" input. The structure is `technical_data.answers[]`, each with `question`, `answer`, `facts`, and `implementation_notes`. Start with `implementation_notes` — these are direct guidance. `facts` contain the cited evidence if you need to verify a detail.
+
 Use `needs_user_input: true` when a human decision or missing credential is blocking progress.
 
 Use `status: blocked` when a hard blocker prevents any useful output. Describe it in `open_issues`.

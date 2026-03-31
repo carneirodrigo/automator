@@ -1,0 +1,183 @@
+{
+  "id": "azure-logic-apps-email-trigger-teams-notifications",
+  "title": "Azure Logic Apps - Office 365 Email Trigger, Send Email, And Teams Channel Notifications",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps triggered by incoming emails on specific subjects or from specific senders",
+    "Workflows that send notification emails and post summaries to Microsoft Teams channels"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Office 365 email trigger uses type ApiConnectionNotification (not ApiConnectionWebhook). It has both a fetch block (polling config) and a subscribe block (webhook registration). The NotificationUrl in subscribe must be @{listCallbackUrl()}.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — When_a_new_email_arrives_(V3) trigger"
+    },
+    {
+      "fact": "splitOn: \"@triggerBody()?['value']\" on the email trigger causes each matching email to start a separate workflow run. Without splitOn, the trigger fires once with an array of emails.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — email trigger with splitOn"
+    },
+    {
+      "fact": "The fetch.queries block supports filtering by: folderPath (e.g. 'Inbox'), from (sender address), subjectFilter (substring match), importance ('Any'/'High'/'Normal'/'Low'), fetchOnlyWithAttachment (boolean), includeAttachments (boolean).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — fetch.queries on email trigger"
+    },
+    {
+      "fact": "The email body text is accessed as @triggerBody()?['body'] when splitOn is set. Without splitOn, each item in the array has its own body field.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Int_Email_Body initializes: @triggerBody()?['body']"
+    },
+    {
+      "fact": "The Office 365 connector key is 'office365' or 'office365_1' in $connections. Its managed API ARM ID uses lowercase: .../managedApis/office365.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections office365_1 block"
+    },
+    {
+      "fact": "The Office 365 send email (V2) action uses type ApiConnection, method POST, path /v2/Mail. Body fields: To, From, Subject, Body (HTML string), Importance. The From field allows specifying a service account sender address.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Send_an_email_(V2) action"
+    },
+    {
+      "fact": "The Teams connector posts to a channel using path /beta/teams/conversation/message/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Channel')}. The recipient block requires channelId (format: 19:...@thread.tacv2) and groupId (Teams team GUID).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Post_message_in_a_chat_or_channel action"
+    },
+    {
+      "fact": "Teams and Office 365 connectors can use empty connectionProperties (no MSI or explicit auth block) when the connection is authenticated via delegated OAuth during setup. MSI is not required for these connectors.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — office365_1 and teams_1 have connectionProperties: {}"
+    },
+    {
+      "fact": "The Teams managed API ARM ID uses lowercase: .../managedApis/teams.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections teams_1 id field"
+    }
+  ],
+  "email_trigger_pattern": {
+    "When_a_new_email_arrives_(V3)": {
+      "splitOn": "@triggerBody()?['value']",
+      "type": "ApiConnectionNotification",
+      "inputs": {
+        "fetch": {
+          "method": "get",
+          "pathTemplate": {"template": "/v3/Mail/OnNewEmail"},
+          "queries": {
+            "fetchOnlyWithAttachment": false,
+            "folderPath": "Inbox",
+            "from": "sender@domain.com",
+            "importance": "Any",
+            "includeAttachments": false,
+            "subjectFilter": "subject keyword"
+          }
+        },
+        "host": {
+          "connection": {"name": "@parameters('$connections')['office365_1']['connectionId']"}
+        },
+        "subscribe": {
+          "body": {"NotificationUrl": "@{listCallbackUrl()}"},
+          "method": "post",
+          "pathTemplate": {"template": "/GraphMailSubscriptionPoke/$subscriptions"},
+          "queries": {
+            "fetchOnlyWithAttachment": false,
+            "folderPath": "Inbox",
+            "importance": "Any"
+          }
+        }
+      }
+    }
+  },
+  "send_email_pattern": {
+    "Send_an_email_(V2)": {
+      "type": "ApiConnection",
+      "inputs": {
+        "body": {
+          "Body": "<p>@{variables('emailbodyHTML')}</p>",
+          "From": "noreply-service@domain.com",
+          "Importance": "Normal",
+          "Subject": "Notification subject",
+          "To": "@{items('For_each')}"
+        },
+        "host": {
+          "connection": {"name": "@parameters('$connections')['office365_1']['connectionId']"}
+        },
+        "method": "post",
+        "path": "/v2/Mail"
+      }
+    }
+  },
+  "teams_post_channel_pattern": {
+    "Post_message_in_a_chat_or_channel": {
+      "type": "ApiConnection",
+      "inputs": {
+        "body": {
+          "messageBody": "<p><strong>Summary:</strong><br>\n@{variables('summary_var')}</p>",
+          "recipient": {
+            "channelId": "19:CHANNEL_THREAD_ID@thread.tacv2",
+            "groupId": "TEAMS_GROUP_GUID"
+          }
+        },
+        "host": {
+          "connection": {"name": "@parameters('$connections')['teams_1']['connectionId']"}
+        },
+        "method": "post",
+        "path": "/beta/teams/conversation/message/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Channel')}"
+      }
+    }
+  },
+  "html_email_body_pattern": {
+    "description": "Build rich HTML email body as a string variable. Embed base64 images with data URI to avoid external dependencies.",
+    "notes": [
+      "Store base64 PNG as a string variable: data:image/png;base64,<base64_string>",
+      "Reference in email HTML as: <img src=\"@{variables('base64Banner')}\" />",
+      "This avoids external image hosting and works in most email clients",
+      "Build the full HTML string as an InitializeVariable value, referencing other variables via @{variables('name')}",
+      "The email Body field wraps the HTML variable: \"<p>@{variables('emailbodyHTML')}</p>\""
+    ]
+  },
+  "array_to_string_for_notifications": {
+    "description": "To include array contents in a Teams or email message, initialize a string variable from the array using @{variables('arrayVar')} coercion.",
+    "example": {
+      "Initialize_var_result_string": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [{
+            "name": "result string",
+            "type": "string",
+            "value": "@{variables('results array')}"
+          }]
+        }
+      }
+    },
+    "note": "This produces a comma-separated string representation of the array, suitable for embedding in HTML messages."
+  },
+  "implementation_notes": [
+    "The email trigger's fetch.queries.subjectFilter is a substring match, not an exact match. Ensure it is specific enough to avoid false trigger on unrelated emails with the same substring.",
+    "Use splitOn to process one email per workflow run. Without it, the trigger fires with an array and you must iterate inside the workflow — splitOn is simpler for independent per-email processing.",
+    "The Office 365 connection does not require MSI — it uses delegated OAuth credentials set up when the connection is created. connectionProperties can be an empty object.",
+    "To send email from a specific address (not the authenticated user's inbox), set the From field explicitly. The sending account must have Send As or Send on Behalf permissions for that address.",
+    "For Teams channel posting, find the channelId by opening the channel in Teams, clicking the three-dot menu > Get link to channel, and extracting the thread ID from the URL. The groupId is the Teams team's Object ID from Entra ID or the Teams admin center.",
+    "Teams messageBody is HTML. Use <p>, <strong>, <br> and @{expression} for dynamic content. The Teams renderer supports a subset of HTML.",
+    "Build static notification content (banners, portal links, template text) as InitializeVariable actions early in the workflow so they are available throughout."
+  ],
+  "common_failures": [
+    "Missing splitOn — trigger fires once with all emails as an array, not once per email.",
+    "Missing NotificationUrl in subscribe.body — Outlook cannot register the push subscription and the trigger never fires.",
+    "Teams channelId or groupId incorrect — the post action returns a connector error. Verify IDs from the Teams admin center.",
+    "From address not authorised to send on behalf — Office 365 rejects the send with a 403.",
+    "HTML in Teams messageBody using unsupported tags — Teams strips or misrenders the content."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/connectors/office365/",
+    "https://learn.microsoft.com/en-us/connectors/teams/"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-graph-http-msi-and-keyvault",
+    "azure-logic-apps-control-flow-and-state"
+  ],
+  "source_projects": ["manual-analysis"]
+}

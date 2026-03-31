@@ -103,7 +103,11 @@ def _cmd_project_list() -> int:
     if not REGISTRY_PATH.exists():
         print("No projects found.")
         return 0
-    registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    try:
+        registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print("Error: project registry is unreadable or corrupt.")
+        return 1
     projects = registry.get("projects", [])
     if not projects:
         print("No projects found.")

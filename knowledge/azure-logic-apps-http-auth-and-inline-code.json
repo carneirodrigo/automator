@@ -1,0 +1,264 @@
+{
+  "id": "azure-logic-apps-http-auth-and-inline-code",
+  "title": "Azure Logic Apps - HTTP Authentication Patterns, Inline JavaScript, and Liquid Transforms",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps making HTTP calls with OAuth client credentials, client certificates, or basic auth",
+    "Logic Apps running inline JavaScript for data transformation not expressible with built-in actions",
+    "Logic Apps using Liquid templates to transform JSON or XML"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "HTTP action authentication types: ManagedServiceIdentity (MSI), ActiveDirectoryOAuth (client credentials), ClientCertificate (mTLS), Basic. All are set in the authentication block inside inputs.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app"
+    },
+    {
+      "fact": "ActiveDirectoryOAuth uses the OAuth 2.0 client credentials flow (app-only). It does NOT support delegated/user flows. Required fields: tenant, audience, clientId, secret.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app"
+    },
+    {
+      "fact": "ClientCertificate authentication requires a base64-encoded PFX (PKCS#12) string in the pfx field. The password field is the PFX password. Store both as securestring parameters to prevent run history exposure.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app"
+    },
+    {
+      "fact": "Inline JavaScript action type is 'JavaScriptCode' (not 'InlineCode' or 'JavaScript'). Action dependencies must be declared in explicitDependencies.actions. The return value is accessed as @body('Execute_JavaScript_Code') downstream.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-run-javascript"
+    },
+    {
+      "fact": "workflowContext in JavaScript gives access to trigger outputs (workflowContext.trigger.outputs.body), action outputs (workflowContext.actions.ActionName.outputs.body), and workflow metadata (workflowContext.workflow.run.name).",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-run-javascript"
+    },
+    {
+      "fact": "JavaScriptCode in Consumption (multi-tenant) requires an Integration Account linked to the Logic App. Standard Logic Apps (single-tenant) do not require an Integration Account for inline JavaScript.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-run-javascript"
+    },
+    {
+      "fact": "JavaScriptCode limits: 5-second max execution time, 50 MB max data. require() is not supported — no npm packages. Node.js 16.x on Consumption, 20.x on Standard (as of early 2026).",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-run-javascript"
+    },
+    {
+      "fact": "Liquid transform action type is 'Liquid'. kind values: JsonToJson, JsonToText, XmlToJson, XmlToText. The output of JsonToJson is a string, not a parsed object — use @json(body('Transform')) if you need object access downstream.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-enterprise-integration-liquid-transform"
+    },
+    {
+      "fact": "Logic Apps uses DotLiquid, which differs from Shopify Liquid. Filters use sentence casing (Replace not replace). The json filter is not implemented. Maps must be in an Integration Account (Consumption) or in the Logic App resource (Standard, source: LogicApp).",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-enterprise-integration-liquid-transform"
+    },
+    {
+      "fact": "Always use securestring parameters for secret, password, and pfx in HTTP authentication. Using string type exposes these values in run history.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app"
+    }
+  ],
+  "http_auth_patterns": {
+    "managed_service_identity": {
+      "description": "Recommended for Azure-to-Azure calls. No credentials in the definition.",
+      "authentication": {
+        "type": "ManagedServiceIdentity",
+        "audience": "https://graph.microsoft.com"
+      },
+      "note": "audience is the resource URI, not the token endpoint. The Logic App MSI must have appropriate RBAC on the target resource."
+    },
+    "active_directory_oauth": {
+      "description": "Client credentials flow for app-only auth to any Azure AD-protected API.",
+      "authentication": {
+        "type": "ActiveDirectoryOAuth",
+        "tenant": "@parameters('tenantId')",
+        "audience": "https://management.azure.com",
+        "clientId": "@parameters('appClientId')",
+        "secret": "@parameters('appClientSecret')"
+      },
+      "note": "appClientSecret must be a securestring parameter. audience is the resource URI (not the token endpoint). Tenant is the directory ID GUID."
+    },
+    "client_certificate": {
+      "description": "mTLS for APIs that require a client certificate.",
+      "authentication": {
+        "type": "ClientCertificate",
+        "pfx": "@parameters('clientCertificatePfxBase64')",
+        "password": "@parameters('clientCertificatePassword')"
+      },
+      "note": "pfx must be base64-encoded PKCS#12. For Standard Logic Apps, set app setting WEBSITE_LOAD_USER_PROFILE=1 to enable client certificate support."
+    },
+    "basic_auth": {
+      "description": "Username/password authentication.",
+      "authentication": {
+        "type": "Basic",
+        "username": "@parameters('apiUsername')",
+        "password": "@parameters('apiPassword')"
+      },
+      "note": "Both username and password should be securestring parameters."
+    },
+    "full_http_example_with_oauth": {
+      "Call_Protected_API": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/resourceGroups?api-version=2021-04-01",
+          "authentication": {
+            "type": "ActiveDirectoryOAuth",
+            "tenant": "@parameters('tenantId')",
+            "audience": "https://management.azure.com",
+            "clientId": "@parameters('appClientId')",
+            "secret": "@parameters('appClientSecret')"
+          }
+        },
+        "runAfter": {}
+      }
+    }
+  },
+  "javascript_code_patterns": {
+    "filter_and_map_array": {
+      "Execute_JavaScript_Code": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "var items = workflowContext.actions.Get_Items.outputs.body.value;\nvar filtered = items.filter(function(i) { return i.Severity === 'High'; });\nvar mapped = filtered.map(function(i) { return { id: i.ID, title: i.Title }; });\nreturn mapped;",
+          "explicitDependencies": {
+            "actions": ["Get_Items"],
+            "includeTrigger": false
+          }
+        },
+        "runAfter": {
+          "Get_Items": ["Succeeded"]
+        }
+      },
+      "output_reference": "@body('Execute_JavaScript_Code')"
+    },
+    "extract_from_trigger_body": {
+      "Extract_Email_Addresses": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "var emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\nvar body = workflowContext.trigger.outputs.body.Body;\nvar matches = body.match(emailRegex);\nreturn matches || [];",
+          "explicitDependencies": {
+            "includeTrigger": true
+          }
+        },
+        "runAfter": {}
+      }
+    },
+    "workflowContext_structure": {
+      "trigger_body": "workflowContext.trigger.outputs.body",
+      "trigger_headers": "workflowContext.trigger.outputs.headers",
+      "action_body": "workflowContext.actions.Action_Name.outputs.body",
+      "action_status": "workflowContext.actions.Action_Name.status",
+      "workflow_run_id": "workflowContext.workflow.run.name",
+      "workflow_name": "workflowContext.workflow.name"
+    },
+    "key_facts": [
+      "Action names in workflowContext use the JSON key (underscored). Action names with dots need bracket notation: workflowContext.actions['My.Action'].",
+      "explicitDependencies.actions is required when accessing an action whose name contains a dot, or when the engine cannot auto-detect the dependency.",
+      "The return value becomes @body('Execute_JavaScript_Code') downstream.",
+      "If the script throws an exception, the action fails. Wrap risky code in try/catch and return an error object instead.",
+      "Consumption requires an Integration Account. Standard does not."
+    ]
+  },
+  "liquid_transform_patterns": {
+    "json_to_json": {
+      "Transform_JSON_To_JSON": {
+        "type": "Liquid",
+        "kind": "JsonToJson",
+        "inputs": {
+          "content": "@triggerBody()",
+          "integrationAccount": {
+            "map": {"name": "MyLiquidMap"}
+          }
+        },
+        "runAfter": {}
+      },
+      "access_output_as_string": "@body('Transform_JSON_To_JSON')",
+      "access_output_as_object": "@json(body('Transform_JSON_To_JSON'))"
+    },
+    "xml_to_json_standard": {
+      "Transform_XML_To_JSON": {
+        "type": "Liquid",
+        "kind": "XmlToJson",
+        "inputs": {
+          "content": "@triggerBody()",
+          "map": {
+            "source": "LogicApp",
+            "name": "XmlToJsonMap"
+          }
+        },
+        "runAfter": {}
+      },
+      "note": "source: 'LogicApp' is for Standard Logic Apps with maps stored in the resource. Use source: 'IntegrationAccount' for maps in an Integration Account."
+    },
+    "xslt_transform": {
+      "Transform_XML": {
+        "type": "Xslt",
+        "inputs": {
+          "content": "@body('Get_XML_Content')",
+          "integrationAccount": {
+            "map": {"name": "OrderTransform"}
+          }
+        },
+        "runAfter": {"Get_XML_Content": ["Succeeded"]}
+      },
+      "note": "XSLT maps (type: Xslt) require an Integration Account on both Consumption and Standard."
+    },
+    "liquid_kind_values": {
+      "JsonToJson": "JSON input → JSON output (as string)",
+      "JsonToText": "JSON input → plain text output",
+      "XmlToJson": "XML input → JSON output (as string)",
+      "XmlToText": "XML input → plain text output"
+    },
+    "dotliquid_differences_from_shopify": [
+      "Filter names use sentence casing: Replace not replace, Upcase not upcase.",
+      "The json filter is not implemented — cannot serialize an object to JSON string inside the template.",
+      "Use {{ forloop.index }} for loop index (not loop.index).",
+      "Custom filters must be registered as .NET assemblies — not available in Logic Apps."
+    ]
+  },
+  "parameter_security_patterns": {
+    "secure_parameter_type": {
+      "definition_parameters": {
+        "appClientSecret": {
+          "type": "securestring"
+        },
+        "clientCertPfx": {
+          "type": "securestring"
+        },
+        "apiPassword": {
+          "type": "securestring"
+        }
+      },
+      "note": "securestring and secureobject parameters are redacted from run history automatically. Always use these types for any credential passed to an authentication block."
+    }
+  },
+  "implementation_notes": [
+    "ActiveDirectoryOAuth fetches a token before each HTTP call. Token caching is handled by the engine — there is no manual token management needed.",
+    "For MSI, always prefer it over ActiveDirectoryOAuth when calling Azure services. MSI requires no secret management and tokens are automatically rotated.",
+    "Store client secrets and certificates in Key Vault and retrieve them with the Key Vault connector action at runtime instead of using definition parameters. This avoids embedding credentials in ARM deployments.",
+    "JavaScript code has access to the full workflowContext but cannot make external HTTP calls, access the filesystem, or use require(). It is a pure in-memory transformation sandbox.",
+    "Use JavaScriptCode for complex transformations (regex extraction, array reshaping, date math) that cannot be expressed cleanly with Logic Apps built-in expressions.",
+    "Liquid maps must exist before the Logic App runs. For Consumption, upload the map to the Integration Account first. For Standard, upload via the Maps blade in the Logic App resource.",
+    "The output of all Liquid transform actions is a string. Always wrap with @json(...) when you need to access properties of the result in downstream actions.",
+    "For client certificate auth, the PFX must include the full certificate chain. Partial chain certs may cause TLS validation failures at the target API."
+  ],
+  "common_failures": [
+    "ActiveDirectoryOAuth with wrong audience — token is issued for the wrong resource and the API rejects with 401.",
+    "ActiveDirectoryOAuth tenant as display name instead of GUID — token fetch fails; use the Directory (tenant) ID.",
+    "ClientCertificate pfx not base64-encoded — connector rejects with a parsing error.",
+    "JavaScriptCode type: 'InlineCode' — wrong type; the action is not recognized. Must be 'JavaScriptCode'.",
+    "JavaScriptCode accessing action name with spaces in workflowContext — use bracket notation for names that are not valid JS identifiers.",
+    "JavaScriptCode exceeding 5-second limit — action fails with timeout. Redesign to pass smaller data or use an Azure Function for complex processing.",
+    "Liquid JsonToJson output treated as object — it is a string. Wrap with @json() before accessing fields.",
+    "DotLiquid filter in lowercase (replace instead of Replace) — filter is not applied, template returns unmodified input.",
+    "securestring parameters exposed by using string type for credentials — values appear in plain text in run history."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/add-run-javascript",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-enterprise-integration-liquid-transform",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-graph-http-msi-and-keyvault",
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-arm-template-and-deployment",
+    "azure-logic-apps-control-flow-code-patterns"
+  ],
+  "source_projects": ["manual-analysis"]
+}

@@ -1,0 +1,352 @@
+{
+  "id": "azure-logic-apps-data-operations-code-samples",
+  "title": "Azure Logic Apps - Data Operations Code Samples",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps workflows that transform, shape, filter, or tabulate data in-workflow",
+    "Compose, Table (CSV/HTML), Filter array, Join, Parse JSON, and Select actions"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "authoritative_source": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-data-operations-code-samples",
+  "last_verified": "2026-03-31T00:00:00Z",
+  "action_samples": {
+    "Compose": {
+      "description": "Merges multiple values or expressions into a single output token. Useful for building objects or formatted strings from variables before passing them downstream.",
+      "key_facts": [
+        "type is 'Compose'",
+        "inputs can be any valid expression, object, or literal — not limited to a single value",
+        "Output is referenced as outputs('Compose') in downstream actions"
+      ],
+      "example": {
+        "actions": {
+          "Compose": {
+            "type": "Compose",
+            "inputs": {
+              "age": "@variables('ageVar')",
+              "fullName": "@{variables('lastNameVar')}, @{variables('firstNameVar')}"
+            },
+            "runAfter": {
+              "Initialize_variable_-_ageVar": ["Succeeded"]
+            }
+          },
+          "Initialize_variable_-_ageVar": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{"name": "ageVar", "type": "Integer", "value": 35}]
+            },
+            "runAfter": {"Initialize_variable_-_lastNameVar": ["Succeeded"]}
+          },
+          "Initialize_variable_-_firstNameVar": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{"name": "firstNameVar", "type": "String", "value": "Sophia "}]
+            },
+            "runAfter": {}
+          },
+          "Initialize_variable_-_lastNameVar": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{"name": "lastNameVar", "type": "String", "value": "Owens"}]
+            },
+            "runAfter": {"Initialize_variable_-_firstNameVar": ["Succeeded"]}
+          }
+        }
+      }
+    },
+    "Create_CSV_table": {
+      "description": "Converts a JSON array into a flat CSV string. Each object in the array becomes one row; object keys become column headers.",
+      "key_facts": [
+        "type is 'Table', format is 'CSV'",
+        "inputs.from must be an array expression — typically body('ParseJson')?['Results'] for API data",
+        "Output is referenced as body('Create_CSV_table') and is a string, not an array"
+      ],
+      "example": {
+        "actions": {
+          "Create_CSV_table": {
+            "type": "Table",
+            "inputs": {
+              "format": "CSV",
+              "from": "@variables('myJSONArray')"
+            },
+            "runAfter": {"Initialize_variable_-_JSON_array": ["Succeeded"]}
+          },
+          "Initialize_variable_-_JSON_array": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myJSONArray",
+                "type": "Array",
+                "value": [
+                  {"Description": "Apples", "Product_ID": 1},
+                  {"Description": "Oranges", "Product_ID": 2}
+                ]
+              }]
+            },
+            "runAfter": {}
+          }
+        }
+      }
+    },
+    "Create_HTML_table": {
+      "description": "Converts a JSON array into an HTML table string. Same shape as CSV table but output is HTML markup.",
+      "key_facts": [
+        "type is 'Table', format is 'HTML'",
+        "inputs.from must be an array expression",
+        "Output is an HTML string suitable for email bodies (e.g. via Office 365 Outlook connector)"
+      ],
+      "example": {
+        "actions": {
+          "Create_HTML_table": {
+            "type": "Table",
+            "inputs": {
+              "format": "HTML",
+              "from": "@variables('myJSONArray')"
+            },
+            "runAfter": {"Initialize_variable_-_JSON_array": ["Succeeded"]}
+          },
+          "Initialize_variable_-_JSON_array": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myJSONArray",
+                "type": "Array",
+                "value": [
+                  {"Description": "Apples", "Product_ID": 1},
+                  {"Description": "Oranges", "Product_ID": 2}
+                ]
+              }]
+            },
+            "runAfter": {}
+          }
+        }
+      }
+    },
+    "Filter_array": {
+      "description": "Filters an array, keeping only items that match a condition. In code view the action type is 'Query'.",
+      "key_facts": [
+        "type is 'Query' (not 'Filter') in the workflow definition JSON",
+        "inputs.from is the source array expression",
+        "inputs.where is the condition expression; use item() to reference the current element",
+        "Output is referenced as body('Filter_array') and is an array"
+      ],
+      "example": {
+        "actions": {
+          "Filter_array": {
+            "type": "Query",
+            "inputs": {
+              "from": "@variables('myIntegerArray')",
+              "where": "@greater(item(), 1)"
+            },
+            "runAfter": {"Initialize_variable_-_integer_array": ["Succeeded"]}
+          },
+          "Initialize_variable_-_integer_array": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myIntegerArray",
+                "type": "Array",
+                "value": [1, 2, 3, 4]
+              }]
+            },
+            "runAfter": {}
+          }
+        }
+      }
+    },
+    "Join": {
+      "description": "Concatenates all items in an array into a single string, separated by a specified delimiter.",
+      "key_facts": [
+        "type is 'Join'",
+        "inputs.from is the source array expression",
+        "inputs.joinWith is the delimiter string",
+        "Output is a string referenced as body('Join')"
+      ],
+      "example": {
+        "actions": {
+          "Initialize_variable_-_integer_array": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myIntegerArray",
+                "type": "Array",
+                "value": [1, 2, 3, 4]
+              }]
+            },
+            "runAfter": {}
+          },
+          "Join": {
+            "type": "Join",
+            "inputs": {
+              "from": "@variables('myIntegerArray')",
+              "joinWith": ":"
+            },
+            "runAfter": {"Initialize_variable_-_integer_array": ["Succeeded"]}
+          }
+        }
+      }
+    },
+    "Parse_JSON": {
+      "description": "Parses a JSON string or object and generates typed tokens for each property, making fields accessible by name in downstream actions.",
+      "key_facts": [
+        "type is 'ParseJson'",
+        "inputs.content is the source — typically body('HTTP_action') or a variable",
+        "inputs.schema defines the expected shape; generate from a sample payload using the designer",
+        "After parsing, access fields as body('Parse_JSON')?['fieldName'] — use ?['x'] null-safe form",
+        "Always parse before accessing nested fields; the raw HTTP body is untyped"
+      ],
+      "example": {
+        "actions": {
+          "Initialize_variable_-_JSON_object": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myJSONObject",
+                "type": "Object",
+                "value": {
+                  "Member": {
+                    "Email": "Sophia.Owens@fabrikam.com",
+                    "FirstName": "Sophia",
+                    "LastName": "Owens"
+                  }
+                }
+              }]
+            },
+            "runAfter": {}
+          },
+          "Parse_JSON": {
+            "type": "ParseJson",
+            "inputs": {
+              "content": "@variables('myJSONObject')",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Member": {
+                    "type": "object",
+                    "properties": {
+                      "Email": {"type": "string"},
+                      "FirstName": {"type": "string"},
+                      "LastName": {"type": "string"}
+                    }
+                  }
+                }
+              }
+            },
+            "runAfter": {"Initialize_variable_-_JSON_object": ["Succeeded"]}
+          }
+        }
+      }
+    },
+    "Select_array_to_objects": {
+      "description": "Projects each item in an array into a new shape. Example 1: transforms an integer array into an array of objects.",
+      "key_facts": [
+        "type is 'Select'",
+        "inputs.from is the source array",
+        "inputs.select is an object mapping output field names to expressions; use item() for the current element",
+        "Output is always an array with the same item count as the source",
+        "body('Select') references the output array"
+      ],
+      "example": {
+        "actions": {
+          "Initialize_variable_-_integer_array": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myIntegerArray",
+                "type": "Array",
+                "value": [1, 2, 3, 4]
+              }]
+            },
+            "runAfter": {}
+          },
+          "Select": {
+            "type": "Select",
+            "inputs": {
+              "from": "@variables('myIntegerArray')",
+              "select": {
+                "Product_ID": "@item()"
+              }
+            },
+            "runAfter": {"Initialize_variable_-_integer_array": ["Succeeded"]}
+          }
+        }
+      }
+    },
+    "Select_objects_to_strings": {
+      "description": "Projects each item in a JSON object array into a string (scalar) rather than another object. Requires text mode in the designer or code view — the select value is a plain expression string, not an object.",
+      "key_facts": [
+        "When select is a string expression (not an object), the output is an array of strings",
+        "Use @{item()?['FieldName']} as the select value to extract a single field from each object",
+        "This mode is not available in the designer map view — switch to text mode (T icon) or use code view",
+        "The from expression typically references an OData-style value array: @body('action')?['value']"
+      ],
+      "example": {
+        "actions": {
+          "Initialize_variable_-_object_array": {
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [{
+                "name": "myObjectArray",
+                "type": "Array",
+                "value": [
+                  {"Val": "1", "Txt": "One"},
+                  {"Val": "2", "Txt": "Two"},
+                  {"Val": "4", "Txt": "Four"},
+                  {"Val": "10", "Txt": "Ten"}
+                ]
+              }]
+            },
+            "runAfter": {}
+          },
+          "Select": {
+            "type": "Select",
+            "inputs": {
+              "from": "@body('myObjectArray')?['value']",
+              "select": "@{item()?['Txt']}"
+            },
+            "runAfter": {"Initialize_variable_-_object_array": ["Succeeded"]}
+          }
+        }
+      }
+    }
+  },
+  "expression_quick_reference": {
+    "reference_variable": "@variables('varName')",
+    "reference_action_body": "@body('ActionName')",
+    "null_safe_field": "@body('ActionName')?['fieldName']",
+    "nested_null_safe": "@body('ActionName')?['outer']?['inner']",
+    "current_loop_item": "@item()",
+    "current_loop_item_field": "@item()?['fieldName']",
+    "compose_output": "@outputs('Compose')",
+    "string_interpolation": "@{expression1} literal text @{expression2}",
+    "greater_than": "@greater(item(), value)",
+    "concat": "@concat('prefix', variables('x'), 'suffix')",
+    "format_date": "@formatDateTime(utcNow(), 'MMMM yyyy')",
+    "add_days": "@addDays(utcNow(), -25)",
+    "uri_encode": "@uriComponent('https://example.com/path')"
+  },
+  "implementation_notes": [
+    "Filter array uses type 'Query' in JSON code view, not 'Filter'. Do not confuse the designer label with the JSON type.",
+    "Parse JSON must precede any action that accesses typed fields from an API response. Raw HTTP body references are strings, not objects.",
+    "Use the null-safe ?['field'] accessor form for all body() and variables() expressions where the field might be absent — especially for API error response fields.",
+    "The Table action (CSV or HTML) takes an array as input and produces a flat string. It cannot handle nested objects well — flatten with Select first if the source array contains nested objects.",
+    "Select with a string select value (for array-to-string-array projection) is only editable in code view or text mode. The visual designer map interface only supports object-to-object projection.",
+    "Compose is useful for pre-building a payload object before an HTTP call or SharePoint write, avoiding repeated variable references in the target action inputs.",
+    "Join is the correct action for turning an array into a delimited string (e.g., comma-separated IDs). Do not use Compose or a ForEach for this.",
+    "InitializeVariable actions are only valid in the workflow definition's actions block — they cannot be placed inside a Foreach or Until scope in Consumption workflows."
+  ],
+  "common_failures": [
+    "Using type 'Filter' instead of 'Query' for Filter array actions — causes validation error.",
+    "Referencing body() fields without a preceding Parse JSON — the expression returns null or errors at runtime.",
+    "Passing a nested object array directly to Create CSV table without flattening — produces '[object Object]' in CSV cells.",
+    "Using the object select form when trying to project to a string array — results in an array of single-key objects instead.",
+    "Calling outputs('Compose') when the correct reference for downstream HTTP or SharePoint input is simply @outputs('Compose') — note it is outputs() not body() for Compose."
+  ],
+  "related_entries": [
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-api-to-sharepoint-playbook"
+  ],
+  "source_projects": ["manual-analysis"]
+}

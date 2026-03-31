@@ -20,16 +20,26 @@ Return a single JSON object with exactly these fields:
 {
   "status": "success | partial | failed",
   "summary": "one-sentence summary of what was found",
-  "facts": ["concrete fact (source: URL or reference)"],
   "sources": ["URL or document reference"],
-  "open_risks": ["risk or ambiguity that could affect implementation"],
-  "implementation_notes": ["direct note relevant to how the fact should be applied"]
+  "technical_data": {
+    "answers": [
+      {
+        "question": "Q1: <verbatim question text>",
+        "answer": "direct answer",
+        "facts": ["atomic fact (source: URL or reference)"],
+        "implementation_notes": ["direct note on how to apply this answer"]
+      }
+    ],
+    "open_risks": ["risk or ambiguity that could affect implementation"]
+  }
 }
 ```
 
 Use `status: partial` when the questions are answered but some ambiguities remain. Use `status: failed` only when the core question cannot be answered at all.
 
-Keep `facts` atomic — one verifiable claim per entry. Avoid summaries or opinions in the facts list.
+When the task numbers questions (Q1:, Q2:, etc.), label each answer with the matching question identifier so the worker can find answers without scanning the full response.
+
+Keep facts atomic — one verifiable claim per entry. Avoid summaries or opinions in the facts list. `sources` at the top level are NOT re-injected into the worker prompt — cite sources inline in `facts` instead.
 
 ## Local Knowledge Base
 

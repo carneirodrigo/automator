@@ -1,0 +1,291 @@
+{
+  "id": "azure-logic-apps-sentinel-incident-playbook",
+  "title": "Azure Logic Apps - Microsoft Sentinel Incident Response Playbook Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps automation playbooks triggered by Microsoft Sentinel incidents",
+    "Sentinel incident response workflows that correlate entities with MDE and take remediation actions"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Sentinel incident trigger uses type ApiConnectionWebhook with the azuresentinel connector on path /incident-creation. The body must include callback_url: @listCallbackUrl() so Sentinel can call back into the workflow.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Microsoft_Sentinel_incident trigger"
+    },
+    {
+      "fact": "The WDATP managed connector (connectionId key: 'wdatp') is the Logic Apps native connector for Microsoft Defender for Endpoint. It exposes MDE API actions without requiring manual OAuth2 token management.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Machines_-_Get_list_of_machines and Actions_-_Run_antivirus_scan use wdatp"
+    },
+    {
+      "fact": "Both the azuresentinel and wdatp connectors authenticate using Managed Service Identity. The connectionProperties block is: { \"authentication\": { \"type\": \"ManagedServiceIdentity\" } }. No client_secret parameter is needed.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections parameters block for both connectors"
+    },
+    {
+      "fact": "Host entities from a Sentinel incident are extracted by posting the relatedEntities array to /entities/host using the azuresentinel connector. The response body contains a Hosts array where each item has a HostName field.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Entities_-_Get_Hosts action"
+    },
+    {
+      "fact": "The Sentinel incident ARM resource ID is at triggerBody()?['object']?['id']. Incident number is at triggerBody()?['object']?['properties']?['incidentNumber']. Title is at triggerBody()?['object']?['properties']?['title'].",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — expressions in Add_comment_to_incident and AV scan comment body"
+    },
+    {
+      "fact": "Adding a comment to a Sentinel incident uses POST /Incidents/Comment on the azuresentinel connector with body fields: incidentArmId (the full ARM ID) and message (an HTML string).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Add_comment_to_incident_(V3) actions in both true and false branches"
+    },
+    {
+      "fact": "The Sentinel incident comment message field expects HTML. The production pattern wraps content in <p class=\"editor-paragraph\">...</p>.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — message body in both comment actions"
+    },
+    {
+      "fact": "The WDATP connector lists all MDE machines with GET /api/machines. The response body is at body('action')?['value'] — an array of machine objects each with fields including id (device ID) and computerDnsName.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — foreach over body('Machines_-_Get_list_of_machines')?['value']"
+    },
+    {
+      "fact": "The WDATP connector triggers an AV scan with POST /api/machines/@{encodeURIComponent(variables('MDEDeviceId'))}/runAntiVirusScan. The device ID must be URL-encoded in the path. Body requires Comment and ScanType fields.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Actions_-_Run_antivirus_scan"
+    },
+    {
+      "fact": "The AV scan action result status is at body('Actions_-_Run_antivirus_scan')?['status'].",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — status referenced in the comment message"
+    },
+    {
+      "fact": "A Condition (If) action in JSON uses type 'If', with an expression object structured as: { \"and\": [{ \"contains\": [expr1, expr2] }] }. The true branch is under 'actions' and the false branch is under 'else.actions'.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Condition action matching MDE hostname against Sentinel hostname"
+    },
+    {
+      "fact": "Sentinel to MDE hostname correlation uses a contains() match (partial), not exact equality. The MDE computerDnsName may include the domain suffix while the Sentinel HostName is just the short hostname.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — expression: contains(Compose_MDE_host, Compose_sentinel_hostname)"
+    },
+    {
+      "fact": "Nested Foreach loops are valid in Consumption Logic Apps. The outer loop iterates Sentinel host entities; the inner loop iterates all MDE machines to find a match. Nested foreach always runs sequentially.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — For_each (outer) containing For_each_mde_host (inner)"
+    },
+    {
+      "fact": "SetVariable (type: SetVariable) works inside a Foreach loop for accumulating or updating a variable during iteration. The variable must be declared with InitializeVariable before the loop.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Set_variable sets MDEDeviceId inside the inner Foreach"
+    },
+    {
+      "fact": "The managed API ARM ID for the Sentinel connector uses mixed case: .../managedApis/Azuresentinel. The WDATP connector uses: .../managedApis/Wdatp. These are case-sensitive in ARM resource IDs.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections value block"
+    }
+  ],
+  "trigger_pattern": {
+    "Microsoft_Sentinel_incident": {
+      "type": "ApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+          }
+        },
+        "body": {
+          "callback_url": "@listCallbackUrl()"
+        },
+        "path": "/incident-creation"
+      }
+    }
+  },
+  "sentinel_data_expressions": {
+    "incident_arm_id": "@triggerBody()?['object']?['id']",
+    "incident_number": "@triggerBody()?['object']?['properties']?['incidentNumber']",
+    "incident_title": "@triggerBody()?['object']?['properties']?['title']",
+    "related_entities": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+    "host_entities_array": "@body('Entities_-_Get_Hosts')?['Hosts']",
+    "host_name_in_loop": "@item()?['HostName']"
+  },
+  "entity_extraction_pattern": {
+    "Entities_-_Get_Hosts": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+          }
+        },
+        "method": "post",
+        "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+        "path": "/entities/host"
+      }
+    }
+  },
+  "add_comment_pattern": {
+    "Add_comment_to_incident_(V3)": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+          }
+        },
+        "method": "post",
+        "body": {
+          "incidentArmId": "@triggerBody()?['object']?['id']",
+          "message": "<p class=\"editor-paragraph\">Your message here with @{expression} interpolation.</p>"
+        },
+        "path": "/Incidents/Comment"
+      }
+    }
+  },
+  "condition_expression_pattern": {
+    "description": "Condition (If) action checking if MDE computerDnsName contains the Sentinel HostName",
+    "Condition": {
+      "type": "If",
+      "expression": {
+        "and": [
+          {
+            "contains": [
+              "@outputs('Compose_MDE_host')",
+              "@outputs('Compose_sentinel_hostname')"
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "_comment": "True branch actions go here"
+      },
+      "else": {
+        "actions": {
+          "_comment": "False branch actions go here"
+        }
+      }
+    }
+  },
+  "wdatp_connector_patterns": {
+    "get_machines": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {"connection": {"name": "@parameters('$connections')['wdatp']['connectionId']"}},
+        "method": "get",
+        "path": "/api/machines"
+      },
+      "note": "Response body is body('action')?['value'] — array of machine objects with fields: id, computerDnsName, osPlatform, healthStatus, etc."
+    },
+    "run_antivirus_scan": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {"connection": {"name": "@parameters('$connections')['wdatp']['connectionId']"}},
+        "method": "post",
+        "body": {
+          "Comment": "AV Scan run from playbook for Sentinel Incident: @{triggerBody()?['object']?['properties']?['incidentNumber']} - @{triggerBody()?['object']?['properties']?['title']}",
+          "ScanType": "Full"
+        },
+        "path": "/api/machines/@{encodeURIComponent(variables('MDEDeviceId'))}/runAntiVirusScan"
+      },
+      "note": "Response body includes 'status' field accessible as body('Actions_-_Run_antivirus_scan')?['status']"
+    }
+  },
+  "connections_msi_pattern": {
+    "description": "Both azuresentinel and wdatp connectors use MSI auth — no client_secret required",
+    "azuresentinel": {
+      "id": "/subscriptions/{sub_id}/providers/Microsoft.Web/locations/{region}/managedApis/Azuresentinel",
+      "connectionId": "/subscriptions/{sub_id}/resourceGroups/{rg}/providers/Microsoft.Web/connections/{connection_name}",
+      "connectionName": "{connection_name}",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity"
+        }
+      }
+    },
+    "wdatp": {
+      "id": "/subscriptions/{sub_id}/providers/Microsoft.Web/locations/{region}/managedApis/Wdatp",
+      "connectionId": "/subscriptions/{sub_id}/resourceGroups/{rg}/providers/Microsoft.Web/connections/{connection_name}",
+      "connectionName": "{connection_name}",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity"
+        }
+      }
+    }
+  },
+  "nested_foreach_pattern": {
+    "description": "Outer loop over Sentinel hosts, inner loop over MDE machines — find the matching device",
+    "For_each": {
+      "type": "Foreach",
+      "foreach": "@body('Entities_-_Get_Hosts')?['Hosts']",
+      "actions": {
+        "Compose_sentinel_hostname": {
+          "type": "Compose",
+          "inputs": "@item()?['HostName']"
+        },
+        "For_each_mde_host": {
+          "type": "Foreach",
+          "foreach": "@body('Machines_-_Get_list_of_machines')?['value']",
+          "runAfter": {"Compose_sentinel_hostname": ["Succeeded"]},
+          "actions": {
+            "Compose_MDE_host": {
+              "type": "Compose",
+              "inputs": "@item()?['computerDnsName']"
+            },
+            "Condition": {
+              "type": "If",
+              "runAfter": {"Compose_MDE_host": ["Succeeded"]},
+              "expression": {
+                "and": [{"contains": ["@outputs('Compose_MDE_host')", "@outputs('Compose_sentinel_hostname')"]}]
+              },
+              "actions": {
+                "Set_variable": {
+                  "type": "SetVariable",
+                  "inputs": {"name": "MDEDeviceId", "value": "@item()?['id']"}
+                }
+              },
+              "else": {"actions": {}}
+            }
+          }
+        }
+      }
+    }
+  },
+  "implementation_notes": [
+    "Use the WDATP managed connector for MDE actions in Sentinel playbooks rather than direct HTTP calls. It handles auth via MSI and wraps the MDE REST API paths — no token fetch step needed.",
+    "Use MSI authentication (connectionProperties.authentication.type: ManagedServiceIdentity) for both azuresentinel and wdatp connectors. Assign the Logic App's managed identity the appropriate roles: Microsoft Sentinel Responder and Windows Defender ATP role in Entra ID.",
+    "The Entities - Get Hosts action must be called before the foreach loop over host entities. Its output body('Entities_-_Get_Hosts')?['Hosts'] is the iterable array.",
+    "Use contains() for hostname matching, not equals(). MDE computerDnsName is typically the FQDN (hostname.domain.com) while Sentinel HostName is the short hostname. contains(fqdn, shortname) handles this reliably.",
+    "Store the matched MDE device ID in a variable (type string, initialized before the loop) so it is accessible in subsequent actions after the inner foreach completes.",
+    "Nested foreach loops always run sequentially in Consumption Logic Apps — no concurrency setting is needed. This ensures the SetVariable update from the inner loop is deterministic.",
+    "The incidentArmId in Add comment must be the full ARM resource ID from triggerBody()?['object']?['id'], not just the incident number.",
+    "Incident comment messages are HTML — wrap text in <p class=\"editor-paragraph\"> for correct rendering in the Sentinel portal.",
+    "The managed API IDs are case-sensitive: Azuresentinel (capital A) and Wdatp (capital W). Using lowercase will cause ARM deployment failures.",
+    "For the AV scan, the device ID must be URL-encoded in the path: @{encodeURIComponent(variables('MDEDeviceId'))}. Not encoding it results in a 404 if the ID contains hyphens or other special characters.",
+    "Initialize the MDEDeviceId variable with type string and no value before any foreach loop that will set it. Logic Apps requires variables to be declared at the workflow actions level, not inside scopes or loops."
+  ],
+  "common_failures": [
+    "Logic App's managed identity not assigned Microsoft Sentinel Responder role — Add comment and Entities actions return 403.",
+    "Managed identity not granted Windows Defender ATP permissions in Entra ID — WDATP connector actions return 401.",
+    "Using equals() instead of contains() for hostname matching — misses matches when MDE has FQDN and Sentinel has short name.",
+    "Forgetting encodeURIComponent on the device ID in the AV scan path — produces 404 for IDs with hyphens.",
+    "Wrong managed API ARM ID casing (azuresentinel vs Azuresentinel) — ARM deployment fails or connection cannot be found.",
+    "Missing callback_url: @listCallbackUrl() in the trigger body — Sentinel cannot call back to start the workflow.",
+    "Accessing body('Entities_-_Get_Hosts')?['Hosts'] before the Entities action completes — null array in the foreach."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/sentinel/automate-responses-with-playbooks",
+    "https://learn.microsoft.com/en-us/connectors/azuresentinel/",
+    "https://learn.microsoft.com/en-us/connectors/wdatp/"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-control-flow-and-state",
+    "azure-logic-apps-security-and-identity",
+    "microsoft-defender-endpoint-api-auth-conventions",
+    "mde-advanced-hunting-api"
+  ],
+  "source_projects": ["manual-analysis"]
+}

@@ -1,0 +1,315 @@
+{
+  "id": "azure-logic-apps-arm-template-and-deployment",
+  "title": "Azure Logic Apps - ARM Template Structure, $connections Deployment, and Definition Parameters",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Deploying Logic Apps via ARM templates (infrastructure as code)",
+    "Configuring managed connector $connections in ARM deployments",
+    "Using workflow definition parameters for configurable values"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The ARM resource type for a Logic App is Microsoft.Logic/workflows (apiVersion: 2019-05-01). The workflow definition (the JSON you edit in code view) lives in properties.definition. Connection values live in properties.parameters.$connections.value.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/templates/microsoft.logic/workflows"
+    },
+    {
+      "fact": "Managed connector connections are separate ARM resources of type Microsoft.Web/connections (apiVersion: 2016-06-01). The Logic App resource must dependsOn each connection resource so the connection is created before the workflow is deployed.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/templates/microsoft.web/connections"
+    },
+    {
+      "fact": "The $connections.value entry for each connector requires exactly three fields: connectionId (ARM resource ID of the Microsoft.Web/connections instance), connectionName (short name string), and id (managed API catalog ARM ID). Missing any field causes a runtime authentication failure.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-azure-resource-manager-templates-overview"
+    },
+    {
+      "fact": "The managed API catalog id uses subscriptionResourceId('Microsoft.Web/locations/managedApis', location, connectorName) in ARM templates. This resolves to /subscriptions/{sub}/providers/Microsoft.Web/locations/{region}/managedApis/{connectorName}.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/templates/microsoft.web/connections"
+    },
+    {
+      "fact": "The connectionId uses resourceId('Microsoft.Web/connections', connectionName) in ARM templates. This resolves to /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Web/connections/{name}.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/templates/microsoft.web/connections"
+    },
+    {
+      "fact": "OAuth-based connections (SharePoint, Office 365, Teams) cannot be fully automated in ARM — a human must authorize the connection after deployment. MSI-based connections (Sentinel, WDATP, Blob with MSI) can be fully automated.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-azure-resource-manager-templates"
+    },
+    {
+      "fact": "Workflow definition parameters live in definition.parameters with type and optional defaultValue. They are different from ARM template parameters. Reference them in actions as @parameters('ParamName'). Supported types: string, securestring, int, float, bool, array, object, secureobject.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language"
+    },
+    {
+      "fact": "securestring and secureobject definition parameter values are automatically redacted from run history. Use these types for any credential or sensitive config value passed into the workflow.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app"
+    },
+    {
+      "fact": "To enable a System-assigned managed identity on a Logic App ARM resource, set identity.type: 'SystemAssigned'. The principalId and tenantId are populated after deployment and available via reference().",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity"
+    },
+    {
+      "fact": "allowedValues on a definition parameter restricts accepted values in the designer for authoring validation only. It is NOT enforced at runtime. Do not rely on it for security.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language"
+    }
+  ],
+  "arm_template_full_example": {
+    "description": "Complete ARM template deploying a Logic App with a Blob Storage connection and MSI",
+    "template": {
+      "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "logicAppName": {
+          "type": "string",
+          "defaultValue": "my-security-workflow"
+        },
+        "location": {
+          "type": "string",
+          "defaultValue": "[resourceGroup().location]"
+        },
+        "storageAccountName": {
+          "type": "string"
+        },
+        "storageAccountKey": {
+          "type": "securestring"
+        }
+      },
+      "resources": [
+        {
+          "type": "Microsoft.Web/connections",
+          "apiVersion": "2016-06-01",
+          "name": "azureblob",
+          "location": "[parameters('location')]",
+          "properties": {
+            "displayName": "blob-connection",
+            "api": {
+              "id": "[subscriptionResourceId('Microsoft.Web/locations/managedApis', parameters('location'), 'azureblob')]"
+            },
+            "parameterValues": {
+              "accountName": "[parameters('storageAccountName')]",
+              "accessKey": "[parameters('storageAccountKey')]"
+            }
+          }
+        },
+        {
+          "type": "Microsoft.Logic/workflows",
+          "apiVersion": "2019-05-01",
+          "name": "[parameters('logicAppName')]",
+          "location": "[parameters('location')]",
+          "identity": {
+            "type": "SystemAssigned"
+          },
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/connections', 'azureblob')]"
+          ],
+          "properties": {
+            "state": "Enabled",
+            "definition": {
+              "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+              "contentVersion": "1.0.0.0",
+              "parameters": {
+                "workspaceName": {
+                  "type": "string",
+                  "defaultValue": "my-workspace"
+                },
+                "$connections": {
+                  "type": "Object",
+                  "defaultValue": {}
+                }
+              },
+              "triggers": {
+                "Recurrence": {
+                  "type": "Recurrence",
+                  "recurrence": {
+                    "frequency": "Hour",
+                    "interval": 1
+                  }
+                }
+              },
+              "actions": {
+                "List_Blobs": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['azureblob']['connectionId']"
+                      }
+                    },
+                    "method": "get",
+                    "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/foldersV2/@{encodeURIComponent(encodeURIComponent('/mycontainer'))}"
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "parameters": {
+              "workspaceName": {"value": "[parameters('logicAppName')]"},
+              "$connections": {
+                "value": {
+                  "azureblob": {
+                    "connectionId": "[resourceId('Microsoft.Web/connections', 'azureblob')]",
+                    "connectionName": "azureblob",
+                    "id": "[subscriptionResourceId('Microsoft.Web/locations/managedApis', parameters('location'), 'azureblob')]"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "connections_block_structure": {
+    "description": "The $connections value block: connectionId, connectionName, and id are all required.",
+    "single_connection_entry": {
+      "azuresentinel": {
+        "connectionId": "/subscriptions/{subId}/resourceGroups/{rg}/providers/Microsoft.Web/connections/{name}",
+        "connectionName": "{name}",
+        "id": "/subscriptions/{subId}/providers/Microsoft.Web/locations/{region}/managedApis/Azuresentinel",
+        "connectionProperties": {
+          "authentication": {
+            "type": "ManagedServiceIdentity"
+          }
+        }
+      }
+    },
+    "field_descriptions": {
+      "connectionId": "ARM resource ID of the Microsoft.Web/connections instance — the specific connection",
+      "connectionName": "Short name string matching the connection resource name",
+      "id": "ARM ID of the managed API catalog entry — same per region+connector, not per connection",
+      "connectionProperties": "Optional — required for MSI-authenticated connections. auth.type: ManagedServiceIdentity"
+    },
+    "connector_managed_api_ids": {
+      "azuresentinel": "managedApis/Azuresentinel",
+      "wdatp": "managedApis/Wdatp",
+      "keyvault": "managedApis/keyvault",
+      "office365": "managedApis/office365",
+      "teams": "managedApis/teams",
+      "azureblob": "managedApis/azureblob",
+      "servicebus": "managedApis/servicebus",
+      "sharepointonline": "managedApis/sharepointonline",
+      "azuread": "managedApis/azuread",
+      "azuremonitorlogs": "managedApis/azuremonitorlogs",
+      "azureeventgrid": "managedApis/azureeventgrid",
+      "note": "Case matters. Azuresentinel and Wdatp use capital first letters. All others are lowercase."
+    }
+  },
+  "msi_connection_arm_pattern": {
+    "description": "Microsoft.Web/connections for MSI-authenticated connectors (Sentinel, WDATP). No credentials in parameterValues.",
+    "connection_resource": {
+      "type": "Microsoft.Web/connections",
+      "apiVersion": "2016-06-01",
+      "name": "azuresentinel",
+      "location": "[parameters('location')]",
+      "properties": {
+        "displayName": "azuresentinel-connection",
+        "api": {
+          "id": "[subscriptionResourceId('Microsoft.Web/locations/managedApis', parameters('location'), 'azuresentinel')]"
+        },
+        "parameterValues": {}
+      }
+    },
+    "logic_app_connections_value_entry": {
+      "azuresentinel": {
+        "connectionId": "[resourceId('Microsoft.Web/connections', 'azuresentinel')]",
+        "connectionName": "azuresentinel",
+        "id": "[subscriptionResourceId('Microsoft.Web/locations/managedApis', parameters('location'), 'Azuresentinel')]",
+        "connectionProperties": {
+          "authentication": {
+            "type": "ManagedServiceIdentity"
+          }
+        }
+      }
+    }
+  },
+  "definition_parameters_pattern": {
+    "description": "Workflow definition parameters for non-secret configurable values.",
+    "definition_parameters_block": {
+      "tenantId": {
+        "type": "string",
+        "defaultValue": "00000000-0000-0000-0000-000000000000",
+        "metadata": {
+          "description": "Azure AD tenant ID"
+        }
+      },
+      "alertSeverityThreshold": {
+        "type": "string",
+        "defaultValue": "High",
+        "allowedValues": ["Low", "Medium", "High", "Critical"]
+      },
+      "notificationRecipients": {
+        "type": "array",
+        "defaultValue": ["security@contoso.com"]
+      },
+      "apiBaseUrl": {
+        "type": "string",
+        "defaultValue": "https://api.contoso.com"
+      },
+      "apiSecret": {
+        "type": "securestring"
+      },
+      "$connections": {
+        "type": "Object",
+        "defaultValue": {}
+      }
+    },
+    "reference_in_action": "@parameters('tenantId')",
+    "arm_properties_parameters_override": {
+      "tenantId": {"value": "[parameters('armTenantId')]"},
+      "alertSeverityThreshold": {"value": "High"},
+      "$connections": {"value": {}}
+    },
+    "key_facts": [
+      "Definition parameters are scoped to the workflow. ARM template parameters are separate.",
+      "Only $connections needs a corresponding entry in ARM properties.parameters. Other definition params get values from properties.parameters overrides or fall back to defaultValue.",
+      "securestring parameters are redacted from run history. Use them for API keys and passwords.",
+      "allowedValues enforces design-time validation only — not runtime enforcement.",
+      "metadata.description appears in the designer and ARM template documentation."
+    ]
+  },
+  "arm_deployment_reference": {
+    "workflow_resource_type": "Microsoft.Logic/workflows",
+    "workflow_api_version": "2019-05-01",
+    "connection_resource_type": "Microsoft.Web/connections",
+    "connection_api_version": "2016-06-01",
+    "definition_schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "state_values": ["Enabled", "Disabled"],
+    "identity_types": ["SystemAssigned", "UserAssigned", "None"]
+  },
+  "implementation_notes": [
+    "Always create Microsoft.Web/connections resources first and add them to dependsOn in the Logic App resource. Deploying the Logic App before the connection exists causes a runtime authentication failure.",
+    "The id field in the $connections value entry must point to the managed API catalog (subscriptionResourceId), NOT to the connection instance. These are different resource IDs.",
+    "For MSI-authenticated connections, add connectionProperties: { authentication: { type: ManagedServiceIdentity } } to the connection entry. This field is absent for OAuth connections.",
+    "OAuth-based connections (Office 365, SharePoint, Teams) must be manually authorized by a user after deployment. Automate only MSI-based connections end-to-end.",
+    "Use ARM template parameters (securestring) to pass credentials to Microsoft.Web/connections.properties.parameterValues. Never hardcode credentials in ARM templates.",
+    "For Azuresentinel and Wdatp, the managed API id in the catalog uses capital first letters (Azuresentinel, Wdatp). Other connectors use lowercase. Getting the casing wrong causes a deployment failure.",
+    "Workflow definition parameters with defaultValue are self-contained. They do not need ARM-level parameter inputs unless you want to override the default at deploy time.",
+    "To export a deployed Logic App to ARM: use the Logic App Designer 'Download' → 'ARM template', or az logic workflow show --out json. The exported template includes the definition and connection IDs."
+  ],
+  "common_failures": [
+    "Missing dependsOn on the Logic App resource — connection is not yet created when the Logic App is provisioned, causing a deployment race.",
+    "id in $connections value pointing to the connection instance instead of the catalog — runtime auth failure.",
+    "connectionId pointing to the catalog instead of the instance — runtime auth failure.",
+    "Wrong casing in managed API id (azuresentinel instead of Azuresentinel) — ARM fails to resolve the API.",
+    "OAuth connection not authorized after deployment — Logic App runs but connector actions return 401.",
+    "Missing $connections in definition.parameters — the @parameters('$connections') expression resolves to null at runtime.",
+    "Deploying the Logic App with state: Disabled and forgetting to enable it — Logic App never runs.",
+    "Using string instead of securestring for credential parameters — values appear in ARM deployment history and run history."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-azure-resource-manager-templates-overview",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-azure-resource-manager-templates",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-deploy-azure-resource-manager-templates",
+    "https://learn.microsoft.com/en-us/azure/templates/microsoft.logic/workflows",
+    "https://learn.microsoft.com/en-us/azure/templates/microsoft.web/connections",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-triggers-reference",
+    "azure-logic-apps-sentinel-incident-playbook",
+    "azure-logic-apps-http-auth-and-inline-code",
+    "azure-logic-apps-security-and-identity"
+  ],
+  "source_projects": ["manual-analysis"]
+}

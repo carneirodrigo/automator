@@ -193,7 +193,10 @@ def load_api_secrets(config_dir: Path | None = None) -> dict[str, Any]:
 
 def _canonical_backend_name(agent_bin: str) -> str:
     """Map an agent binary name (e.g., 'claude', '/usr/bin/gemini') to a canonical config key."""
-    parts = shlex.split(agent_bin)
+    try:
+        parts = shlex.split(agent_bin)
+    except ValueError:
+        parts = [agent_bin]
     binary_name = parts[0].lower() if parts else ""
     for alias, canonical in _BACKEND_ALIASES.items():
         if alias in binary_name:

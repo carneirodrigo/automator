@@ -210,7 +210,6 @@ def run_agent_api(
         session=session,
     )
     prompt_tokens = estimate_tokens(prompt)
-    is_toon_available()
     emit_progress(stage_start_message(role, task, prompt_tokens=prompt_tokens))
 
     resolved_timeout = timeout_seconds or 660

@@ -103,12 +103,6 @@ class _FakeCodexToolPopen:
     def kill(self):
         self.returncode = -9
 
-    def wait(self):
-        pass
-
-    def kill(self):
-        self.returncode = -9
-
 
 class _FakeCodexSessionPopen:
     """Fake Popen that emits a Codex thread.started event before the final message."""

@@ -964,7 +964,13 @@ def _build_processed_inputs(
             source_agent = data.get("agent", p.name.split("_result_")[0] if "_result_" in p.name else "unknown")
             source_status = data.get("status", "unknown")
             tech_data = data.get("technical_data", data)
-            processed_inputs.append(f"Artifact from {source_agent} (status: {source_status}): {p.name}\n{serialize_artifact_for_prompt(tech_data, source_role=source_agent)}")
+            serialized = serialize_artifact_for_prompt(tech_data, source_role=source_agent)
+            if source_agent == "research":
+                # Two separate elements so the compaction system can drop [header, data] as a pair.
+                processed_inputs.append(f"\nResearch Artifact Summary (status: {source_status}): {p.name}")
+                processed_inputs.append(serialized)
+            else:
+                processed_inputs.append(f"Artifact from {source_agent} (status: {source_status}): {p.name}\n{serialized}")
         else:
             processed_inputs.append(_summarize_input_file(p))
     return processed_inputs
@@ -982,7 +988,11 @@ def build_prompt(
     expected_result_shape: dict[str, Any] | None = None,
     session: AgentSession | None = None,
 ) -> str:
-    agent_spec = (REPO_ROOT / "agents" / f"{role}.md").read_text(encoding="utf-8")
+    spec_path = REPO_ROOT / "agents" / f"{role}.md"
+    try:
+        agent_spec = spec_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Agent spec not found for role '{role}': {spec_path}") from None
 
     agent_spec = minify_text(agent_spec)
     agent_spec = _strip_execution_prompt_template(agent_spec)
@@ -1139,6 +1149,7 @@ configure_orchestrator_environment(
     save_last_active_project=save_last_active_project,
     _get_project_input_paths=_get_project_input_paths,
     REGISTRY_PATH=REGISTRY_PATH,
+    extract_project_knowledge=_extract_project_knowledge,
 )
 
 
@@ -1213,7 +1224,11 @@ def purge_project_knowledge(project_id: str) -> int:
             continue
 
         entry_file = entry.get("file", "")
-        entry_path = KNOWLEDGE_DIR / entry_file if entry_file else None
+        if entry_file:
+            candidate = (KNOWLEDGE_DIR / entry_file).resolve()
+            entry_path = candidate if candidate.is_relative_to(KNOWLEDGE_DIR.resolve()) else None
+        else:
+            entry_path = None
         owns_entry = entry.get("source_project_id") == project_id
 
         if owns_entry:

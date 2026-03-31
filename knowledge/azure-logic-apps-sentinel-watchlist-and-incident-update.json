@@ -1,0 +1,399 @@
+{
+  "id": "azure-logic-apps-sentinel-watchlist-and-incident-update",
+  "title": "Azure Logic Apps - Sentinel Watchlist Lookup, Account Entity Extraction, And Incident Update",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Sentinel playbooks that extract Account entities and resolve UPNs",
+    "Playbooks that fetch Sentinel watchlist items and check accounts against them",
+    "Workflows that update incident severity, add tags, and rename titles based on watchlist matches"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Account entities are extracted from a Sentinel incident using POST /entities/account on the azuresentinel connector (not /entities/host). The response body is body('Entities_-_Get_Accounts')?['Accounts'] — an array where each item may contain 'AadUserId', 'Name', and 'UPNSuffix' fields.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Entities_-_Get_Accounts action and foreach over ?['Accounts']"
+    },
+    {
+      "fact": "Account entities may or may not have an AadUserId field. The production pattern checks for it with contains(items('loop'), 'aadUserId'). If present, use the Azure AD connector to look up the UPN. If absent, construct UPN as concat(Name, string('@'), UPNSuffix).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Check_for_aadUserId Condition with true/else branches"
+    },
+    {
+      "fact": "The Azure AD connector (key: 'azuread') supports GET /v1.0/users/@{encodeURIComponent(aadUserId)} to resolve a user object. The UPN is at body('Get_user')?['userPrincipalName']. The connector uses empty connectionProperties (OAuth delegated auth, not MSI).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Get_user action and azuread $connections block"
+    },
+    {
+      "fact": "The Azure AD managed API ARM ID uses lowercase: .../managedApis/azuread. The connection uses empty connectionProperties (delegated OAuth, not ManagedServiceIdentity).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections azuread block"
+    },
+    {
+      "fact": "Sentinel Watchlist items are retrieved via GET on the azuresentinel connector using path: /Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent(parameters('WatchlistName'))}/watchlistItems",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Watchlists_-_Get_all_watchlist_Items_for_a_given_watchlist"
+    },
+    {
+      "fact": "Workspace context for watchlist path comes from the trigger: SubscriptionId and ResourceGroupName are at triggerBody()?['workspaceInfo']?['SubscriptionId'] and triggerBody()?['workspaceInfo']?['ResourceGroupName']. The workspace ID is at triggerBody()?['workspaceId'].",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Watchlists path expressions"
+    },
+    {
+      "fact": "The watchlist name should be a workflow definition parameter (type: String, defaultValue: 'WatchlistName') rather than hardcoded, so it can be overridden per deployment. Reference it as parameters('WatchlistName').",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — WatchlistName definition parameter with defaultValue: 'RiskMonitoredUsers'"
+    },
+    {
+      "fact": "The Watchlist items ParseJson schema uses dot-notation field names. The watchlist item field is 'properties.itemsKeyValue' (with a literal dot in the key name). Access it as items('loop')?['properties.itemsKeyValue']?['ColumnName']. Logic Apps handles dot-notation keys in ParseJson schemas correctly.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Parse_JSON_-_Watchlist_Items schema"
+    },
+    {
+      "fact": "For case-insensitive watchlist membership checks, build the watchlist array with toLower() applied during append: toLower(items('loop')?['properties.itemsKeyValue']?['Username']). Then check membership with contains(variables('watchlistAccounts'), toLower(currentItem)).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Append_to_watchlistAccounts uses toLower; IF_Watchlist contains check uses toLower on the entity"
+    },
+    {
+      "fact": "contains() on an array variable checks for value membership (not substring). contains(variables('arrayVar'), value) returns true if value is an element of the array. This is different from contains(string, substring).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — IF_Watchlist_Contains_Valid_Account expression"
+    },
+    {
+      "fact": "AppendToStringVariable (type: AppendToStringVariable) appends a string fragment to an existing string variable. inputs.name is the variable name, inputs.value is the string to append. This is the string equivalent of AppendToArrayVariable.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Append_to_finalCommentString"
+    },
+    {
+      "fact": "The Terminate action (type: Terminate) ends a workflow run with a specified status. inputs.runStatus can be 'Cancelled', 'Failed', or 'Succeeded'. Use it for early exits when there is no work to do (e.g., no entities found).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Cancel_Run action with runStatus: 'Cancelled'"
+    },
+    {
+      "fact": "The Sentinel Update incident action uses PUT /Incidents on the azuresentinel connector. Body fields: incidentArmId (full ARM ID), severity (string), title (string), tagsToAdd. The tagsToAdd structure is: { 'TagsToAdd': [{ 'Tag': 'tagname' }] }.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Update_incident actions in Switch cases"
+    },
+    {
+      "fact": "Incident severity escalation pattern: Switch on @triggerBody()?['object']?['properties']?['severity'] with string cases 'Informational', 'Low', 'Medium'. Each case upgrades severity by one level. The default case sets High (covers 'High' and any unknown values).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Switch on severity with Informational→Low, Low→Medium, Medium→High, default→High"
+    },
+    {
+      "fact": "Incident title can be prepended via the Update incident action title field. Production pattern: 'RISKY USER - @{triggerBody()?[\\'object\\'?[\\'properties\\']?[\\'title\\']}' to flag incidents matching a watchlist.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — title field in all Update_incident actions"
+    },
+    {
+      "fact": "length() is the correct expression function to count items in an array variable or string. Use @length(variables('arrayVar')) in a condition with equals or greater to check if an array is empty or non-empty.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — IF_entityValidAccounts_Len_is_zero uses equals(@length(...), 0); Modify_Incident... uses greater(@length(...), 0)"
+    },
+    {
+      "fact": "Workflow definition parameters (not $connections) can carry configuration values like watchlist names. Define them in definition.parameters with type and defaultValue. Reference as parameters('ParamName') in expressions. Root-level parameters block does not need an entry for these — they live only in the definition.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — WatchlistName parameter in definition.parameters with defaultValue: 'RiskMonitoredUsers'"
+    }
+  ],
+  "account_entity_extraction_pattern": {
+    "description": "Extract account entities from a Sentinel incident, resolve UPNs via AadUserId lookup or Name+UPNSuffix construction",
+    "Entities_-_Get_Accounts": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {"name": "@parameters('$connections')['azuresentinel']['connectionId']"}
+        },
+        "method": "post",
+        "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+        "path": "/entities/account"
+      },
+      "note": "Response is body('Entities_-_Get_Accounts')?['Accounts'] — array with fields AadUserId (optional), Name, UPNSuffix"
+    },
+    "UPN_resolution_in_foreach": {
+      "description": "For each account entity: use AadUserId if present, else construct UPN from Name+UPNSuffix",
+      "Check_for_aadUserId": {
+        "type": "If",
+        "expression": {
+          "and": [{"contains": ["@items('foreach_action')", "aadUserId"]}]
+        },
+        "actions": {
+          "Get_user": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {"connection": {"name": "@parameters('$connections')['azuread']['connectionId']"}},
+              "method": "get",
+              "path": "/v1.0/users/@{encodeURIComponent(items('foreach_action')?['AadUserId'])}"
+            }
+          },
+          "Append_to_entityValidAccounts2": {
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "entityValidAccounts",
+              "value": "@body('Get_user')?['userPrincipalName']"
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Append_to_entityValidAccounts": {
+              "type": "AppendToArrayVariable",
+              "inputs": {
+                "name": "entityValidAccounts",
+                "value": "@concat(items('foreach_action')?['Name'], string('@'), items('foreach_action')?['UPNSuffix'])"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "watchlist_retrieval_pattern": {
+    "Watchlists_-_Get_all_watchlist_Items_for_a_given_watchlist": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {"name": "@parameters('$connections')['azuresentinel']['connectionId']"}
+        },
+        "method": "get",
+        "path": "/Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent(parameters('WatchlistName'))}/watchlistItems"
+      }
+    },
+    "Parse_JSON_Watchlist_Items": {
+      "type": "ParseJson",
+      "inputs": {
+        "content": "@body('Watchlists_-_Get_all_watchlist_Items_for_a_given_watchlist')",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "properties": {
+              "type": "object",
+              "properties": {
+                "watchlistItems": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "properties.itemsKeyValue": {
+                        "type": "object",
+                        "properties": {
+                          "Username": {"type": "string"}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Get_Watchlist_Usernames_foreach": {
+      "description": "Populate a lowercase watchlist array from parsed watchlist items",
+      "type": "Foreach",
+      "foreach": "@body('Parse_JSON_-_Watchlist_Items')?['properties']?['watchlistItems']",
+      "actions": {
+        "Append_to_watchlistAccounts": {
+          "type": "AppendToArrayVariable",
+          "inputs": {
+            "name": "watchlistAccounts",
+            "value": "@toLower(items('Get_Watchlist_Usernames')?['properties.itemsKeyValue']?['Username'])"
+          }
+        }
+      }
+    },
+    "note": "Access watchlist column values as items('loop')?['properties.itemsKeyValue']?['ColumnName']. The dot in 'properties.itemsKeyValue' is a literal key name, not a path separator."
+  },
+  "watchlist_membership_check_pattern": {
+    "description": "Case-insensitive check: does watchlist array contain the current entity UPN?",
+    "IF_Watchlist_Contains_Valid_Account": {
+      "type": "If",
+      "expression": {
+        "and": [
+          {
+            "contains": [
+              "@variables('watchlistAccounts')",
+              "@toLower(items('Check_Each_Valid_Account_Against_Watchlist_Usernames'))"
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "Append_to_matchingUsers": {
+          "type": "AppendToArrayVariable",
+          "inputs": {
+            "name": "matchingUsers",
+            "value": "@items('Check_Each_Valid_Account_Against_Watchlist_Usernames')"
+          }
+        }
+      }
+    },
+    "note": "contains(array, value) checks membership; toLower() on both sides ensures case-insensitive matching."
+  },
+  "terminate_action_pattern": {
+    "Cancel_Run": {
+      "type": "Terminate",
+      "inputs": {
+        "runStatus": "Cancelled"
+      }
+    },
+    "note": "Use Terminate with runStatus 'Cancelled' for clean early exits when there is nothing to process (e.g., no entities found). runStatus can also be 'Failed' (to mark as error) or 'Succeeded'."
+  },
+  "update_incident_pattern": {
+    "description": "Update a Sentinel incident's severity, add tags, and rename the title",
+    "Update_incident": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {"name": "@parameters('$connections')['azuresentinel']['connectionId']"}
+        },
+        "method": "put",
+        "path": "/Incidents",
+        "body": {
+          "incidentArmId": "@triggerBody()?['object']?['id']",
+          "severity": "High",
+          "title": "RISKY USER - @{triggerBody()?['object']?['properties']?['title']}",
+          "tagsToAdd": {
+            "TagsToAdd": [
+              {"Tag": "UserinWatchList"}
+            ]
+          }
+        }
+      }
+    },
+    "note": "method is PUT (not POST) for incident updates. tagsToAdd wraps the array in a 'TagsToAdd' key."
+  },
+  "severity_escalation_switch_pattern": {
+    "description": "Switch on current incident severity and escalate by one level",
+    "Switch": {
+      "type": "Switch",
+      "expression": "@triggerBody()?['object']?['properties']?['severity']",
+      "cases": {
+        "Case": {
+          "case": "Informational",
+          "actions": {"Update_incident": {"note": "set severity: Low"}}
+        },
+        "Case_2": {
+          "case": "Low",
+          "actions": {"Update_incident_2": {"note": "set severity: Medium"}}
+        },
+        "Case_3": {
+          "case": "Medium",
+          "actions": {"Update_incident_3": {"note": "set severity: High"}}
+        }
+      },
+      "default": {
+        "actions": {"Update_incident_4": {"note": "set severity: High — covers High and unknown values"}}
+      }
+    },
+    "note": "Switch cases on severity use string values ('Informational', 'Low', 'Medium'). Default handles 'High' and any unexpected value."
+  },
+  "append_to_string_variable_pattern": {
+    "Append_to_finalCommentString": {
+      "type": "AppendToStringVariable",
+      "inputs": {
+        "name": "finalCommentString",
+        "value": "@{items('For_each_Comment_Creation')}<br>"
+      }
+    },
+    "note": "AppendToStringVariable concatenates the value to an existing string variable in place. Use it inside a foreach to build a multi-line HTML string (e.g., UPNs separated by <br> for a Sentinel comment)."
+  },
+  "length_in_condition_patterns": {
+    "empty_check": {
+      "expression": {"and": [{"equals": ["@length(variables('arrayVar'))", 0]}]},
+      "note": "Check if array is empty before proceeding — use with Terminate to cancel if nothing to process."
+    },
+    "non_empty_check": {
+      "expression": {"and": [{"greater": ["@length(variables('arrayVar'))", 0]}]},
+      "note": "Check if array has items before taking action — gate the notification/update block on this."
+    }
+  },
+  "definition_parameter_pattern": {
+    "description": "Workflow definition-level parameters for configurable values (not secrets)",
+    "definition_parameters": {
+      "WatchlistName": {
+        "defaultValue": "RiskMonitoredUsers",
+        "type": "String"
+      },
+      "$connections": {
+        "type": "Object",
+        "defaultValue": {}
+      }
+    },
+    "note": "Definition parameters live in definition.parameters. They have defaultValue and can be overridden at deploy time. Reference as parameters('WatchlistName') in expressions. The root-level parameters block only needs $connections — other definition parameters do not require a root-level entry."
+  },
+  "azuread_connector_pattern": {
+    "Get_user_by_aadUserId": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {"name": "@parameters('$connections')['azuread']['connectionId']"}
+        },
+        "method": "get",
+        "path": "/v1.0/users/@{encodeURIComponent(items('foreach')?['AadUserId'])}"
+      },
+      "note": "Response body contains the user object. UPN is at body('Get_user')?['userPrincipalName']."
+    },
+    "connections_block": {
+      "azuread": {
+        "id": "/subscriptions/{sub_id}/providers/Microsoft.Web/locations/{region}/managedApis/azuread",
+        "connectionId": "/subscriptions/{sub_id}/resourceGroups/{rg}/providers/Microsoft.Web/connections/{connection_name}",
+        "connectionName": "{connection_name}",
+        "connectionProperties": {}
+      },
+      "note": "The Azure AD connector uses empty connectionProperties — OAuth delegated auth, not ManagedServiceIdentity. ARM ID uses lowercase: .../managedApis/azuread."
+    }
+  },
+  "implementation_notes": [
+    "Use /entities/account (not /entities/host) for user/account entity extraction. The response array key is 'Accounts', not 'Hosts'.",
+    "Account entities may have AadUserId (Entra ID object GUID) or just Name + UPNSuffix. Always handle both cases — check for 'aadUserId' field presence using contains(item, 'aadUserId') before deciding which branch to take.",
+    "When using the Azure AD connector to resolve a user by AadUserId, the UPN is at body('Get_user')?['userPrincipalName']. The AadUserId must be URL-encoded in the path.",
+    "Always terminate early (Terminate action with runStatus: Cancelled) when no entities are found before running watchlist lookups. This avoids unnecessary API calls.",
+    "Sentinel watchlist path requires three encodeURIComponent calls: SubscriptionId, ResourceGroupName, and workspaceId from the trigger, plus the watchlist name from a parameter.",
+    "The watchlist ParseJson schema key 'properties.itemsKeyValue' contains a literal dot — it is a single key name, not a nested path. Access it as items('loop')?['properties.itemsKeyValue']?['ColumnName'].",
+    "Build the watchlist membership array with toLower() applied during the append step (not at comparison time) to avoid calling toLower() on every comparison. Then toLower() the entity at comparison time for case-insensitive matching.",
+    "contains(array, value) and contains(string, substring) are the same function but behave differently based on the first argument type. For membership checks, pass the array variable as the first argument.",
+    "AppendToStringVariable is the correct action to accumulate HTML content inside a foreach. Initialize the variable as an empty string before the loop.",
+    "Update incident uses PUT /Incidents (not POST). Always include incidentArmId from triggerBody()?['object']?['id'].",
+    "tagsToAdd must be wrapped in a 'TagsToAdd' key: { 'TagsToAdd': [{ 'Tag': 'tagname' }] }. Using a flat array will not work.",
+    "Severity escalation via Switch on string severity values. The default case must handle 'High' to avoid leaving it at High with no update action — or intentionally skip it with an empty default.",
+    "Workflow definition parameters (non-connection config like watchlist names) belong in definition.parameters with defaultValue. Do not hardcode them in the path or action inputs."
+  ],
+  "common_failures": [
+    "Using /entities/host instead of /entities/account — the response structure differs (Accounts vs Hosts array).",
+    "Not checking for AadUserId presence — treating all entities as having a UPN, causing null UPNs when the field is absent.",
+    "Forgetting encodeURIComponent on the AadUserId path parameter — produces 400 if the GUID contains hyphens (it always does).",
+    "Watchlist path: missing encodeURIComponent on one of the three dynamic segments — produces 404.",
+    "Accessing watchlist column as items('loop')?['properties']?['itemsKeyValue']?['Column'] — incorrect; the key is 'properties.itemsKeyValue' with a literal dot, not a nested path.",
+    "Case-sensitive watchlist comparison — toLower() missing on one side causes mismatches when casing differs between incident entity and watchlist entry.",
+    "Using contains(string, substring) when the intent is array membership — Logic Apps will match substrings in the serialized array string representation, not exact element membership.",
+    "AppendToArrayVariable and AppendToStringVariable run inside a parallel foreach by default — race conditions can cause missing or duplicate entries. Set the foreach to sequential if using append.",
+    "Update incident body missing 'TagsToAdd' wrapper — tagsToAdd must be { 'TagsToAdd': [{ 'Tag': '...' }] }, not a flat array.",
+    "Update incident uses PUT — not POST. Using POST returns a 405."
+  ],
+  "sentinel_data_expressions": {
+    "incident_severity": "@triggerBody()?['object']?['properties']?['severity']",
+    "workspace_subscription_id": "@triggerBody()?['workspaceInfo']?['SubscriptionId']",
+    "workspace_resource_group": "@triggerBody()?['workspaceInfo']?['ResourceGroupName']",
+    "workspace_id": "@triggerBody()?['workspaceId']",
+    "account_entities_array": "@body('Entities_-_Get_Accounts')?['Accounts']",
+    "account_aad_user_id": "@items('foreach')?['AadUserId']",
+    "account_name": "@items('foreach')?['Name']",
+    "account_upn_suffix": "@items('foreach')?['UPNSuffix']"
+  },
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/sentinel/automate-responses-with-playbooks",
+    "https://learn.microsoft.com/en-us/connectors/azuresentinel/",
+    "https://learn.microsoft.com/en-us/connectors/azuread/"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-sentinel-incident-playbook",
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-control-flow-and-state",
+    "azure-logic-apps-graph-http-msi-and-keyvault"
+  ],
+  "source_projects": ["manual-analysis"]
+}

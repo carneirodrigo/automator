@@ -1,0 +1,381 @@
+{
+  "id": "azure-logic-apps-control-flow-code-patterns",
+  "title": "Azure Logic Apps - Control Flow Code Patterns: Until, Scope, Delay, Parallel, Variables",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps using Until loops for polling or do-while patterns",
+    "Logic Apps using Scope for try-catch error handling",
+    "Logic Apps using Delay (Wait) for timed pauses",
+    "Logic Apps with parallel branches and controlled forEach concurrency",
+    "Logic Apps using IncrementVariable and DecrementVariable"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Until action type is 'Until'. The loop body runs first, then the expression is checked — true do-while semantics. limit.count is the max iteration cap (default 60, max 5000). limit.timeout is ISO 8601. Hitting either limit makes the Until action status Failed.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops"
+    },
+    {
+      "fact": "Scope action type is 'Scope'. It groups actions into a named unit. The Scope's own status (Succeeded/Failed/Skipped/TimedOut) is the aggregate status of its contained actions. Use runAfter on a downstream Scope to implement catch/finally patterns.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes"
+    },
+    {
+      "fact": "result('ScopeName') returns an array of result objects for all top-level actions inside the scope. Each item has: name, status, inputs, outputs, startTime, endTime, code. Nested scope results are not included — they must be drilled into explicitly.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes"
+    },
+    {
+      "fact": "Delay (Wait) action type is 'Wait'. Use 'interval' sub-block for duration delays, 'until' sub-block for timestamp-based delays. Both use the same type — the difference is which sub-block is present.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-delay"
+    },
+    {
+      "fact": "Parallel branches are implicit in Logic Apps — any two actions whose runAfter points to the same predecessor run in parallel automatically. A join action lists all parallel predecessors in its runAfter.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-branches"
+    },
+    {
+      "fact": "forEach parallelism is set via runtimeConfiguration.concurrency.repetitions. Range: 1 (sequential) to 50. Default is 20. Setting repetitions to 1 is equivalent to operationOptions: Sequential.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops"
+    },
+    {
+      "fact": "IncrementVariable type is 'IncrementVariable'. DecrementVariable type is 'DecrementVariable'. Both require the variable to be initialized before use. Only valid for integer and float types. The value field can be an expression.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values"
+    },
+    {
+      "fact": "retryPolicy on HTTP and ApiConnection actions: type values are 'default', 'none', 'fixed', 'exponential'. Default is exponential with 4 retries. For fixed: set count and interval. For exponential: set count, interval, minimumInterval, maximumInterval.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers"
+    },
+    {
+      "fact": "@iterationIndexes('ForeachActionName') returns the current zero-based index of the current iteration inside a forEach loop. This is the correct expression — @iterationIndex() without the action name does not work.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/workflow-definition-language-functions-reference"
+    },
+    {
+      "fact": "@result('ScopeName') returns the action results array filtered to top-level actions only. Filter it with a Query action to extract only failed items: where @equals(item()['status'], 'Failed').",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes"
+    }
+  ],
+  "until_loop_patterns": {
+    "counter_loop": {
+      "description": "Loop a fixed number of times using a counter variable",
+      "Initialize_Counter": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [{"name": "counter", "type": "integer", "value": 0}]
+        },
+        "runAfter": {}
+      },
+      "Until_Counter_Reaches_10": {
+        "type": "Until",
+        "actions": {
+          "Do_Work": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "https://api.example.com/item/@{variables('counter')}"
+            },
+            "runAfter": {}
+          },
+          "Increment_Counter": {
+            "type": "IncrementVariable",
+            "inputs": {"name": "counter", "value": 1},
+            "runAfter": {"Do_Work": ["Succeeded"]}
+          }
+        },
+        "expression": "@greaterOrEquals(variables('counter'), 10)",
+        "limit": {"count": 60, "timeout": "PT1H"},
+        "runAfter": {"Initialize_Counter": ["Succeeded"]}
+      }
+    },
+    "poll_until_complete": {
+      "description": "Poll a job status endpoint until the job completes or fails",
+      "Initialize_Status": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [{"name": "jobStatus", "type": "string", "value": "Pending"}]
+        },
+        "runAfter": {}
+      },
+      "Until_Job_Complete": {
+        "type": "Until",
+        "actions": {
+          "Check_Job_Status": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "https://api.example.com/jobs/@{variables('jobId')}/status",
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "audience": "https://management.azure.com"
+              }
+            },
+            "runAfter": {}
+          },
+          "Set_Status_Variable": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "jobStatus",
+              "value": "@body('Check_Job_Status')?['status']"
+            },
+            "runAfter": {"Check_Job_Status": ["Succeeded"]}
+          },
+          "Delay_30_Seconds": {
+            "type": "Wait",
+            "inputs": {"interval": {"count": 30, "unit": "Second"}},
+            "runAfter": {"Set_Status_Variable": ["Succeeded"]}
+          }
+        },
+        "expression": "@or(equals(variables('jobStatus'), 'Completed'), equals(variables('jobStatus'), 'Failed'))",
+        "limit": {"count": 120, "timeout": "PT2H"},
+        "runAfter": {}
+      }
+    }
+  },
+  "scope_try_catch_pattern": {
+    "description": "Use two Scopes to implement try-catch error handling. Filter failed actions using result().",
+    "Try_Scope": {
+      "type": "Scope",
+      "actions": {
+        "Call_API": {
+          "type": "Http",
+          "inputs": {
+            "method": "POST",
+            "uri": "https://api.example.com/data",
+            "body": "@triggerBody()",
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 4,
+              "interval": "PT7S",
+              "minimumInterval": "PT5S",
+              "maximumInterval": "PT1H"
+            }
+          },
+          "runAfter": {}
+        },
+        "Parse_Response": {
+          "type": "ParseJson",
+          "inputs": {
+            "content": "@body('Call_API')",
+            "schema": {"type": "object"}
+          },
+          "runAfter": {"Call_API": ["Succeeded"]}
+        }
+      },
+      "runAfter": {}
+    },
+    "Catch_Scope": {
+      "type": "Scope",
+      "actions": {
+        "Filter_Failed_Actions": {
+          "type": "Query",
+          "inputs": {
+            "from": "@result('Try_Scope')",
+            "where": "@equals(item()['status'], 'Failed')"
+          },
+          "runAfter": {}
+        },
+        "Get_Error_Details": {
+          "type": "Compose",
+          "inputs": {
+            "failedAction": "@body('Filter_Failed_Actions')[0]['name']",
+            "errorCode": "@body('Filter_Failed_Actions')[0]['code']",
+            "errorMessage": "@body('Filter_Failed_Actions')[0]['outputs']['body']"
+          },
+          "runAfter": {"Filter_Failed_Actions": ["Succeeded"]}
+        }
+      },
+      "runAfter": {
+        "Try_Scope": ["Failed", "TimedOut", "Skipped"]
+      }
+    },
+    "result_object_fields": {
+      "name": "Action name (string)",
+      "status": "Succeeded | Failed | Skipped | TimedOut",
+      "inputs": "Action inputs object",
+      "outputs": "Action outputs object (includes body, headers, statusCode)",
+      "startTime": "ISO 8601 timestamp",
+      "endTime": "ISO 8601 timestamp",
+      "code": "Error code string (when Failed)",
+      "clientTrackingId": "Correlation ID"
+    }
+  },
+  "delay_patterns": {
+    "delay_by_duration": {
+      "Delay_15_Minutes": {
+        "type": "Wait",
+        "inputs": {
+          "interval": {"count": 15, "unit": "Minute"}
+        },
+        "runAfter": {"Previous_Action": ["Succeeded"]}
+      },
+      "valid_units": ["Second", "Minute", "Hour", "Day", "Week", "Month"]
+    },
+    "delay_until_timestamp": {
+      "Delay_Until_Scheduled_Time": {
+        "type": "Wait",
+        "inputs": {
+          "until": {
+            "timestamp": "@addHours(utcNow(), 2)"
+          }
+        },
+        "runAfter": {}
+      },
+      "note": "timestamp must be ISO 8601 UTC string. Use addHours(), addDays(), or a variable containing the target time. Maximum delay is 49 days on Consumption."
+    }
+  },
+  "parallel_branch_patterns": {
+    "description": "Two or more actions referencing the same predecessor in runAfter run in parallel automatically.",
+    "example": {
+      "Parent_Action": {
+        "type": "Http",
+        "inputs": {"method": "GET", "uri": "https://api.example.com/data"},
+        "runAfter": {}
+      },
+      "Branch_A": {
+        "type": "Compose",
+        "inputs": "@body('Parent_Action')?['fieldA']",
+        "runAfter": {"Parent_Action": ["Succeeded"]}
+      },
+      "Branch_B": {
+        "type": "Compose",
+        "inputs": "@body('Parent_Action')?['fieldB']",
+        "runAfter": {"Parent_Action": ["Succeeded"]}
+      },
+      "Join_Action": {
+        "type": "Compose",
+        "inputs": {
+          "resultA": "@outputs('Branch_A')",
+          "resultB": "@outputs('Branch_B')"
+        },
+        "runAfter": {
+          "Branch_A": ["Succeeded"],
+          "Branch_B": ["Succeeded"]
+        }
+      }
+    },
+    "foreach_with_concurrency": {
+      "Process_Each_Item": {
+        "type": "Foreach",
+        "foreach": "@body('Get_Items')?['value']",
+        "actions": {
+          "Process_Item": {
+            "type": "Http",
+            "inputs": {
+              "method": "POST",
+              "uri": "https://api.example.com/process",
+              "body": "@item()"
+            },
+            "runAfter": {}
+          }
+        },
+        "runtimeConfiguration": {
+          "concurrency": {
+            "repetitions": 10
+          }
+        },
+        "runAfter": {"Get_Items": ["Succeeded"]}
+      }
+    },
+    "foreach_sequential": {
+      "runtimeConfiguration": {
+        "concurrency": {"repetitions": 1}
+      },
+      "note": "Setting repetitions to 1 forces sequential execution. Required when appending to shared variables inside the loop."
+    }
+  },
+  "variable_actions": {
+    "IncrementVariable": {
+      "type": "IncrementVariable",
+      "inputs": {
+        "name": "counter",
+        "value": 1
+      },
+      "note": "Only valid for integer and float variables. value can be an expression."
+    },
+    "DecrementVariable": {
+      "type": "DecrementVariable",
+      "inputs": {
+        "name": "counter",
+        "value": 1
+      },
+      "note": "Only valid for integer and float variables."
+    },
+    "all_variable_types": {
+      "InitializeVariable": "Declare variable — must run before any other variable action on that variable",
+      "SetVariable": "Replace variable value",
+      "IncrementVariable": "Add to integer/float in place",
+      "DecrementVariable": "Subtract from integer/float in place",
+      "AppendToArrayVariable": "Add item to end of array",
+      "AppendToStringVariable": "Concatenate string to end of string variable"
+    }
+  },
+  "retry_policy_patterns": {
+    "exponential": {
+      "retryPolicy": {
+        "type": "exponential",
+        "count": 4,
+        "interval": "PT7S",
+        "minimumInterval": "PT5S",
+        "maximumInterval": "PT1H"
+      }
+    },
+    "fixed": {
+      "retryPolicy": {
+        "type": "fixed",
+        "count": 3,
+        "interval": "PT30S"
+      }
+    },
+    "none": {
+      "retryPolicy": {"type": "none"}
+    },
+    "note": "retryPolicy goes inside the action's inputs block (same level as method, uri, body for HTTP actions). type: 'default' uses the built-in exponential backoff (4 retries). interval is ISO 8601 duration."
+  },
+  "useful_expression_patterns": {
+    "current_loop_index": "@iterationIndexes('ForeachActionName')",
+    "scope_result_array": "@result('ScopeName')",
+    "first_failed_action_name": "@result('Try_Scope')[0]['name']",
+    "first_failed_action_code": "@result('Try_Scope')[0]['code']",
+    "first_failed_action_body": "@result('Try_Scope')[0]['outputs']['body']",
+    "workflow_run_id": "@workflow()['run']['name']",
+    "workflow_name": "@workflow()['name']",
+    "current_utc": "@utcNow()",
+    "two_hours_from_now": "@addHours(utcNow(), 2)",
+    "formatted_date": "@formatDateTime(utcNow(), 'yyyy-MM-dd')"
+  },
+  "implementation_notes": [
+    "Until loop body always executes at least once. If the stop condition is already true at the start, the first iteration still runs before the condition is checked.",
+    "Always set a realistic limit.count and limit.timeout on Until loops. The default limit.count of 60 may not be enough for long-running polls. Hitting the limit produces a Failed status on the Until action.",
+    "For Scope try-catch: the Catch scope's runAfter must list the Try scope name with Failed/TimedOut/Skipped statuses. Omitting TimedOut misses timeout failures.",
+    "result() only returns top-level actions within the scope, not nested scopes or actions inside nested loops. For fine-grained error inspection, keep the Try scope flat.",
+    "Parallel branches increase throughput but are unsafe when actions inside them mutate shared variables. Use sequential forEach (repetitions: 1) or redesign to collect results in the join action.",
+    "The join action (with multiple entries in runAfter) only runs when ALL listed predecessors complete. If any listed predecessor is Skipped, the join action is also Skipped unless its runAfter includes Skipped.",
+    "Add Delay (Wait) inside an Until poll loop to avoid hammering an API. The delay runs inside the loop body, so it counts toward limit.timeout.",
+    "IncrementVariable and DecrementVariable are atomic within a single iteration but are not safe across concurrent parallel forEach iterations. Force sequential execution (repetitions: 1) if multiple iterations increment the same counter.",
+    "retryPolicy is applied per HTTP/ApiConnection action. Set type: 'none' to disable retries for actions where retrying would cause side effects (e.g. message sends, record creates)."
+  ],
+  "common_failures": [
+    "Until loop limit.count too low — loop fails before the condition is met. Increase count or timeout.",
+    "Catch scope runAfter missing 'TimedOut' — timeout failures in the Try scope cause the Catch scope to be skipped.",
+    "result() indexing with [0] when the scope has no actions — null reference error. Always filter with Query before indexing.",
+    "parallel forEach appending to shared array without sequential concurrency — race condition produces missing or duplicate entries.",
+    "Join action's runAfter not listing all parallel predecessors — join runs before all branches complete.",
+    "Delay 'until' timestamp not in UTC ISO 8601 format (missing Z suffix) — delay behavior is undefined.",
+    "IncrementVariable used on a string variable — causes runtime error. Initialize with type integer or float."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-delay",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-branches",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-control-flow-and-state",
+    "azure-logic-apps-data-operations-code-samples",
+    "azure-logic-apps-triggers-reference",
+    "azure-logic-apps-arm-template-and-deployment"
+  ],
+  "source_projects": ["manual-analysis"]
+}

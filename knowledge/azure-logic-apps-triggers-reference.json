@@ -1,0 +1,243 @@
+{
+  "id": "azure-logic-apps-triggers-reference",
+  "title": "Azure Logic Apps - Trigger Types: Recurrence, HTTP Request, and Event Grid",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps triggered on a schedule (Recurrence)",
+    "Logic Apps triggered by an inbound HTTP request (manual/webhook)",
+    "Logic Apps triggered by Azure Event Grid resource events"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Recurrence trigger uses type 'Recurrence' (not ApiConnection). It lives in the triggers block and needs no connector. frequency values: Second, Minute, Hour, Day, Week, Month.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence"
+    },
+    {
+      "fact": "The schedule sub-block (hours, minutes, weekDays) is only effective for Week and Month frequencies. Adding schedule.hours to a Day frequency trigger has no effect.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence"
+    },
+    {
+      "fact": "The startTime for a Recurrence trigger without a timezone suffix is assumed UTC. Always set timeZone explicitly to avoid DST drift.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence"
+    },
+    {
+      "fact": "The HTTP Request trigger uses type 'Request', kind 'Http'. It exposes an HTTPS inbound URL. kind is required — omitting it prevents the endpoint from being created.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres"
+    },
+    {
+      "fact": "The schema field in a Request trigger is optional but recommended. It makes trigger body properties available as typed tokens in downstream actions.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres"
+    },
+    {
+      "fact": "relativePath segments like {id} in an HTTP Request trigger become accessible as @triggerOutputs()['relativePathParameters']['id'] in downstream actions.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres"
+    },
+    {
+      "fact": "Trigger concurrency (how many simultaneous workflow runs) is controlled via runTimeConfiguration.concurrency.runs and is separate from forEach parallelism.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers"
+    },
+    {
+      "fact": "The Event Grid trigger uses type ApiConnectionWebhook. listCallbackUrl() in the body.properties.destination.endpointUrl automatically registers the Logic App's inbound URL as the Event Grid subscriber.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azureeventgrid/"
+    },
+    {
+      "fact": "splitOn on a trigger processes each element of the trigger body as a separate workflow run. For Event Grid and Service Bus triggers, splitOn: '@triggerBody()' fires one run per event/message.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers"
+    }
+  ],
+  "recurrence_trigger_patterns": {
+    "simple_hourly": {
+      "Recurrence": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Hour",
+          "interval": 1
+        }
+      }
+    },
+    "weekly_schedule": {
+      "Recurrence": {
+        "type": "Recurrence",
+        "recurrence": {
+          "frequency": "Week",
+          "interval": 1,
+          "schedule": {
+            "hours": [8, 12, 17],
+            "minutes": [0],
+            "weekDays": ["Monday", "Wednesday", "Friday"]
+          },
+          "startTime": "2026-01-01T08:00:00",
+          "timeZone": "AUS Eastern Standard Time"
+        }
+      }
+    },
+    "note": "There are no trigger outputs for Recurrence. Access the current timestamp with @utcNow() in downstream actions."
+  },
+  "http_request_trigger_pattern": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "incidentId": {"type": "string"},
+            "severity": {"type": "string"},
+            "entities": {
+              "type": "array",
+              "items": {"type": "object"}
+            }
+          },
+          "required": ["incidentId"]
+        }
+      }
+    },
+    "with_path_parameter": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "method": "POST",
+        "relativePath": "incidents/{id}",
+        "schema": {}
+      },
+      "runTimeConfiguration": {
+        "concurrency": {
+          "runs": 10,
+          "maximumWaitingRuns": 20
+        }
+      }
+    },
+    "downstream_expressions": {
+      "body_field": "@triggerBody()?['incidentId']",
+      "header": "@triggerOutputs()['headers']['Authorization']",
+      "path_parameter": "@triggerOutputs()['relativePathParameters']['id']",
+      "full_body": "@triggerBody()"
+    },
+    "note": "The inbound HTTPS URL is generated after first save and is not in the definition JSON. Callers POST to that URL. The schema determines which body tokens are available in the designer."
+  },
+  "http_response_action_pattern": {
+    "description": "Return a response to the HTTP Request trigger caller. Only valid in workflows with a Request trigger.",
+    "success_response": {
+      "Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 200,
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "status": "accepted",
+            "id": "@triggerBody()?['incidentId']"
+          }
+        },
+        "runAfter": {
+          "Process_Data": ["Succeeded"]
+        }
+      }
+    },
+    "error_response": {
+      "Error_Response": {
+        "type": "Response",
+        "kind": "http",
+        "inputs": {
+          "statusCode": 400,
+          "headers": {"Content-Type": "application/json"},
+          "body": {
+            "error": "ValidationFailed",
+            "message": "@{body('Validate')?['errorMessage']}"
+          }
+        },
+        "runAfter": {
+          "Validate": ["Failed"]
+        }
+      }
+    },
+    "key_facts": [
+      "kind: 'http' is required alongside type: 'Response'.",
+      "The HTTP caller receives the response as soon as this action runs — subsequent actions still execute asynchronously.",
+      "If Response has not run within 2 minutes of the trigger, the caller automatically receives 202 Accepted.",
+      "body can be an expression, object literal, or @body('SomeAction')."
+    ]
+  },
+  "event_grid_trigger_pattern": {
+    "When_a_resource_event_occurs": {
+      "type": "ApiConnectionWebhook",
+      "inputs": {
+        "body": {
+          "properties": {
+            "destination": {
+              "endpointType": "webhook",
+              "properties": {
+                "endpointUrl": "@{listCallbackUrl()}"
+              }
+            },
+            "filter": {
+              "includedEventTypes": [
+                "Microsoft.Storage.BlobCreated",
+                "Microsoft.Storage.BlobDeleted"
+              ]
+            }
+          }
+        },
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['azureeventgrid']['connectionId']"
+          }
+        },
+        "path": "/subscriptions/@{encodeURIComponent('{subscriptionId}')}/providers/@{encodeURIComponent('Microsoft.Storage.StorageAccounts')}/resource/eventSubscriptions",
+        "queries": {
+          "x-ms-api-version": "2017-06-15-preview"
+        }
+      },
+      "splitOn": "@triggerBody()"
+    },
+    "downstream_expressions": {
+      "event_type": "@triggerBody()?['eventType']",
+      "subject": "@triggerBody()?['subject']",
+      "blob_url_on_created": "@triggerBody()?['data']['url']",
+      "event_time": "@triggerBody()?['eventTime']"
+    },
+    "note": "listCallbackUrl() auto-registers the Logic App URL with Event Grid. splitOn fires one run per event. The path encodes the subscription ID and resource provider."
+  },
+  "trigger_type_reference": {
+    "Recurrence": "Time-based polling. No connector. No outputs.",
+    "Request (kind: Http)": "HTTP webhook. Exposes an HTTPS URL. Supports schema, relativePath, concurrency.",
+    "ApiConnectionNotification": "Managed connector polling + webhook hybrid. Used by Office 365 email trigger (V3). Requires fetch + subscribe blocks.",
+    "ApiConnectionWebhook": "Managed connector webhook. Used by Sentinel incident trigger, Event Grid. Requires listCallbackUrl() in body.",
+    "ApiConnection (polling)": "Managed connector polling. Used by Service Bus queue trigger. Has recurrence sub-block."
+  },
+  "implementation_notes": [
+    "Recurrence triggers fire based on wall-clock time, not elapsed time from last run. If a run takes longer than the interval, the next run is skipped, not queued.",
+    "For HTTP Request triggers, the method field is optional. Omitting it accepts any HTTP method.",
+    "Always define schema on HTTP Request triggers — this unlocks token access in the designer and makes body fields null-safe with ?[] in expressions.",
+    "For Event Grid triggers, the filter.includedEventTypes array restricts event types at the subscription level — only matching events fire the workflow.",
+    "The Event Grid trigger connector name in $connections is 'azureeventgrid'. The connection must be authorized and the Logic App's managed identity (or connection credentials) must have EventGrid Event Subscription Contributor rights on the resource.",
+    "splitOn processes one item per run. Without splitOn, the trigger fires once with an array body — you must iterate inside the workflow."
+  ],
+  "common_failures": [
+    "Recurrence with schedule.hours on a Day frequency — hours are ignored; only frequency + interval matters for Day.",
+    "HTTP Request trigger missing kind: 'Http' — no inbound URL is generated, the trigger is inactive.",
+    "HTTP Response action used without a Request trigger — causes a workflow validation error.",
+    "Event Grid trigger missing listCallbackUrl() in endpointUrl — Event Grid cannot call back, trigger never fires.",
+    "Missing splitOn on Event Grid or Service Bus trigger — fires once per batch rather than once per event."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers",
+    "https://learn.microsoft.com/en-us/connectors/azureeventgrid/"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-control-flow-and-state",
+    "azure-logic-apps-email-trigger-teams-notifications",
+    "azure-logic-apps-sentinel-incident-playbook",
+    "azure-logic-apps-arm-template-and-deployment"
+  ],
+  "source_projects": ["manual-analysis"]
+}

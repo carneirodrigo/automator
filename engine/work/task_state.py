@@ -8,7 +8,7 @@ from typing_extensions import TypedDict, NotRequired
 
 class PendingResolution(TypedDict):
     """Outcome requiring user action before the project can be closed."""
-    type: str               # "user_acceptance" | "review_blocked"
+    type: str               # "user_acceptance" | "review_blocked" | "user_input_required"
     message: str
     original_request: str
 

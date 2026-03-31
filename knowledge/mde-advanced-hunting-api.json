@@ -1,0 +1,147 @@
+{
+  "id": "mde-advanced-hunting-api",
+  "title": "Microsoft Defender for Endpoint - Advanced Hunting API (KQL)",
+  "source_family": "windows-security",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Running KQL queries against Microsoft Defender TVM and device telemetry from Logic Apps or other automation",
+    "Exporting Defender vulnerability, device, and software data via the Advanced Hunting endpoint"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "prerequisites": [
+    "Azure app registration with client credentials (client_id + client_secret)",
+    "App permission: WindowsDefenderATP AdvancedQuery.Read.All (or AdvancedQuery.Read)",
+    "OAuth2 token obtained for audience https://api.securitycenter.microsoft.com"
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The Advanced Hunting endpoint is POST https://api.securitycenter.microsoft.com/api/advancedqueries/run and accepts a JSON body with a single 'Query' string field containing KQL.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — confirmed working in production"
+    },
+    {
+      "fact": "The OAuth2 token scope for this endpoint is https://api.securitycenter.microsoft.com/.default (legacy securitycenter audience, not api.security.microsoft.com).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — using this scope with client credentials produces a valid Bearer token accepted by the endpoint"
+    },
+    {
+      "fact": "The response schema is an object with three top-level fields: Stats (execution metadata), Schema (array of {Name, Type} column descriptors), and Results (array of data row objects).",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App ParseJson schema"
+    },
+    {
+      "fact": "Downstream actions should always access body('action_name')?['Results'] to get the data rows. Stats and Schema are diagnostic only.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Create CSV Table action uses @body('Parse_JSON_-_Devices')?['Results']"
+    },
+    {
+      "fact": "Large KQL result sets can hit Logic Apps response size limits. Use '| take 50000' in the KQL query to cap output when the dataset may be very large.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Desktops_Legacy branch uses '| take 50000' for CVEs older than 365 days"
+    },
+    {
+      "fact": "The HTTP action for this endpoint requires runtimeConfiguration.contentTransfer.transferMode: 'Chunked' to handle large result sets without truncation.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — all HTTP calls to this endpoint set transferMode Chunked"
+    },
+    {
+      "fact": "DeviceTvmSoftwareVulnerabilities and DeviceTvmSoftwareVulnerabilitiesKB must be joined on CveId. CveId from the KB table must be cast with extend CveId = tostring(CveId) before the join.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App KQL queries"
+    },
+    {
+      "fact": "KQL OS segmentation patterns that work in production: non-Windows devices use 'where OSPlatform !startswith \"Windows\"'; Windows Server uses 'where OSPlatform startswith \"WindowsServer\"'; Windows 10/11 desktops use 'where OSPlatform startswith \"Windows1\"'.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — four parallel queries targeting different OS slices"
+    },
+    {
+      "fact": "Date-based filtering uses 'where PublishedDate > ago(365d)' for recent vulnerabilities and 'where PublishedDate < ago(365d)' for legacy/historical ones.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Desktops vs Desktops_Legacy branch split"
+    }
+  ],
+  "kql_patterns": {
+    "join_tvm_kb": "DeviceTvmSoftwareVulnerabilities\n| join kind=inner (\n    DeviceTvmSoftwareVulnerabilitiesKB\n    | extend CveId = tostring(CveId)\n    | project CveId, VulnerabilitySeverityLevel, CvssScore, PublishedDate, VulnerabilityDescription\n) on CveId\n| project OSPlatform, CVE = CveId, CvssScore, Risk = VulnerabilitySeverityLevel,\n    Host = DeviceName, OSVersion, SoftwareName, VulnerabilityDescription,\n    Solution = RecommendedSecurityUpdate, SoftwareVendor, SoftwareVersion, PublishedDate",
+    "os_filters": {
+      "non_windows": "where OSPlatform !startswith 'Windows'",
+      "windows_server": "where OSPlatform startswith 'WindowsServer'",
+      "windows_desktop": "where OSPlatform startswith 'Windows1'"
+    },
+    "large_dataset_cap": "| take 50000",
+    "recency_filter_recent": "where PublishedDate > ago(365d)",
+    "recency_filter_legacy": "where PublishedDate < ago(365d)"
+  },
+  "logic_app_action_pattern": {
+    "type": "Http",
+    "inputs": {
+      "uri": "https://api.securitycenter.microsoft.com/api/advancedqueries/run",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "@{concat('Bearer ', body('Parse_JSON')?['access_token'])}"
+      },
+      "body": {
+        "Query": "<KQL query string here>"
+      }
+    },
+    "runtimeConfiguration": {
+      "contentTransfer": {
+        "transferMode": "Chunked"
+      }
+    }
+  },
+  "parse_json_schema": {
+    "type": "object",
+    "properties": {
+      "Stats": {
+        "type": "object"
+      },
+      "Schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "Name": {"type": "string"},
+            "Type": {"type": "string"}
+          }
+        }
+      },
+      "Results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "description": "One object per query column. Properties match the projected KQL field names."
+        }
+      }
+    }
+  },
+  "implementation_notes": [
+    "Always use the securitycenter audience (https://api.securitycenter.microsoft.com/.default) for this endpoint, not the newer api.security.microsoft.com audience. Mixing them causes 403 errors.",
+    "Always add a ParseJson action after the HTTP call. Access Results through the null-safe operator: body('Parse_JSON_-_Devices')?['Results']. The ?['field'] form is required because Stats or Results may be absent on error responses.",
+    "For parallel data pulls (e.g., Devices, Servers, Desktops), all HTTP actions can share the same runAfter dependency on the token ParseJson step. No parallel container is needed — they run concurrently automatically.",
+    "Split large OS segments into separate queries rather than one combined query. The 50,000 row limit applies per query, and different OS slices have different data volumes and freshness profiles.",
+    "When the dataset is time-segmented (e.g., recent vs. legacy), use date filters in KQL rather than post-filtering in Logic Apps. This keeps response size predictable.",
+    "The Table action (type: Table, format: CSV) applied to a Results array produces a flat CSV from the projected KQL columns. Column order matches the project statement in the KQL.",
+    "Do not include Stats or Schema in the CSV output. Only pass Results to the Table action."
+  ],
+  "common_failures": [
+    "Using https://api.security.microsoft.com/.default as the token scope — this audience is rejected by the securitycenter endpoint.",
+    "Omitting contentTransfer.transferMode: Chunked on the HTTP action — large result sets are truncated silently.",
+    "Forgetting extend CveId = tostring(CveId) in the KB table before the join — the join fails or produces no rows.",
+    "Accessing body('action')?['Results'] before the ParseJson step — the raw HTTP body is not typed and the expression fails at runtime.",
+    "Running one combined query for all OS types — a single query across all devices can hit the 50,000 row limit and lose data from some segments."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/run-advanced-query-api",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/apis-intro"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "microsoft-defender-endpoint-api-auth-conventions",
+    "microsoft-defender-endpoint-devices-vulnerabilities",
+    "defender-vulnerabilities-playbook",
+    "azure-logic-apps-production-patterns"
+  ],
+  "source_projects": ["manual-analysis"]
+}

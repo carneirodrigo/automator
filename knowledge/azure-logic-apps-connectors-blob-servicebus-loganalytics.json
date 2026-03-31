@@ -1,0 +1,267 @@
+{
+  "id": "azure-logic-apps-connectors-blob-servicebus-loganalytics",
+  "title": "Azure Logic Apps - Managed Connectors: Blob Storage, Service Bus, and Azure Monitor Logs",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps reading or writing to Azure Blob Storage",
+    "Logic Apps sending or consuming Azure Service Bus messages",
+    "Logic Apps running KQL queries against Log Analytics workspaces"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Blob Storage V2 actions use double encodeURIComponent for both the storage account name and the folder/file path in path segments. Single encoding is insufficient and returns a connector error.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azureblobconnector/"
+    },
+    {
+      "fact": "Blob content retrieved from the connector is returned as $content (base64-encoded) and $content-type. To get the raw text: @base64ToString(body('Get_Blob_Content')['$content']).",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azureblobconnector/"
+    },
+    {
+      "fact": "The Blob Storage managed connector has a 50 MB per-file limit without chunking. Enable chunked transfer in action settings to support files up to 1 GB.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azureblobconnector/"
+    },
+    {
+      "fact": "Service Bus ContentData must be base64-encoded before sending. The connector does not auto-encode. Use @base64(body('Compose_Message')) to encode.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/servicebus/"
+    },
+    {
+      "fact": "To receive Service Bus messages, the trigger uses a polling pattern with a recurrence sub-block. splitOn: '@triggerBody()' processes one message per workflow run. Without splitOn, the trigger fires with an array.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/servicebus/"
+    },
+    {
+      "fact": "The Service Bus LockToken from the trigger body is required for peek-lock complete/abandon/dead-letter operations. Access it as @triggerBody()?['LockToken'].",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/servicebus/"
+    },
+    {
+      "fact": "The Azure Monitor Logs connector (key: azuremonitorlogs) runs KQL queries via POST /queryData. The response value array is at @body('action')?['value']. Max 500,000 rows. 110-second timeout.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azuremonitorlogs/"
+    },
+    {
+      "fact": "The Log Analytics query timerange field: 'Set in query' delegates time filtering to the KQL query itself (requires a TimeGenerated filter). Alternatively use preset strings like 'Last 24 hours' or 'Last 7 days'.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azuremonitorlogs/"
+    },
+    {
+      "fact": "The Azure Blob Storage connector key in $connections is 'azureblob'. The managed API ARM ID uses lowercase: .../managedApis/azureblob. Service Bus uses 'servicebus' / .../managedApis/servicebus. Azure Monitor Logs uses 'azuremonitorlogs' / .../managedApis/azuremonitorlogs.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/azureblobconnector/"
+    }
+  ],
+  "blob_storage_patterns": {
+    "create_blob": {
+      "Create_Blob": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['azureblob']['connectionId']"}
+          },
+          "method": "post",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files",
+          "queries": {
+            "folderPath": "/my-container/output",
+            "name": "@{utcNow('yyyyMMdd')}_report.json",
+            "queryParametersSingleEncoded": true
+          },
+          "body": "@body('Compose_Payload')",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      },
+      "outputs": {
+        "blob_path": "@body('Create_Blob')['Path']",
+        "blob_id": "@body('Create_Blob')['Id']"
+      }
+    },
+    "get_blob_content": {
+      "Get_Blob_Content": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['azureblob']['connectionId']"}
+          },
+          "method": "get",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/GetFileContentByPath",
+          "queries": {
+            "path": "/my-container/data/input.json",
+            "inferContentType": true,
+            "queryParametersSingleEncoded": true
+          }
+        }
+      },
+      "decode_to_text": "@base64ToString(body('Get_Blob_Content')['$content'])"
+    },
+    "list_blobs": {
+      "List_Blobs": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['azureblob']['connectionId']"}
+          },
+          "method": "get",
+          "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/foldersV2/@{encodeURIComponent(encodeURIComponent('/my-container/input'))}",
+          "queries": {
+            "useFlatListing": false,
+            "queryParametersSingleEncoded": true
+          }
+        }
+      },
+      "output_array": "@body('List_Blobs')['value']"
+    },
+    "note": "Double encodeURIComponent is required for V2 blob paths. 'AccountNameFromSettings' is a connector placeholder — parameterize the account name for deployments."
+  },
+  "service_bus_patterns": {
+    "queue_receive_trigger": {
+      "When_a_message_is_received_in_a_queue": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['servicebus']['connectionId']"}
+          },
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('my-queue'))}/messages/head",
+          "queries": {
+            "queueType": "Main"
+          }
+        },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
+        "splitOn": "@triggerBody()"
+      },
+      "trigger_body_fields": {
+        "ContentData": "base64-encoded message body — decode with @base64ToString(triggerBody()?['ContentData'])",
+        "MessageId": "Message ID string",
+        "LockToken": "Required for peek-lock complete/abandon/dead-letter",
+        "UserProperties": "Custom message properties object"
+      }
+    },
+    "send_message": {
+      "Send_Message": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['servicebus']['connectionId']"}
+          },
+          "method": "post",
+          "path": "/@{encodeURIComponent(encodeURIComponent('my-queue'))}/messages",
+          "body": {
+            "ContentData": "@{base64(body('Compose_Message'))}",
+            "ContentType": "application/json",
+            "Label": "IncidentAlert",
+            "UserProperties": {
+              "incidentId": "@{triggerBody()?['incidentId']}",
+              "severity": "@{triggerBody()?['severity']}"
+            }
+          }
+        }
+      },
+      "note": "ContentData must be base64-encoded. Label is the message subject. UserProperties carries custom metadata."
+    },
+    "complete_message_peek_lock": {
+      "Complete_Message": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['servicebus']['connectionId']"}
+          },
+          "method": "delete",
+          "path": "/@{encodeURIComponent(encodeURIComponent('my-queue'))}/messages/complete",
+          "queries": {
+            "lockToken": "@{triggerBody()?['LockToken']}",
+            "queueType": "Main",
+            "sessionId": ""
+          }
+        },
+        "runAfter": {
+          "Process_Message": ["Succeeded"]
+        }
+      },
+      "note": "For topics: replace queue path with '<topic>/subscriptions/<subscription>/messages/head'."
+    }
+  },
+  "log_analytics_patterns": {
+    "run_kql_query": {
+      "Run_Log_Analytics_Query": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"}
+          },
+          "method": "post",
+          "path": "/queryData",
+          "body": {
+            "query": "SecurityAlert\n| where TimeGenerated > ago(1h)\n| where AlertSeverity == 'High'\n| summarize count() by AlertName\n| order by count_ desc",
+            "subscriptions": ["@parameters('subscriptionId')"],
+            "resourcegroups": ["@parameters('resourceGroupName')"],
+            "resourcetype": "Log Analytics Workspace",
+            "resourcename": "@parameters('workspaceName')",
+            "timerange": "Set in query"
+          }
+        }
+      },
+      "output_array": "@body('Run_Log_Analytics_Query')?['value']",
+      "output_first_row_field": "@body('Run_Log_Analytics_Query')?['value'][0]['AlertName']"
+    },
+    "key_facts": [
+      "timerange: 'Set in query' requires a TimeGenerated filter in the KQL. Preset values: 'Last 24 hours', 'Last 7 days', 'Last 30 days'.",
+      "Max 500,000 rows returned. 110-second connector timeout.",
+      "Connector name in $connections may be 'azuremonitorlogs' or 'azuremonitorlogs_1' — check your actual connection.",
+      "Auth: Managed Identity recommended. The Logic App's MSI must have Log Analytics Reader role on the workspace.",
+      "Each row in the response value array is a JSON object with column names as keys."
+    ]
+  },
+  "connections_reference": {
+    "azureblob": {
+      "managed_api_arm_id_suffix": "managedApis/azureblob",
+      "connection_key": "azureblob",
+      "auth_options": ["accountKey", "ManagedServiceIdentity"]
+    },
+    "servicebus": {
+      "managed_api_arm_id_suffix": "managedApis/servicebus",
+      "connection_key": "servicebus",
+      "auth_options": ["connectionString", "ManagedServiceIdentity"]
+    },
+    "azuremonitorlogs": {
+      "managed_api_arm_id_suffix": "managedApis/azuremonitorlogs",
+      "connection_key": "azuremonitorlogs",
+      "auth_options": ["OAuth", "ManagedServiceIdentity", "ServicePrincipal"]
+    }
+  },
+  "implementation_notes": [
+    "Blob V2 paths require double encodeURIComponent — this is a connector-level requirement. Single encoding causes 404 or 400 even with a correct path.",
+    "Blob content is returned as base64. Always decode with @base64ToString(...) before processing as text or JSON.",
+    "Service Bus messages must be base64-encoded before sending. The connector does not encode automatically.",
+    "For Service Bus peek-lock receive, always add a Complete (or Abandon/Dead-letter) action after processing. Messages not completed within the lock timeout are re-queued.",
+    "Service Bus topics: path uses the pattern /<topic>/subscriptions/<subscription>/messages/head. Replace 'my-queue' in the queue pattern with this path.",
+    "Log Analytics queries should include | take N to cap results and avoid timeout. The connector timeout is 110 seconds regardless of row count.",
+    "For Log Analytics, use 'Set in query' timerange + explicit TimeGenerated filter in KQL. This gives precise control. Preset timerange values are coarse and ignore time-of-day.",
+    "All three connectors support MSI authentication — recommended over credential-based connections for automated deployments."
+  ],
+  "common_failures": [
+    "Blob: single encodeURIComponent on path — connector returns 404 even for an existing blob.",
+    "Blob: accessing body('Get_Blob_Content') directly as text — it is base64. Must use @base64ToString(body('Get_Blob_Content')['$content']).",
+    "Service Bus: ContentData not base64-encoded before send — message body is corrupted on the receiving end.",
+    "Service Bus: missing splitOn on trigger — fires once with a batch of messages instead of once per message.",
+    "Service Bus: LockToken not passed in Complete action — message re-queues after lock timeout even though it was processed.",
+    "Log Analytics: query without TimeGenerated filter when timerange is 'Set in query' — returns all historical data and times out.",
+    "Log Analytics: connector timeout (110s) hit before query returns — reduce result set size with | take or | summarize."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/connectors/azureblobconnector/",
+    "https://learn.microsoft.com/en-us/connectors/servicebus/",
+    "https://learn.microsoft.com/en-us/connectors/azuremonitorlogs/",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-azureblobstorage",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-arm-template-and-deployment",
+    "azure-logic-apps-control-flow-code-patterns",
+    "mde-advanced-hunting-api"
+  ],
+  "source_projects": ["manual-analysis"]
+}

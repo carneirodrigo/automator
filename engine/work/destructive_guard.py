@@ -211,7 +211,8 @@ def register_created_path(path: Path | str) -> None:
 
 def is_engine_created(path: Path | str) -> bool:
     """Return True if this path was created by the engine (current or prior session)."""
-    abs_str = str(Path(path))
+    p = Path(path)
+    abs_str = str(p.resolve() if not p.is_absolute() else p)
     if abs_str in _ENGINE_CREATED_PATHS:
         return True
     project_id = _project_id_from_path(Path(abs_str))

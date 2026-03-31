@@ -24,8 +24,11 @@ _KB_CANDIDATE_CACHE_MAX = 128
 def _load_json(path: Path) -> Any:
     if not path.exists():
         return {}
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def minify_text(text: str) -> str:

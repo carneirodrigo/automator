@@ -150,6 +150,7 @@ def _configure(
         save_last_active_project=MagicMock(),
         _get_project_input_paths=MagicMock(return_value=[]),
         REGISTRY_PATH=Path("/fake/registry.json"),
+        extract_project_knowledge=MagicMock(),
     )
 
     return active_project, task_state_path

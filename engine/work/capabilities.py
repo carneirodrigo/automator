@@ -140,6 +140,14 @@ def _bind_secret_placeholders(value: Any, secret_map: dict[str, str]) -> Any:
     return value
 
 
+def _redact_secrets_from_text(text: str, secret_map: dict[str, str]) -> str:
+    """Replace any secret values found in text with [REDACTED]."""
+    for secret_value in secret_map.values():
+        if secret_value and len(secret_value) >= 8 and secret_value in text:
+            text = text.replace(secret_value, "[REDACTED]")
+    return text
+
+
 def _write_json_file(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -447,6 +455,8 @@ def _cap_write_file(capability: str, arguments: dict[str, Any]) -> dict[str, Any
     max_size = _require("MAX_CAPABILITY_WRITE_SIZE")
     file_path = arguments.get("path", "")
     content = arguments.get("content", "")
+    if not isinstance(content, str):
+        return {"capability": capability, "status": "failed", "result": None, "issues": ["content must be a string"]}
     if len(content) > max_size:
         return {
             "capability": capability,
@@ -701,6 +711,7 @@ def _cap_http_request_with_secret_binding(capability: str, arguments: dict[str, 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
+            raw = _redact_secrets_from_text(raw, secret_map)
             content_type = resp.headers.get("Content-Type", "")
             body: Any = raw
             if "json" in content_type.lower() and raw:
@@ -721,6 +732,7 @@ def _cap_http_request_with_secret_binding(capability: str, arguments: dict[str, 
             }
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace")
+        error_body = _redact_secrets_from_text(error_body, secret_map)
         return {
             "capability": capability,
             "status": "failed",
@@ -1201,9 +1213,12 @@ def _cap_search_code(capability: str, arguments: dict[str, Any]) -> dict[str, An
         return {"capability": capability, "status": "failed", "result": None, "issues": [str(exc)]}
 
     file_glob: str | None = arguments.get("file_glob")
-    context_lines = min(int(arguments.get("context_lines", 0)), 3)
+    try:
+        context_lines = min(int(arguments.get("context_lines", 0)), 3)
+        max_matches   = min(int(arguments.get("max_matches", 50)), 200)
+    except (ValueError, TypeError) as exc:
+        return {"capability": capability, "status": "failed", "result": None, "issues": [f"Invalid numeric argument: {exc}"]}
     case_insensitive: bool = arguments.get("case_insensitive", False)
-    max_matches = min(int(arguments.get("max_matches", 50)), 200)
 
     cmd = ["grep", "-rn", "-I"]  # -I skips binary files
     if case_insensitive:

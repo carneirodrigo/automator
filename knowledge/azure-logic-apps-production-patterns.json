@@ -1,0 +1,172 @@
+{
+  "id": "azure-logic-apps-production-patterns",
+  "title": "Azure Logic Apps - Production-Verified Implementation Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Consumption Logic Apps that call external APIs using client credentials OAuth2",
+    "Logic Apps that write CSV or file output to SharePoint document libraries",
+    "Workflows that fan out to multiple parallel API calls from a single auth step"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The client credentials token body must be built as a single form-encoded string using concat() with uriComponent() for the scope value, not as a JSON object. The correct expression is: concat('scope=', uriComponent('<resource>/.default'), '&client_id=', '<app_id>', '&client_secret=', parameters('client_secret'), '&grant_type=client_credentials').",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Get_Token action body expression, confirmed working"
+    },
+    {
+      "fact": "The Get_Token HTTP action must have runtimeConfiguration.secureData.properties: ['inputs'] to prevent the client_secret and full request body from appearing in Logic Apps run history.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — runtimeConfiguration on Get_Token action"
+    },
+    {
+      "fact": "The client_secret must be stored as a workflow parameter (type: String) and referenced as parameters('client_secret'). Never hardcode secrets in the action definition.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — definition.parameters.client_secret with defaultValue placeholder"
+    },
+    {
+      "fact": "The Bearer token injection expression for downstream API calls is @{concat('Bearer ', body('Parse_JSON')?['access_token'])} — the null-safe ?['access_token'] form is required because an error response from the token endpoint will not have this field.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Authorization header on all Defender API HTTP actions"
+    },
+    {
+      "fact": "Multiple independent branches can all use runAfter: { SharedStep: ['Succeeded'] } to execute in parallel. No For Each or Parallel container is needed in Consumption workflows — any actions sharing the same runAfter dependency run concurrently.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — five parallel HTTP actions all reference Parse_JSON as their runAfter step"
+    },
+    {
+      "fact": "The SharePoint Online connector file upload path must use double URL encoding: /datasets/@{encodeURIComponent(encodeURIComponent('<full_site_url>'))}/files. Single encoding fails with connector resolution errors.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Save_CSV_into_Sharepoint actions, confirmed working in production"
+    },
+    {
+      "fact": "The SharePoint file upload action must include queryParametersSingleEncoded: true in its queries object. Omitting this causes the connector to double-encode the already-encoded path and produce a broken file path.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — all SharePoint save actions include this setting"
+    },
+    {
+      "fact": "A retry policy of type fixed, count 1, interval PT5S (one retry after 5 seconds) is the production-proven default for SharePoint file upload actions in Logic Apps.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — retryPolicy on all Save_CSV actions"
+    },
+    {
+      "fact": "Both the HTTP API call action AND the SharePoint file upload action require runtimeConfiguration.contentTransfer.transferMode: 'Chunked' when handling large payloads. Omitting it from either side can truncate data silently.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Chunked is set on all HTTP and SharePoint actions"
+    },
+    {
+      "fact": "Date-based file naming uses formatDateTime(addDays(utcNow(), -N), 'MMMM yyyy') to produce month names like 'March 2026'. The -N offset accounts for report generation lag relative to the data period.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — file name expressions in all SharePoint save actions use addDays(utcNow(), -25)"
+    },
+    {
+      "fact": "The $connections parameter appears in two places: inside definition.parameters.$connections (type: Object, defaultValue: {}) and at the workflow root level as parameters.$connections.value containing the actual ARM resource IDs. Both are required.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — top-level parameters block"
+    },
+    {
+      "fact": "The SharePoint managed API ARM ID pattern is: /subscriptions/{sub_id}/providers/Microsoft.Web/locations/{region}/managedApis/sharepointonline. The connection resource ARM ID pattern is: /subscriptions/{sub_id}/resourceGroups/{rg}/providers/Microsoft.Web/connections/{connection_name}.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections value block"
+    },
+    {
+      "fact": "Action names use the convention Verb_Noun_-_Qualifier with underscores as word separators and ' - ' between the base name and the data-segment qualifier. Examples: Run_Defender_TVM_API_-_Devices, Save_CSV_into_Sharepoint_-_Servers.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — consistent naming across all 20 actions"
+    }
+  ],
+  "token_fetch_pattern": {
+    "type": "Http",
+    "inputs": {
+      "uri": "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json"
+      },
+      "body": "@concat('scope=', uriComponent('{resource}/.default'), '&client_id=', '{app_id}', '&client_secret=', parameters('client_secret'), '&grant_type=client_credentials')"
+    },
+    "runtimeConfiguration": {
+      "contentTransfer": {"transferMode": "Chunked"},
+      "secureData": {"properties": ["inputs"]}
+    }
+  },
+  "sharepoint_file_upload_pattern": {
+    "type": "ApiConnection",
+    "inputs": {
+      "host": {
+        "connection": {
+          "name": "@parameters('$connections')['sharepointonline']['connectionId']"
+        }
+      },
+      "method": "post",
+      "body": "@body('<CreateCsvActionName>')",
+      "path": "/datasets/@{encodeURIComponent(encodeURIComponent('{full_sharepoint_site_url}'))}/files",
+      "queries": {
+        "folderPath": "{/Shared Documents/path/to/folder}",
+        "name": "@concat('{prefix} ', formatDateTime(addDays(utcNow(), -25), 'MMMM yyyy'), '.csv')",
+        "queryParametersSingleEncoded": true
+      },
+      "retryPolicy": {"type": "fixed", "count": 1, "interval": "PT5S"}
+    },
+    "runtimeConfiguration": {
+      "contentTransfer": {"transferMode": "Chunked"}
+    }
+  },
+  "connections_parameter_structure": {
+    "definition_parameters": {
+      "client_secret": {"defaultValue": "REPLACE_WITH_SECRET", "type": "String"},
+      "$connections": {"type": "Object", "defaultValue": {}}
+    },
+    "root_parameters": {
+      "$connections": {
+        "type": "Object",
+        "value": {
+          "sharepointonline": {
+            "id": "/subscriptions/{sub_id}/providers/Microsoft.Web/locations/{region}/managedApis/sharepointonline",
+            "connectionId": "/subscriptions/{sub_id}/resourceGroups/{rg}/providers/Microsoft.Web/connections/sharepointonline",
+            "connectionName": "sharepointonline",
+            "connectionProperties": {}
+          }
+        }
+      }
+    }
+  },
+  "implementation_notes": [
+    "Always use runtimeConfiguration.secureData.properties: ['inputs'] on any action that sends credentials (token request, API key in body). This hides the action inputs from the Logic Apps run history UI and log exports.",
+    "The client_secret parameter defaultValue should be a placeholder string ('XYZ' or 'REPLACE_WITH_SECRET'). The actual secret is injected at deploy time through ARM parameters or via the portal — it should never be committed to source control.",
+    "For parallel fan-out to multiple API calls: do not use any parallel container. Simply set the same runAfter dependency on the shared preceding step for all independent branches. Logic Apps Consumption executes all actions whose runAfter dependencies are satisfied concurrently.",
+    "The double encodeURIComponent pattern for SharePoint paths is not a mistake — the SharePoint connector for Logic Apps requires the site URL to be encoded twice. Single encoding results in a 404 or path resolution error.",
+    "The Table action (type: Table, format: CSV) is the correct way to produce CSV output from an array. Wire it directly to the Results array from the ParseJson action, not the full API response body.",
+    "Apply Chunked transfer mode to all steps that handle potentially large payloads: the API HTTP call, the ParseJson (if large), and the SharePoint upload action. Missing it on the upload side causes truncation of the written file.",
+    "When building multi-segment workflows (e.g., different OS types, date slices), use separate named action groups per segment rather than a For Each loop. Separate named actions produce clearer run history and enable independent retry and monitoring per segment.",
+    "Use addDays(utcNow(), -N) for the date offset in file names when the report is generated after the data period ends. The offset should reflect the typical lag between the data reporting period and the workflow run date.",
+    "The token ParseJson schema should always include error and error_description fields alongside access_token so the workflow can surface auth failures in run history rather than silently proceeding with a null token."
+  ],
+  "common_failures": [
+    "Single encodeURIComponent on the SharePoint path — causes connector path resolution errors.",
+    "Missing queryParametersSingleEncoded: true — causes the connector to double-encode an already-encoded path.",
+    "Missing secureData on the token action — client_secret is visible in plain text in Logic Apps run history.",
+    "Passing the full HTTP response body to the Table action instead of body('ParseJson')?['Results'] — the Table action errors because the schema is not an array.",
+    "Missing Chunked transfer mode on the SharePoint upload action when the CSV is large — file is written but truncated.",
+    "Building the token body as a JSON object instead of a form-encoded string — the token endpoint returns 400 Bad Request.",
+    "Using ['access_token'] instead of ?['access_token'] in the Bearer expression — causes a null reference error if the token call fails."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app",
+    "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-sharepoint-connector-conventions",
+    "mde-advanced-hunting-api",
+    "microsoft-defender-endpoint-api-auth-conventions"
+  ],
+  "source_projects": ["manual-analysis"]
+}

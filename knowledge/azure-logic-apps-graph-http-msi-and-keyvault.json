@@ -1,0 +1,239 @@
+{
+  "id": "azure-logic-apps-graph-http-msi-and-keyvault",
+  "title": "Azure Logic Apps - Graph API via HTTP MSI, Key Vault Secret Retrieval, And Switch on Status Code",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps calling Microsoft Graph API directly via HTTP action with Managed Service Identity",
+    "Workflows that retrieve secrets from Azure Key Vault and use them in downstream HTTP calls",
+    "Error-path routing by switching on HTTP status codes"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-01-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The HTTP action supports inline MSI authentication without a connector. Set authentication: { type: 'ManagedServiceIdentity', audience: 'https://graph.microsoft.com' } in the inputs block. No token fetch step or connector is needed.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — HTTP_verify_account, HTTP_Account_Status, HTTP_Revoke_Session, HTTP_2_Password_on_NextSignin all use this pattern"
+    },
+    {
+      "fact": "Graph API user lookup uses GET https://graph.microsoft.com/v1.0/users/@{items('For_each')} where the loop item is the UPN. A 404 means the user does not exist; 200 means they do.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — HTTP_verify_account"
+    },
+    {
+      "fact": "OData $select can be appended directly to the Graph URI: GET /v1.0/users/{upn}/?$select=Displayname,accountEnabled. This reduces response size and ParseJson schema complexity.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — HTTP_Account_Status URI"
+    },
+    {
+      "fact": "Force password change on next sign-in uses PATCH https://graph.microsoft.com/v1.0/users/{upn} with body: { passwordProfile: { forceChangePasswordNextSignIn: true } }.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — HTTP_2_Password_on_NextSignin"
+    },
+    {
+      "fact": "Revoking all active sessions uses POST https://graph.microsoft.com/v1.0/users/{upn}/revokeSignInSessions with no body.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — HTTP_Revoke_Session"
+    },
+    {
+      "fact": "The Switch action switches on an expression value. To route by HTTP status code, use expression: \"@outputs('HTTP_ActionName')['statusCode']\". Individual cases match on integer values (e.g. case: 404). The default block handles all unmatched values.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Switch action after HTTP_verify_account"
+    },
+    {
+      "fact": "runAfter can list multiple acceptable prior statuses to ensure an action runs even when the preceding step failed or timed out: runAfter: { HTTP_action: ['Succeeded', 'TimedOut', 'Skipped', 'Failed'] }. This is essential for error-routing Switch actions.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Switch runAfter lists all four statuses to catch all outcomes"
+    },
+    {
+      "fact": "The Key Vault connector retrieves a secret with GET /secrets/@{encodeURIComponent('SecretName')}/value. The secret name must be URL-encoded. The secret value is at body('action')?['value'].",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Get_secret_Renisac_Function_App"
+    },
+    {
+      "fact": "Key Vault connector action must have runtimeConfiguration.secureData.properties: ['outputs'] to prevent the secret value from appearing in run history. Note: this is 'outputs' not 'inputs' — it hides the response, not the request.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Get_secret action runtimeConfiguration"
+    },
+    {
+      "fact": "Azure Function authentication uses the x-functions-key header. Retrieve the function key from Key Vault and pass it as: headers: { 'x-functions-key': \"@body('Get_secret_action')?['value']\" }.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — HTTP_Func action"
+    },
+    {
+      "fact": "The Key Vault managed API ARM ID uses lowercase: .../managedApis/keyvault. The connector uses MSI auth: connectionProperties.authentication.type: 'ManagedServiceIdentity'.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — $connections keyvault block"
+    },
+    {
+      "fact": "AppendToArrayVariable (type: AppendToArrayVariable) adds a single item to an array variable during a loop. inputs.name is the variable name, inputs.value is the item to append.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Append_to_array_Enabled_accounts, Append_to_array_Disabled_accounts, Append_to_array_Failed_accounts"
+    },
+    {
+      "fact": "split(replace(variables('UPN'), ' ', ''), ',') is the production-verified expression to parse a comma-separated UPN list from email body text — removes spaces first, then splits on comma.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Compose_UPN action inputs"
+    },
+    {
+      "fact": "The Graph user response ParseJson schema can include 'odata.context' (field name with a dot) as a string property. Logic Apps handles dot-notation field names in ParseJson schemas correctly.",
+      "verified_date": "2026-03-31",
+      "source": "production Logic App — Parse_JSON_2 schema"
+    }
+  ],
+  "http_msi_graph_pattern": {
+    "description": "HTTP action calling Graph API with inline Managed Service Identity auth — no connector or token fetch needed",
+    "HTTP_verify_account": {
+      "type": "Http",
+      "inputs": {
+        "authentication": {
+          "audience": "https://graph.microsoft.com",
+          "type": "ManagedServiceIdentity"
+        },
+        "method": "GET",
+        "uri": "https://graph.microsoft.com/v1.0/users/@{items('For_each')}"
+      }
+    },
+    "HTTP_Account_Status": {
+      "type": "Http",
+      "inputs": {
+        "authentication": {
+          "audience": "https://graph.microsoft.com",
+          "type": "ManagedServiceIdentity"
+        },
+        "method": "GET",
+        "uri": "https://graph.microsoft.com/v1.0/users/@{items('For_each')}/?$select=Displayname,accountEnabled"
+      }
+    },
+    "HTTP_Revoke_Session": {
+      "type": "Http",
+      "inputs": {
+        "authentication": {
+          "audience": "https://graph.microsoft.com",
+          "type": "ManagedServiceIdentity"
+        },
+        "method": "POST",
+        "uri": "https://graph.microsoft.com/v1.0/users/@{items('For_each')}/revokeSignInSessions"
+      }
+    },
+    "HTTP_Force_Password_Change": {
+      "type": "Http",
+      "inputs": {
+        "authentication": {
+          "audience": "https://graph.microsoft.com",
+          "type": "ManagedServiceIdentity"
+        },
+        "body": {
+          "passwordProfile": {
+            "forceChangePasswordNextSignIn": true
+          }
+        },
+        "method": "PATCH",
+        "uri": "https://graph.microsoft.com/v1.0/users/@{items('For_each')}"
+      }
+    }
+  },
+  "switch_on_status_code_pattern": {
+    "Switch": {
+      "type": "Switch",
+      "runAfter": {
+        "HTTP_verify_account": ["Succeeded", "TimedOut", "Skipped", "Failed"]
+      },
+      "expression": "@outputs('HTTP_verify_account')['statusCode']",
+      "cases": {
+        "Case_404": {
+          "case": 404,
+          "actions": {
+            "_comment": "User not found — handle 404 here"
+          }
+        }
+      },
+      "default": {
+        "actions": {
+          "_comment": "All other status codes — handle success path here"
+        }
+      }
+    }
+  },
+  "keyvault_secret_pattern": {
+    "Get_secret": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {"name": "@parameters('$connections')['keyvault']['connectionId']"}
+        },
+        "method": "get",
+        "path": "/secrets/@{encodeURIComponent('SecretName')}/value"
+      },
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": ["outputs"]
+        }
+      }
+    },
+    "note": "Access the secret value as body('Get_secret')?['value']. Always set secureData outputs to hide the value from run history."
+  },
+  "azure_function_call_pattern": {
+    "HTTP_Function": {
+      "type": "Http",
+      "inputs": {
+        "body": {
+          "input_field": "@variables('inputVar')"
+        },
+        "headers": {
+          "x-functions-key": "@body('Get_secret')?['value']"
+        },
+        "method": "POST",
+        "uri": "https://functionappname.azurewebsites.net/api/FunctionName"
+      }
+    },
+    "note": "Retrieve the function key from Key Vault first, then reference it in the x-functions-key header. Function response is accessed as body('HTTP_Function')."
+  },
+  "append_to_array_pattern": {
+    "Append_to_array_result": {
+      "type": "AppendToArrayVariable",
+      "inputs": {
+        "name": "results array",
+        "value": "@items('For_each')"
+      }
+    },
+    "note": "Initialize the array variable (type: array, no value) before the foreach loop. Append inside the loop. After the loop, the array contains all matched items."
+  },
+  "implementation_notes": [
+    "For HTTP MSI calls to Graph, the Logic App's managed identity must be granted the required Graph API application permissions in Entra ID (e.g. User.ReadWrite.All for password reset, User.Read.All for lookup). Role assignment alone is not enough — app permissions must be granted via API permissions in the app registration or via PowerShell/Graph.",
+    "Use runAfter with all four statuses ['Succeeded', 'TimedOut', 'Skipped', 'Failed'] on a Switch that routes by HTTP status code. Without this, the Switch is skipped when the HTTP action returns a non-2xx status.",
+    "The Switch expression must reference statusCode from outputs(), not body(): \"@outputs('HTTP_action')['statusCode']\". Using body() does not expose the status code.",
+    "secureData on the Key Vault action hides the outputs (the secret value) from run history. Always include this for any action that retrieves a secret. Use 'inputs' to hide request bodies, 'outputs' to hide response bodies.",
+    "The Key Vault secret name in the path must be URL-encoded with encodeURIComponent even if the name contains no special characters. This is required by the connector.",
+    "For Azure Function authentication, x-functions-key is the standard header. Retrieve the key at runtime from Key Vault rather than hardcoding it. Function keys can be rotated without redeploying the Logic App.",
+    "The Graph passwordProfile PATCH requires User.ReadWrite.All or Directory.AccessAsUser.All permissions. Confirm the MSI has these before testing.",
+    "Use AppendToArrayVariable inside a foreach to collect results (matched items, failed items, etc.) into separate categorised arrays for later reporting.",
+    "After a foreach loop, convert array results to strings with @{variables('arrayVar')} for embedding in Teams messages or email bodies.",
+    "For email body parsing (extract UPNs from email text), a dedicated Azure Function is cleaner than complex Logic Apps expressions. Pass the raw email body to the function and return a clean list."
+  ],
+  "common_failures": [
+    "Logic App MSI not granted Graph application permissions — all HTTP Graph calls return 403.",
+    "Switch action not set to run after all four statuses — Switch is skipped when HTTP returns 404 or other error, so the error case is never handled.",
+    "Using body() instead of outputs() to get statusCode — expression resolves to null, Switch falls to default for all cases.",
+    "Missing secureData outputs on Key Vault action — the secret value appears in run history in plain text.",
+    "Key Vault secret name not URL-encoded — connector returns 400 or 404 even when the secret exists.",
+    "AppendToArrayVariable inside a parallel foreach — race condition; multiple iterations appending simultaneously can produce duplicate or missing entries. Set the foreach to sequential if appending to a shared array."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-switch-statement",
+    "https://learn.microsoft.com/en-us/connectors/keyvault/",
+    "https://learn.microsoft.com/en-us/graph/api/user-revokesigninsessions",
+    "https://learn.microsoft.com/en-us/graph/api/user-update"
+  ],
+  "last_verified": "2026-03-31T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-control-flow-and-state",
+    "azure-logic-apps-sentinel-incident-playbook",
+    "azure-logic-apps-email-trigger-teams-notifications",
+    "ms-graph-api-conventions"
+  ],
+  "source_projects": ["manual-analysis"]
+}

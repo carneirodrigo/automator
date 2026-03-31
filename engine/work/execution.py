@@ -303,7 +303,8 @@ def _stream_process(
 
     def _reader() -> None:
         try:
-            assert proc.stdout is not None
+            if proc.stdout is None:
+                return
             for raw in proc.stdout:
                 line_q.put(("line", raw.rstrip("\n")))
         finally:
@@ -339,7 +340,8 @@ def _stream_process(
         if kind == "done":
             break
 
-        assert data is not None
+        if data is None:
+            continue
         collected.append(data)
         # Reset heartbeat timer — visible activity replaces the fallback message
         last_heartbeat_at = datetime.now(timezone.utc)

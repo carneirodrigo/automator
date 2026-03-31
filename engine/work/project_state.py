@@ -163,7 +163,7 @@ def fork_project(
                 # "unknown" avoids silently promoting artifacts that lack status metadata.
                 "status": data.get("status", "unknown"),
                 "summary": f"Inherited from {source_project_id}: {data.get('summary', 'no summary')}"[:300],
-                "artifact_path": str(new_artifact_path),
+                "artifact": str(new_artifact_path),
                 "artifact_size_bytes": new_artifact_path.stat().st_size,
                 "inherited": True,
             }
@@ -173,7 +173,7 @@ def fork_project(
     state_path = runtime_dir / "state" / "active_task.json"
     state = load_json(state_path)
     state["completed_steps"] = inherited_steps
-    state["artifacts"] = [step["artifact_path"] for step in inherited_steps]
+    state["artifacts"] = [step["artifact"] for step in inherited_steps]
     state["forked_from"] = source_project_id
     write_json(state_path, state)
 
@@ -195,6 +195,7 @@ def detect_fork_intent(
     return {
         "source_project_id": source_project["project_id"],
         "source_project_name": source_project["project_name"],
+        "inherit_artifacts": ["worker"],
     }
 
 

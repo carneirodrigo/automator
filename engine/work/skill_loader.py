@@ -336,13 +336,17 @@ def _ensure_repo_cached(repo_config: dict[str, Any]) -> Path | None:
     if cache_path.exists() and (cache_path / ".git").exists():
         # Pull latest
         try:
-            subprocess.run(
+            pull = subprocess.run(
                 ["git", "-C", str(cache_path), "pull", "--ff-only"],
                 capture_output=True,
+                text=True,
                 timeout=60,
             )
+            if pull.returncode != 0:
+                import sys as _sys
+                print(f"[skill-loader] git pull failed for '{repo_id}' (using stale cache): {pull.stderr.strip()}", file=_sys.stderr)
         except (subprocess.TimeoutExpired, OSError):
-            pass  # git pull failure is non-fatal; work continues with stale local cache
+            pass  # non-fatal; work continues with stale local cache
         return cache_path
 
     # Fresh clone

@@ -100,11 +100,6 @@ class RoleAllowlistTest(unittest.TestCase):
         if r is not None:
             self.assertNotIn("not permitted to use capability", r["issues"][0])
 
-    def test_research_cannot_write_file(self):
-        r = check_capability(_req("write_file"), role="research", delivery_mode=None)
-        self.assertIsNotNone(r)
-        self.assertIn("not permitted", r["issues"][0])
-
     def test_worker_can_write_file(self):
         # Path inside projects/ and no content — passes allowlist; other checks may fire
         r = check_capability(
