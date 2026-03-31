@@ -1,0 +1,59 @@
+{
+  "id": "azure-logic-apps-defender-endpoint-playbook",
+  "title": "Playbook - Azure Logic Apps To Microsoft Defender For Endpoint APIs",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps workflows that retrieve Microsoft Defender for Endpoint data for reporting or downstream storage"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Defender for Endpoint app registration and permission grants are complete",
+    "Logic Apps workflow has a supported authentication path for acquiring a bearer token",
+    "Clear target endpoint such as machines, vulnerabilities, recommendations, or score APIs"
+  ],
+  "required_permissions": [
+    "Defender for Endpoint permissions specific to the endpoint family, such as Machine.Read.All or Score.Read.All",
+    "App or delegated access aligned with the intended unattended or user-context workflow"
+  ],
+  "request_sequence": [
+    "Acquire a token for the Defender for Endpoint API audience expected by the target API family.",
+    "Call the target endpoint through the Logic Apps HTTP action, using the canonical base URI or a regional URI when appropriate.",
+    "For onboarded-device reporting, query /api/machines and filter by onboardingStatus.",
+    "For posture reporting, call score endpoints such as /api/configurationScore when the output needs summarized security posture rather than raw machine rows.",
+    "Parse the response JSON and normalize the fields required by downstream storage or reporting.",
+    "Persist the normalized result to SharePoint or pass it forward to another reporting pipeline."
+  ],
+  "implementation_notes": [
+    "Use Logic Apps for orchestration, but treat Defender for Endpoint auth as a first-class design step because of the legacy audience and permission nuances.",
+    "For onboarded-device counts, the simplest pattern is to retrieve filtered machine rows and aggregate them in Logic Apps or downstream in Power BI.",
+    "For recurring reports, store extraction time and any business snapshot date so Power BI can distinguish when the metric was observed from when it was reported.",
+    "If you combine MDE inventory with Microsoft Graph phishing simulation data in one workflow, keep their authentication and pagination paths separate and only join after normalization."
+  ],
+  "caveats": [
+    "A token with the wrong audience can make a correctly permissioned Logic App fail unexpectedly.",
+    "Machines is a current-state inventory API, not a historical month-end count API.",
+    "Logic Apps knowledge covers the orchestration pattern; exact connector or HTTP auth implementation details still depend on your chosen identity path."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/api-hello-world",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-device-secure-score"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "microsoft-defender-endpoint-api-auth-conventions",
+    "defender-devices-inventory-playbook",
+    "microsoft-defender-endpoint-reporting-and-score-apis"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "mde-api-research"
+  ]
+}

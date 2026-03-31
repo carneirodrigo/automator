@@ -1,0 +1,65 @@
+{
+  "id": "azure-logic-apps-limits-and-networking",
+  "title": "Azure Logic Apps - Limits, Runtime, And Networking Considerations",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps runtime planning",
+    "Network and firewall design for Logic Apps workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Azure Logic Apps publishes separate limits and configuration guidance for multitenant Consumption logic apps and single-tenant Standard logic apps.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For multitenant Azure Logic Apps behind strict firewalls, the environment must allow the inbound and outbound IP addresses required by Azure Logic Apps in the logic app's region.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft recommends using Azure service tags instead of specific IP addresses for firewall rules, including LogicAppsManagement, LogicApps, and AzureConnectors.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Standard logic app workflows in single-tenant Azure Logic Apps, networking restrictions must also account for connector connections and fully qualified domain names in addition to service tags.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Logic Apps documentation includes separate operational guidance for recurrence schedules, deployment automation, unit testing from workflow definitions or runs, and DevOps setup for Standard workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/recurrence-schedules"
+  ],
+  "implementation_notes": [
+    "Treat the limits document as mandatory source material before designing high-volume or network-restricted Logic Apps solutions.",
+    "For multitenant workflows, regional IP and service-tag allowances are a first-class infrastructure prerequisite, especially for HTTP triggers, webhooks, and connector callbacks.",
+    "For Standard workflows, include FQDN and connection-specific network requirements in the design, not just service tags.",
+    "When building knowledge or implementation guides, capture whether the workflow is latency-sensitive, long-running, webhook-driven, or recurrence-driven because those characteristics determine which limits matter most."
+  ],
+  "caveats": [
+    "The limits page is extensive and changes over time; any production design should re-check the current limits before implementation.",
+    "Firewall design differs materially between Standard and Consumption.",
+    "Power Automate and Logic Apps share some platform infrastructure behavior, but their operational limits are not interchangeable."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-solution-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

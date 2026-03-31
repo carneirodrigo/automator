@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "source_families": [
+    {
+      "id": "microsoft-graph",
+      "title": "Microsoft Graph",
+      "category": "api_vendor",
+      "domains": ["learn.microsoft.com", "graph.microsoft.com", "login.microsoftonline.com"],
+      "start_urls": [
+        "https://learn.microsoft.com/en-us/graph/",
+        "https://learn.microsoft.com/en-us/entra/identity-platform/"
+      ],
+      "search_hints": [
+        "site:learn.microsoft.com Microsoft Graph REST API",
+        "site:learn.microsoft.com Entra OAuth2 client credentials",
+        "site:learn.microsoft.com Microsoft Graph security API",
+        "site:learn.microsoft.com Microsoft Graph security authorization",
+        "site:learn.microsoft.com Microsoft Graph alerts incidents security",
+        "site:learn.microsoft.com Microsoft Graph runHuntingQuery secureScore threatIntelligence",
+        "site:learn.microsoft.com Microsoft Graph SharePoint sites lists drives",
+        "site:learn.microsoft.com Microsoft Graph SharePoint listitem create delete driveitem"
+      ],
+      "auth_family": "oauth2_client_credentials",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["microsoft-graph", "entra-id", "oauth2", "odata", "security", "sharepoint"],
+      "notes": "Use official Graph and Entra docs first. Prefer v1.0 docs unless the task explicitly requires beta. For security work, route requests by capability family such as alerts, incidents, hunting, secure score, or threat intelligence. Before planning a security integration, separate app-only versus delegated authorization and confirm whether Microsoft Entra role assignment is required in addition to Graph permissions. For SharePoint work, separate site discovery from list CRUD and drive or file CRUD."
+    },
+    {
+      "id": "qualys",
+      "title": "Qualys APIs",
+      "category": "api_vendor",
+      "domains": ["docs.qualys.com", "www.qualys.com", "cdn2.qualys.com", "qualysguard.qualys.com"],
+      "start_urls": [
+        "https://docs.qualys.com/en/",
+        "https://www.qualys.com/platform-identification"
+      ],
+      "search_hints": [
+        "site:docs.qualys.com Qualys API",
+        "site:docs.qualys.com Qualys authentication API",
+        "site:docs.qualys.com Qualys host detection api",
+        "site:docs.qualys.com Qualys knowledgebase api",
+        "site:cdn2.qualys.com Qualys Global IT Asset Inventory API",
+        "site:docs.qualys.com Qualys WAS API finding search",
+        "site:docs.qualys.com Qualys report APIs asset tags"
+      ],
+      "auth_family": "vendor_api_auth",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["qualys", "authentication", "pagination", "rate-limits", "reporting", "asset-inventory", "was"],
+      "notes": "Prefer official Qualys docs, platform-identification guidance, and official Qualys PDFs. Use community or partner integrations only as secondary corroboration."
+    },
+    {
+      "id": "bitsight",
+      "title": "BitSight APIs",
+      "category": "api_vendor",
+      "domains": ["help.bitsighttech.com", "api.bitsighttech.com"],
+      "start_urls": [
+        "https://help.bitsighttech.com/"
+      ],
+      "search_hints": [
+        "site:help.bitsighttech.com BitSight API",
+        "site:help.bitsighttech.com BitSight authentication",
+        "site:help.bitsighttech.com BitSight current ratings API",
+        "site:help.bitsighttech.com BitSight company details rating history",
+        "site:help.bitsighttech.com BitSight ratings history report",
+        "site:learn.microsoft.com Bitsight Security Ratings Power BI connector"
+      ],
+      "auth_family": "vendor_api_auth",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["bitsight", "portfolio", "entities", "pagination", "ratings"],
+      "notes": "Prefer BitSight help center and official Microsoft connector references. Capture tenant- or entitlement-specific caveats separately."
+    },
+    {
+      "id": "windows-security",
+      "title": "Windows Security Platform Docs",
+      "category": "platform_docs",
+      "domains": ["learn.microsoft.com", "microsoft.com"],
+      "start_urls": [
+        "https://learn.microsoft.com/en-us/windows/",
+        "https://learn.microsoft.com/en-us/defender-endpoint/"
+      ],
+      "search_hints": [
+        "site:learn.microsoft.com Windows security API",
+        "site:learn.microsoft.com Win32 security authentication",
+        "site:learn.microsoft.com defender-endpoint api exposed apis list",
+        "site:learn.microsoft.com defender-endpoint api get-machines",
+        "site:learn.microsoft.com defender-endpoint api configurationScore",
+        "site:learn.microsoft.com defender-endpoint api api-hello-world"
+      ],
+      "auth_family": "platform_dependent",
+      "freshness_days": 45,
+      "preferred_artifact_tags": ["windows-security", "win32", "defender", "authentication", "reporting"],
+      "notes": "Split findings by subsystem such as Win32 auth, Defender APIs, eventing, or hardening guidance rather than one broad entry. For Defender for Endpoint, separate auth, inventory, vulnerability, and reporting or score surfaces."
+    },
+    {
+      "id": "power-platform",
+      "title": "Microsoft Power Platform and Dataverse",
+      "category": "platform_docs",
+      "domains": ["learn.microsoft.com", "api.powerplatform.com", "api.bap.microsoft.com"],
+      "start_urls": [
+        "https://learn.microsoft.com/en-us/rest/api/power-platform/",
+        "https://learn.microsoft.com/en-us/power-platform/admin/",
+        "https://learn.microsoft.com/en-us/power-apps/developer/data-platform/"
+      ],
+      "search_hints": [
+        "site:learn.microsoft.com Power Platform API authentication",
+        "site:learn.microsoft.com Dataverse Web API authentication"
+      ],
+      "auth_family": "oauth2_user_or_service_principal",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["power-platform", "dataverse", "oauth2", "service-principal"],
+      "notes": "Separate Power Platform management APIs from Dataverse Web API details, but keep shared Microsoft Entra authentication guidance linked."
+    },
+    {
+      "id": "power-bi",
+      "title": "Power BI",
+      "category": "platform_docs",
+      "domains": ["learn.microsoft.com"],
+      "start_urls": [
+        "https://learn.microsoft.com/en-us/power-bi/"
+      ],
+      "search_hints": [
+        "site:learn.microsoft.com Power BI reports dashboards",
+        "site:learn.microsoft.com Power BI data sources refresh",
+        "site:learn.microsoft.com Power BI samples pbix",
+        "site:learn.microsoft.com Power BI Copilot overview requirements",
+        "site:learn.microsoft.com Power BI DirectQuery composite models Direct Lake",
+        "site:learn.microsoft.com Power BI paginated reports Report Builder",
+        "site:learn.microsoft.com Power BI mobile optimized reports",
+        "site:learn.microsoft.com Power BI metrics scorecards goals",
+        "site:learn.microsoft.com Power BI learning path directory",
+        "site:learn.microsoft.com Power BI relationships DAX measures",
+        "site:learn.microsoft.com Power BI row-level security workspaces apps",
+        "site:learn.microsoft.com Power BI embedded analytics",
+        "site:learn.microsoft.com Power BI REST API datasets reports dashboards workspaces"
+      ],
+      "auth_family": "microsoft_service_auth",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["power-bi", "reports", "dashboards", "refresh", "semantic-models"],
+      "notes": "Prefer official Power BI docs. Separate report and dashboard behavior, data-source and refresh design, semantic modeling, governance, embedding, Copilot, DirectQuery, paginated reporting, mobile layout, and scorecards into distinct entries. Use the learning-path directory as a scenario router when a request is persona-driven, such as admin, developer, DirectQuery, paginated reporting, or metrics."
+    },
+    {
+      "id": "azure-logic-apps",
+      "title": "Azure Logic Apps",
+      "category": "platform_docs",
+      "domains": ["learn.microsoft.com", "azure.microsoft.com"],
+      "start_urls": [
+        "https://learn.microsoft.com/en-us/azure/logic-apps/"
+      ],
+      "search_hints": [
+        "site:learn.microsoft.com Azure Logic Apps",
+        "site:learn.microsoft.com Azure Logic Apps managed identity",
+        "site:learn.microsoft.com Azure Logic Apps single-tenant multitenant",
+        "site:learn.microsoft.com Azure Logic Apps limits networking",
+        "site:learn.microsoft.com Azure Logic Apps examples common scenarios",
+        "site:learn.microsoft.com Azure Logic Apps built-in connectors service providers managed connectors",
+        "site:learn.microsoft.com Azure Logic Apps custom API custom connector polling webhook",
+        "site:learn.microsoft.com Azure Logic Apps HTTP request trigger Parse JSON",
+        "site:learn.microsoft.com Azure Logic Apps condition switch loops variables scopes data operations",
+        "site:learn.microsoft.com Azure Logic Apps manage workflows portal disable enable delete recover",
+        "site:learn.microsoft.com connectors sharepointonline Logic Apps",
+        "site:learn.microsoft.com Azure Logic Apps error exception handling run after retry",
+        "site:learn.microsoft.com Azure Logic Apps Defender for Endpoint HTTP"
+      ],
+      "auth_family": "azure_identity_and_connector_dependent",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["azure-logic-apps", "managed-identity", "connectors", "networking", "sharepoint"],
+      "notes": "Prefer official Azure Logic Apps docs. Separate hosting model selection, scenario routing, management or recovery behavior, security or identity design, built-in versus managed connector behavior, control flow or state behavior, and programmatic API-ingestion patterns into distinct entries."
+    },
+    {
+      "id": "github",
+      "title": "GitHub REST API",
+      "category": "api_vendor",
+      "domains": ["docs.github.com", "api.github.com"],
+      "start_urls": [
+        "https://docs.github.com/en/rest"
+      ],
+      "search_hints": [
+        "site:docs.github.com GitHub REST API",
+        "site:docs.github.com GitHub REST API authentication",
+        "site:docs.github.com GitHub REST API issues",
+        "site:docs.github.com GitHub REST API pagination",
+        "site:docs.github.com GitHub REST API rate limits",
+        "site:docs.github.com GitHub Apps installation tokens",
+        "site:docs.github.com fine-grained personal access tokens"
+      ],
+      "auth_family": "token_and_app_auth",
+      "freshness_days": 30,
+      "preferred_artifact_tags": ["github", "rest-api", "authentication", "pagination", "rate-limits", "personal-access-token"],
+      "notes": "Prefer official GitHub docs. Separate authentication patterns (fine-grained PAT, classic PAT, GitHub Apps), endpoint-specific behavior, pagination via Link header, and rate-limit handling into distinct entries. Always note when SAML SSO enforcement requires explicit token authorization."
+    },
+    {
+      "id": "powershell-automation",
+      "title": "PowerShell Automation And Scripting",
+      "category": "platform_docs",
+      "domains": ["learn.microsoft.com", "pnp.github.io", "github.com"],
+      "start_urls": [
+        "https://learn.microsoft.com/en-us/powershell/",
+        "https://pnp.github.io/powershell/",
+        "https://learn.microsoft.com/en-us/azure/automation/"
+      ],
+      "search_hints": [
+        "site:learn.microsoft.com PowerShell Invoke-RestMethod retry rate limit",
+        "site:learn.microsoft.com PowerShell SecretManagement Azure Key Vault",
+        "site:learn.microsoft.com Azure Automation runbook Managed Identity PowerShell",
+        "site:learn.microsoft.com Windows Task Scheduler PowerShell scheduled task",
+        "site:pnp.github.io PnP PowerShell Connect-PnPOnline SharePoint",
+        "site:github.com dfinke ImportExcel Export-Excel conditional formatting",
+        "site:github.com EvotecIT PSWriteHTML New-HTML table report",
+        "site:learn.microsoft.com PowerShell Export-Csv encoding NoTypeInformation"
+      ],
+      "auth_family": "platform_dependent",
+      "freshness_days": 60,
+      "preferred_artifact_tags": ["powershell", "invoke-restmethod", "retry", "credentials", "scheduling", "azure-automation", "importexcel", "pswritehtml"],
+      "notes": "Covers cross-cutting PowerShell automation patterns not tied to a specific vendor API: HTTP client wrapper patterns, retry and rate-limit handling, credential management (Key Vault, SecretManagement, Managed Identity), report generation (ImportExcel, PSWriteHTML, CSV), and scheduling (Task Scheduler, Azure Automation). Vendor-specific PowerShell patterns (e.g., PowerShell for Qualys) belong in the vendor's source family but reference these cross-cutting entries. Prefer official Microsoft docs for built-in cmdlets, GitHub repos for community modules (ImportExcel, PSWriteHTML, PnP.PowerShell)."
+    }
+  ]
+}

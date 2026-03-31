@@ -1,0 +1,87 @@
+{
+  "id": "azure-logic-apps-devops-cicd-arm",
+  "title": "Azure Logic Apps - DevOps, CI/CD, ARM Templates, And Environment Parameterization",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Deploying Logic Apps via ARM templates and GitHub Actions",
+    "Parameterizing Logic Apps across dev, staging, and production environments",
+    "Source-controlling Logic Apps workflow definitions",
+    "Automating connector connection management in CI/CD pipelines"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Consumption Logic Apps: the workflow definition is embedded inside the ARM template under `properties.definition`. Export the current ARM template from the portal via Overview > Automation > Export template. The exported template includes the workflow JSON, parameters, and connection references.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-deploy-azure-resource-manager-templates",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Standard Logic Apps: the workflow definition lives in a `workflow.json` file inside the Logic App's file system (deployed like a Function App). The ARM template deploys the Logic App resource and app settings; the workflow JSON is deployed separately via zip deploy or the Azure Functions Core Tools. This separation enables independent versioning of infrastructure and workflow logic.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-deploy-azure-resource-manager-templates",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "ARM template parameterization for Consumption Logic Apps: replace environment-specific values (SharePoint site URL, API base URLs, connection resource IDs) with ARM parameters: `\"siteUrl\": \"[parameters('sharePointSiteUrl')]\"`. Store parameter files per environment (`parameters.dev.json`, `parameters.prod.json`) in source control.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-deploy-azure-resource-manager-templates",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Logic Apps connections (managed connector connections) are separate ARM resources of type `Microsoft.Web/connections`. They must be created before the Logic App is deployed and referenced by resource ID. In CI/CD, create connections in a pre-deployment step or ensure they already exist in the target resource group.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-deploy-azure-resource-manager-templates",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub Actions workflow for deploying a Consumption Logic App: use `azure/arm-deploy@v1` action. Example step: `- uses: azure/arm-deploy@v1 with: resourceGroupName: ${{ vars.RG_NAME }} template: ./logicapp.json parameters: ./parameters.${{ vars.ENV }}.json`. Authenticate using `azure/login@v1` with a service principal or OIDC federated identity.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-deploy-azure-resource-manager-templates",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub Actions workflow for deploying a Standard Logic App workflow: use `azure/functions-action@v1` or `azure/webapps-deploy@v2` with the zip package. First zip the workflow folder: `zip -r workflow.zip .`, then deploy: `- uses: azure/webapps-deploy@v2 with: app-name: ${{ vars.LOGIC_APP_NAME }} package: workflow.zip`.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-single-tenant-workflow-deployment-slots",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Standard Logic Apps support deployment slots (similar to Azure App Service). Use slots for blue-green deployments: deploy to a staging slot, smoke-test, then swap to production with `az logicapp deployment slot swap --name $appName --resource-group $rg --slot staging --target-slot production`. Slot swapping is near-instantaneous and preserves in-flight executions.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-single-tenant-workflow-deployment-slots",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Use Azure CLI to disable a Logic App before deployment to prevent mid-deployment executions: `az logic workflow update --name $workflowName --resource-group $rg --state Disabled`. Re-enable after deployment: `--state Enabled`. For Standard, workflows within the app can be individually enabled/disabled.",
+      "source_url": "https://learn.microsoft.com/en-us/cli/azure/logic/workflow",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Store Logic App workflow definitions in Git alongside the pipeline scripts. For Consumption, export the ARM template after each portal change. For Standard, the workflow.json file is already a deployable artifact.",
+    "Use ARM template `parameters` for all values that differ between environments: API URLs, SharePoint site URLs, Key Vault names, connection resource IDs. Never hardcode environment-specific values in the workflow definition.",
+    "For managed connector connections (SharePoint, Outlook), document which connections must exist before deployment and include connection creation scripts in the CI/CD pipeline's bootstrap step.",
+    "Tag every deployed Logic App ARM resource with `environment`, `pipeline`, and `version` tags. This simplifies cost attribution and makes it easier to identify which deployment a failed run belongs to."
+  ],
+  "caveats": [
+    "Managed connector connections contain OAuth credentials. They cannot be fully automated in CI/CD without interactive OAuth consent. Use Managed Identity-based connectors (HTTP with managed identity, built-in SharePoint in Standard) to avoid this limitation.",
+    "ARM template export from the portal may not include all parameterization. Review exported templates carefully and replace hardcoded resource IDs and URLs with parameters before committing.",
+    "Deployment slot swap for Standard Logic Apps swaps app settings (including connection strings) but not Key Vault references — ensure Key Vault access policies are configured for both slots."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-deploy-azure-resource-manager-templates",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-single-tenant-workflow-deployment-slots",
+    "https://learn.microsoft.com/en-us/cli/azure/logic/workflow"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview-and-hosting-models",
+    "azure-logic-apps-security-and-managed-identity",
+    "azure-logic-apps-monitoring-observability"
+  ],
+  "source_projects": ["shared-seed"]
+}

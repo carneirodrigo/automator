@@ -1,0 +1,56 @@
+{
+  "id": "power-bi-samples-and-prototyping-playbook",
+  "title": "Playbook - Power BI Samples, Prototyping, And Report Bootstrapping",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI learning, prototyping, and initial report design using official samples"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Official Power BI samples are available as built-in samples, downloadable PBIX files, Excel workbooks, templates, and direct database samples.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/sample-datasets",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A PBIX file contains the report pages, data model, queries, and visuals and is intended for Power BI Desktop.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/sample-datasets",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "An XLSX sample workbook can be used as a data source in Power BI Desktop or published from Excel to the Power BI service, and advanced Excel users can inspect or edit the model in Power Pivot.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/sample-datasets",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The samples page explicitly recommends using official samples to try features, prototype reports, validate scenarios, or jumpstart projects.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/sample-datasets",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use sample PBIX files when the goal is to learn report structure, visual design, page navigation, and semantic-model layout in one artifact.",
+    "Use sample XLSX files when the goal is to practice source ingestion or compare Excel-originated models with Power BI-authored models.",
+    "Treat official samples as scaffolding, not production architecture. Replace sample source assumptions, measures, and visuals with domain-specific equivalents before calling a design production-ready.",
+    "When building knowledge or implementation guides, samples are most useful for naming concrete starting artifacts and showing the difference between report design and data-source design."
+  ],
+  "caveats": [
+    "Samples are educational accelerators, not evidence that a production data model or refresh design is correct.",
+    "A report that works well with a sample PBIX may still require a very different semantic model when connected to real enterprise data."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/sample-datasets"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-data-sources-and-refresh"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

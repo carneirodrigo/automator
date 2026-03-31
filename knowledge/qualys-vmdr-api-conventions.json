@@ -1,0 +1,74 @@
+{
+  "id": "qualys-vmdr-api-conventions",
+  "title": "Qualys VMDR - Host Detection And Reporting Conventions",
+  "source_family": "qualys",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Qualys VMDR host inventory and vulnerability detections",
+    "Qualys vulnerability reporting derived from classic VM APIs"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Host Detection List API is GET or POST /api/2.0/fo/asset/host/vm/detection/?action=list.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys describes the Host Detection List API as a source of the latest complete vulnerability status for hosts, including NEW, ACTIVE, FIXED, and REOPENED, plus history information.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Host Detection List API can include the Qualys Detection Score (QDS) in output and can filter records by QDS.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The API supports output_format values XML, CSV, CSV_NO_METADATA, CSV_NO_METADATA_MS_EXCEL, and CSV_MS_EXCEL, with XML as the default.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The API supports host-side scoping and time filters such as detection_updated_since/before, vm_processed_after/before, and asset tag-related parameters when tag-based scoping is used.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys UI documentation for Vulnerability Details lists QID, Title, QDS, and Severity as core vulnerability-view columns, which aligns with deriving dashboard-style metrics from host detections plus KnowledgeBase enrichment.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+    "https://docs.qualys.com/en/vm/latest/knowledgebase/severity_levels.htm",
+    "https://docs.qualys.com/en/admin/api/administration_api/api_conventions.htm"
+  ],
+  "implementation_notes": [
+    "Treat host detections as the fact table for vulnerability reporting. Derive dashboard metrics from detection rows, not from a dedicated dashboard API surface.",
+    "Use show_asset_id=1 so the classic detection feed can be joined directly to Asset Inventory assetId values when available.",
+    "Enable show_qds=1 whenever reporting requires QDS-based filtering or bucketing.",
+    "Use detection_updated_since/before for incremental change capture and vm_processed_after/before when you need report windows tied to host processing time.",
+    "Expect XML parsing for the richest classic workflow. CSV exports can help with ad hoc extraction, but XML preserves nested host and detection structures more predictably.",
+    "Use truncation_limit deliberately and follow the continuation URL in truncated responses for large host scopes."
+  ],
+  "caveats": [
+    "The documented sources do not expose one dedicated VMDR dashboard metrics API. Snapshot, monthly, and quarterly metrics must be computed from detections, KnowledgeBase enrichment, and asset inventory data.",
+    "QDS is detection-centric and distinct from KB severity. Keep both in the normalized model because users may ask for either severity or QDS views.",
+    "Tag-based scoping and host visibility depend on user permissions and Qualys scoping features such as TBUS."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-vmdr-reporting-model",
+    "qualys-vmdr-metrics-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

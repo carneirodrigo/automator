@@ -1,0 +1,120 @@
+{
+  "id": "powershell-security-reporting-pipeline-playbook",
+  "title": "Playbook - PowerShell Security Data Pipeline: Qualys / BitSight / Defender → SharePoint → Power BI",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "End-to-end PowerShell pipeline combining Qualys VMDR, BitSight ratings, and Defender for Endpoint",
+    "Staging security data to SharePoint lists and triggering Power BI refresh",
+    "Azure Automation runbook orchestrating the full multi-source reporting cycle"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "App registration in Entra ID with Sites.ReadWrite.All (Graph), SecurityAlert.Read.All, Machine.Read.All application permissions",
+    "Azure Automation Account with System-assigned Managed Identity (or certificate-based service principal) granted the above permissions",
+    "Modules imported into Automation Account: PnP.PowerShell, ImportExcel (or use Graph SDK for SharePoint writes)",
+    "Qualys API credentials (username + password) stored in Automation Account encrypted variables or Key Vault",
+    "BitSight API token stored in Automation Account encrypted variable or Key Vault",
+    "SharePoint site with staging lists: QualysHostDetections, BitSightRatings, DefenderDevices — each with a SourceKey indexed column",
+    "Power BI dataset configured to use SharePoint lists or uploaded CSV files as data source"
+  ],
+  "request_sequence": [
+    {
+      "step": 1,
+      "name": "Authenticate",
+      "description": "Establish all API connections at script start. For Azure Automation with Managed Identity: Connect-AzAccount -Identity; Connect-MgGraph -Identity; Connect-PnPOnline -Url $spSiteUrl -ManagedIdentity. Retrieve Qualys and BitSight credentials from Key Vault or Automation encrypted variables.",
+      "error_handling": "If any connection fails, write structured error to Output stream and exit. Do not proceed with partial authentication."
+    },
+    {
+      "step": 2,
+      "name": "Pre-load SharePoint staging list maps",
+      "description": "For each staging list (QualysHostDetections, BitSightRatings, DefenderDevices), load all existing items into a hashtable keyed by SourceKey. Pattern: $existingMap = @{}; Get-PnPListItem -List 'QualysHostDetections' -PageSize 500 | ForEach-Object { $existingMap[$_.FieldValues['SourceKey']] = $_.Id }. This enables O(1) upsert lookups without per-row CAML queries.",
+      "error_handling": "Log item counts loaded. If list is empty, proceed — first run will be all inserts."
+    },
+    {
+      "step": 3,
+      "name": "Extract Qualys VMDR host detections",
+      "description": "Call Qualys VMDR detection API with truncation_limit=1000 and pagination via id_min. For each host, aggregate detection counts by severity (Critical, High, Medium, Low). Build a PSCustomObject array with HostId, IPAddress, HostName, LastScanDate, CriticalCount, HighCount, MediumCount, LastUpdated.",
+      "error_handling": "Wrap each API call in Invoke-ApiRequest with retry logic. On persistent failure after 5 attempts, skip Qualys step and log warning; continue with BitSight and Defender."
+    },
+    {
+      "step": 4,
+      "name": "Extract BitSight portfolio ratings",
+      "description": "Call GET /ratings/v1/companies to get all portfolio companies. For each company, call GET /ratings/v1/companies/{guid} for factor breakdown. Build PSCustomObject array with CompanyGuid, CompanyName, OverallRating, RatingDate, and per-category ratings (CompromisedSystems, Diligence, UserBehavior, etc.).",
+      "error_handling": "Add 250ms delay between per-company detail calls. On 429, apply Retry-After backoff. On persistent failure, skip BitSight step and log warning."
+    },
+    {
+      "step": 5,
+      "name": "Extract Defender for Endpoint device inventory",
+      "description": "Call GET https://api.securitycenter.microsoft.com/api/machines via Invoke-RestMethod with Graph or Defender token. Paginate using @odata.nextLink. Build PSCustomObject array with DeviceId, DeviceName, RiskScore, ExposureLevel, OSPlatform, LastSeen, OnboardingStatus.",
+      "error_handling": "Use Graph token with Machine.Read.All permission. On throttle (429), honor Retry-After. Log device count extracted."
+    },
+    {
+      "step": 6,
+      "name": "Upsert all data to SharePoint staging lists",
+      "description": "For each data source, apply upsert logic using the pre-loaded existingMap from step 2. Build separate insert and update lists. Execute inserts in PnP batches of 100. Execute updates individually (PnP batch updates may have limitations). Set LastUpdated = Get-Date -Format 'o' (UTC ISO 8601) on every row.",
+      "error_handling": "Log insert and update counts per list. On batch failure, retry the failed batch once. Log any items that could not be written."
+    },
+    {
+      "step": 7,
+      "name": "Generate Excel and HTML summary reports",
+      "description": "Using ImportExcel, create a workbook with sheets: Executive Summary (KPI counts), Qualys Detail, BitSight Detail, Defender Detail. Apply conditional formatting for critical counts > 0 (red) and ratings < 700 (orange). Using PSWriteHTML, generate an HTML summary for email distribution.",
+      "error_handling": "Report generation is non-blocking. If it fails, log warning but do not halt pipeline — data is already staged to SharePoint."
+    },
+    {
+      "step": 8,
+      "name": "Upload reports to SharePoint and trigger Power BI refresh",
+      "description": "Upload the Excel report to the SharePoint document library: Add-PnPFile -Path $reportPath -Folder 'Shared Documents/Reports'. Then trigger Power BI dataset refresh: POST to https://api.powerbi.com/v1.0/myorg/datasets/{datasetId}/refreshes with a Power BI bearer token. Poll refresh status until Completed or Failed (max 30 minutes).",
+      "error_handling": "On Power BI refresh failure, log the error details from the refresh history response. Do not retry more than once."
+    },
+    {
+      "step": 9,
+      "name": "Send summary email",
+      "description": "Use Send-MgUserMail to send the HTML summary and attach the Excel report. Include KPI summary in the email body: total devices by risk score, average BitSight rating, critical Qualys findings count. Recipients from a configuration variable.",
+      "error_handling": "Email failure is non-blocking. Log warning and exit cleanly."
+    },
+    {
+      "step": 10,
+      "name": "Log completion and disconnect",
+      "description": "Write structured completion log to Output stream: start time, end time, records extracted per source, records inserted/updated per list, Power BI refresh status. Call Disconnect-PnPOnline. Disconnect-MgGraph. This creates a clean audit trail in Azure Automation job history.",
+      "error_handling": "Always execute this step even if prior steps had partial failures."
+    }
+  ],
+  "implementation_notes": [
+    "Run the pipeline daily at 06:00 UTC via Azure Automation schedule. This ensures Power BI reports are current before business hours in most timezones.",
+    "The pipeline is idempotent by design: re-running it on the same day updates existing SharePoint records (via upsert) and re-uploads the report file. Repeated runs do not create duplicates.",
+    "For the first run on a new environment, skip the Power BI refresh trigger until the semantic model is validated against the initial data load.",
+    "Keep each step in a separate function to enable independent testing and debugging. The step sequence above maps directly to function names: Invoke-QualysExtract, Invoke-BitSightExtract, Invoke-DefenderExtract, Invoke-SharePointUpsert, etc.",
+    "For the Executive Summary worksheet, calculate KPIs in PowerShell before writing: total critical findings = ($qualysData | Measure-Object CriticalCount -Sum).Sum; average BitSight rating = ($bitsightData | Measure-Object OverallRating -Average).Average; high-risk device count = ($defenderData | Where-Object RiskScore -eq 'High').Count."
+  ],
+  "caveats": [
+    "Defender for Endpoint API uses a separate token endpoint and permission scope from Microsoft Graph. Acquire it separately from the Graph token.",
+    "Azure Automation sandbox has a 3-hour job timeout. The full pipeline should complete in under 30 minutes for typical portfolio sizes (< 500 Qualys hosts, < 100 BitSight companies, < 10,000 Defender devices).",
+    "Power BI dataset refresh count limits apply (8/day for Pro, 48/day for Premium). Avoid triggering more than once per pipeline run.",
+    "SharePoint list view threshold: ensure SourceKey column is indexed before the list exceeds 5,000 items. For Defender devices (potentially >10,000), use a dedicated list with index.",
+    "BitSight per-company factor detail calls multiply quickly: 100 companies = 101 API calls. With 250ms delay this takes ~25 seconds. For portfolios >500 companies, consider caching factor data and only refreshing companies where the rating changed."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/automation/automation-runbook-types",
+    "https://pnp.github.io/powershell/",
+    "https://docs.qualys.com/en/vm/api/2.0/",
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+    "https://learn.microsoft.com/en-us/microsoft-365/security/defender-endpoint/api-overview",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "powershell-microsoftgraph-sdk-auth-sharepoint",
+    "powershell-pnp-sharepoint-operations",
+    "powershell-qualys-http-client-patterns",
+    "powershell-bitsight-http-client-patterns",
+    "powershell-sharepoint-data-staging-upsert",
+    "powershell-http-retry-rate-limit-patterns",
+    "powershell-report-generation-excel-html-csv",
+    "powershell-scheduling-task-scheduler-azure-automation",
+    "powershell-credential-management-key-vault",
+    "microsoft-security-sharepoint-powerbi-playbook"
+  ],
+  "source_projects": ["shared-seed"]
+}

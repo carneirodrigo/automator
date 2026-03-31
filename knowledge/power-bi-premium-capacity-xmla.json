@@ -1,0 +1,80 @@
+{
+  "id": "power-bi-premium-capacity-xmla",
+  "title": "Power BI Premium Capacity - XMLA Endpoint, Capacity Metrics, And Sizing",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Connecting external tools (SSMS, Tabular Editor, DAX Studio) to Power BI semantic models via XMLA",
+    "Monitoring capacity health and preventing throttling in Power BI Premium",
+    "Choosing between P, EM, A, and F SKUs for security reporting workloads",
+    "Automating dataset operations (refresh, schema changes) via XMLA"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "XMLA endpoint: available in Power BI Premium capacity and Premium Per User. Enable in the Admin portal > Capacity settings > XMLA endpoint (set to Read Only or Read/Write). Connection string format: `powerbi://api.powerbi.com/v1.0/myorg/WorkspaceName`. Connect using SSMS (Analysis Services connection), Tabular Editor, or DAX Studio.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-connect-tools",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "XMLA authentication: uses Entra ID (Azure AD) user credentials or service principal. For service principal XMLA access, the SP must be a workspace member with at least Contributor role, and service principal XMLA access must be enabled in the Admin portal under Developer settings > Allow service principals to use Power BI APIs.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-connect-tools",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Premium capacity SKUs (v-cores): P1 = 8 v-cores, P2 = 16, P3 = 32, P4 = 64, P5 = 128. Premium Per User (PPU) = equivalent to P1 but licensed per user. For security reporting with moderate dataset size (<10GB semantic model, <20 concurrent users), P1 or PPU is typically sufficient. F-SKUs (Fabric) are the current generation and provide better price/performance.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-what-is",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Premium Gen2 (current generation): no per-dataset memory limit — datasets are only limited by total capacity memory. Autoscale is available (A SKU or F SKU required) to handle burst workloads. Gen2 is the default for all new Premium capacities; Gen1 is legacy.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-what-is",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Capacity Metrics app: install the 'Microsoft Fabric Capacity Metrics' app from AppSource. It provides real-time CPU, memory, and operation duration metrics per item (dataset, dataflow, paginated report). Key metric: CPU % utilization — sustained >70% indicates capacity pressure. The 'Overloaded' indicator shows when a capacity was throttled.",
+      "source_url": "https://learn.microsoft.com/en-us/fabric/enterprise/metrics-app",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Trigger a dataset refresh via XMLA using Tabular Object Model (TOM) in C# or PowerShell with Analysis Services Management Objects (AMO): `$server = New-Object Microsoft.AnalysisServices.Tabular.Server; $server.Connect($xmlaConnectionString); $db = $server.Databases[$datasetName]; $db.Model.RequestRefresh([Microsoft.AnalysisServices.Tabular.RefreshType]::Full); $db.Model.SaveChanges()`. Requires the AMO NuGet package.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-connect-tools",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Pause and resume Premium capacity (EM and A SKUs in Azure): use Az.PowerBI module: `Suspend-AzPowerBIEmbeddedCapacity -Name $capacityName -ResourceGroupName $rg` to pause (stop billing). `Resume-AzPowerBIEmbeddedCapacity` to restart. P SKUs (Office 365) cannot be paused. Useful for development/test capacities that only need to run during business hours.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/developer/embedded/azure-pbie-pause-start",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For the security reporting use case, the primary XMLA benefit is using Tabular Editor or DAX Studio to develop and optimise the semantic model against the live production dataset without re-publishing from Power BI Desktop.",
+    "Monitor capacity health weekly using the Capacity Metrics app. If CPU utilisation during the daily pipeline refresh exceeds 70% consistently, either optimise the semantic model (add aggregations, reduce model size) or upgrade SKU.",
+    "For service principal access via XMLA, use a dedicated SP (not the same one used for the PowerShell pipeline) to keep permission scopes separate and audit logs clean."
+  ],
+  "caveats": [
+    "XMLA write operations (schema changes, partition management) require Read/Write endpoint setting. Read Only allows query and refresh but not model modification.",
+    "PPU (Premium Per User) XMLA endpoint only allows access by PPU-licensed users — service principals cannot connect to PPU workspaces via XMLA as of early 2026.",
+    "The Capacity Metrics app is a Power BI report itself and consumes capacity resources. For small capacities (P1), install it in a separate workspace to avoid metrics collection affecting the measured workloads."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-connect-tools",
+    "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-what-is",
+    "https://learn.microsoft.com/en-us/fabric/enterprise/metrics-app"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-rest-api-automation",
+    "power-bi-semantic-modeling-dax"
+  ],
+  "source_projects": ["shared-seed"]
+}

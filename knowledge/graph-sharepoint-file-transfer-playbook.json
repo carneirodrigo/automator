@@ -1,0 +1,105 @@
+{
+  "id": "graph-sharepoint-file-transfer-playbook",
+  "title": "Playbook - Microsoft Graph SharePoint Drive And File CRUD",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Upload, list, update, move, download, and delete SharePoint files and folders through Microsoft Graph drives"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Working Graph OAuth token",
+    "Resolved site ID and drive ID or enough information to discover them",
+    "Target file path, folder path, parent item ID, or driveItem ID"
+  ],
+  "required_permissions": [
+    "Verify least-privilege file permissions such as Files.ReadWrite or Sites.ReadWrite.All for the exact read or write pattern",
+    "For application permissions, ensure admin consent is in place before unattended uploads or deletions"
+  ],
+  "request_sequence": [
+    "Resolve the site if needed: GET /sites/{hostname}:/{relative-path} or another site-discovery method.",
+    "List drives under the site: GET /sites/{site-id}/drives or use /sites/{site-id}/drive for the default document library.",
+    "List files and folders in a location: GET /drives/{drive-id}/items/{item-id}/children or by path under the drive.",
+    "Create a folder: POST /drives/{drive-id}/items/{parent-id}/children with a driveItem body that includes a folder facet.",
+    "Small upload: PUT /drives/{drive-id}/items/{parent-id}:/{filename}:/content with bytes.",
+    "Large upload: POST /drives/{drive-id}/items/{parent-id}:/{filename}:/createUploadSession, then upload chunks to the returned session URL.",
+    "Download a file: GET /drives/{drive-id}/items/{item-id}/content or by path.",
+    "Update file or folder metadata, or move an item: PATCH /drives/{drive-id}/items/{item-id}.",
+    "Delete a file or folder: DELETE /drives/{drive-id}/items/{item-id}."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "Document libraries are represented as drives under the site.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/drive-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Listing children of a folder or container driveItem is supported through the children relationship.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-list-children?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Creating a child driveItem with a folder facet under the children collection creates a folder.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-post-children?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "File download uses the driveItem content endpoint.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Small file uploads can be sent directly with PUT to the content endpoint, and this method supports files up to 250 MB.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Large file uploads should use createUploadSession and chunked transfer.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Updating driveItem properties can also move an item by changing its parentReference.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-update?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Deleting a driveItem moves it to the recycle bin and returns 204 No Content on success.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-delete?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use upload sessions by default when file size may exceed simple upload limits or when transfers need resiliency.",
+    "Treat drive IDs and driveItem IDs as stable handles after discovery.",
+    "Preserve returned metadata from upload and folder-creation responses so later steps can reference item IDs without extra lookups.",
+    "Use PATCH for metadata changes, rename operations, or moves; use PUT content only for actual file content writes."
+  ],
+  "common_failures": [
+    "403 from missing file or site permissions.",
+    "409 naming collisions when creating folders or uploading to an existing path without the intended conflict behavior.",
+    "Interrupted upload-session chunking if the client does not honor the upload-session protocol.",
+    "Deleting by the wrong item ID or path and unexpectedly recycling the wrong document library item."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/drive-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-list-children?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-post-children?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-update?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-delete?view=graph-rest-1.0"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-sharepoint-data-conventions",
+    "graph-sharepoint-site-discovery-playbook",
+    "ms-graph-api-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "sharepoint-graph-research"
+  ]
+}

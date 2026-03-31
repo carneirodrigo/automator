@@ -1,0 +1,89 @@
+{
+  "id": "power-bi-learning-path-routing",
+  "title": "Power BI - Scenario And Learning Path Routing Directory",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Routing Power BI requests by user goal, skill level, and solution shape",
+    "Power BI learning and adoption planning",
+    "Choosing the right Power BI documentation branch for implementation work"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Power BI learning path directory provides curated sequential documentation paths for common Power BI scenarios and is intended to take a user from start to finish for a specific use case.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The scenario selection guide currently identifies fifteen Power BI paths: new user, Excel user, business user, report creator, Copilot user, data analyst, advanced report creator, collaborator, Fabric user, mobile user, admin, developer, DirectQuery user, print-ready reports, and goals and metrics.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The report creator path explicitly includes report authoring, publishing to the service, dashboard creation, refresh, scheduled refresh, and sharing.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The data analyst path emphasizes data sources, Power Query, modeling view, relationships, measures, calculated columns, DAX, time intelligence, calculation groups, tabular modeling, and an end-to-end dimensional model tutorial.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The developer path focuses on embedding, Power BI REST API, Fabric REST APIs, Tabular Model Scripting Language, custom visuals, visuals API, AppSource publishing, and row-level security in embedded scenarios.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The DirectQuery path centers on live connections, import versus DirectQuery versus composite models, Direct Lake, Fabric lakehouses, and DirectQuery model guidance.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The print-ready reports path routes users to paginated reports and Power BI Report Builder rather than standard interactive report pages in Power BI Desktop.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "scenario_selection_rules": [
+    "Use the report creator path when the user wants standard interactive report authoring, publishing, dashboards, refresh, and sharing.",
+    "Use the data analyst path when the request is primarily about connection, shaping, modeling, DAX, relationships, or time-intelligence design.",
+    "Use the advanced report creator path when the user wants bookmarks, drillthrough, custom visuals, conditional formatting, accessibility, or report-performance tuning.",
+    "Use the collaborator path when the request is about workspaces, apps, Teams or SharePoint embedding, subscriptions, endorsement, or deployment pipelines.",
+    "Use the admin path when the request is about tenant settings, governance, licensing, usage metrics, gateways, RLS, or migration governance.",
+    "Use the developer path when the request is about embedding, REST APIs, TMSL, custom visuals, or programmatic integration.",
+    "Use the DirectQuery path when the request is about live data connectivity, composite models, Direct Lake, or low-latency reporting design.",
+    "Use the print-ready reports path when the output must be paginated, print-precise, invoice-style, or export-oriented.",
+    "Use the goals and metrics path when the request is really about scorecards and KPI tracking rather than standard report pages or dashboards.",
+    "Use the Fabric user path when the request explicitly depends on lakehouses, Fabric pipelines, OneLake, Real-Time Intelligence, or Fabric licensing."
+  ],
+  "implementation_notes": [
+    "Treat this directory as a routing aid, not just end-user training. It is useful for deciding whether a Power BI request belongs in Desktop, the service, Report Builder, Fabric, admin tooling, or developer tooling.",
+    "When a user says 'build a Power BI dashboard', check whether they mean an interactive report, a service dashboard, a paginated report, a scorecard, or an embedded experience. The learning-path directory separates these effectively.",
+    "When building implementation guides or orchestration plans, use the scenario path to name the capability family first, then pull deeper endpoint or modeling knowledge from the corresponding KB entries."
+  ],
+  "caveats": [
+    "The directory is a high-level scenario map. It does not replace endpoint-specific API references, modeling documentation, or tenant-governance detail pages.",
+    "Some paths deliberately branch into Fabric or adjacent Microsoft Learn areas, so not every linked page is strictly Power BI-only.",
+    "Copilot, metrics, and some Fabric-integrated features can have licensing or workspace prerequisites that are not fully captured by the directory itself."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-data-sources-and-refresh",
+    "power-bi-modeling-dax-and-relationships",
+    "power-bi-row-level-security-and-governance",
+    "power-bi-embedding-and-apis",
+    "power-bi-samples-and-prototyping-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

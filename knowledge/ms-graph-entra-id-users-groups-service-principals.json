@@ -1,0 +1,87 @@
+{
+  "id": "ms-graph-entra-id-users-groups-service-principals",
+  "title": "Microsoft Graph - Entra ID Users, Groups, And Service Principal Management",
+  "source_family": "microsoft-graph",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Automating user and group management via Microsoft Graph PowerShell or REST",
+    "Service principal and app registration lifecycle management",
+    "Querying Entra ID RBAC role assignments programmatically",
+    "Granting Microsoft Graph application permissions to service principals"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "List users: `GET /users?$select=id,displayName,userPrincipalName,accountEnabled,assignedLicenses&$top=999`. Use `$select` to limit fields returned — improves performance and reduces token size. Paginate via `@odata.nextLink`. Filter disabled accounts: `$filter=accountEnabled eq false`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/user-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List group members: `GET /groups/{groupId}/members?$select=id,displayName,userPrincipalName`. Returns a collection of directoryObject. To get only users (exclude nested groups, devices): `GET /groups/{groupId}/members/microsoft.graph.user`. For transitive membership: `GET /groups/{groupId}/transitiveMembers`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/group-list-members",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List service principals (app registrations): `GET /servicePrincipals?$select=id,appId,displayName,appRoles,oauth2PermissionScopes`. Filter by app ID: `$filter=appId eq '{appId}'`. This returns the service principal object including the list of app roles the SP exposes.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Grant an application permission (app role) to a service principal (app-only access): `POST /servicePrincipals/{spObjectId}/appRoleAssignments` with body `{ \"principalId\": \"<SP object ID>\", \"resourceId\": \"<Graph SP object ID>\", \"appRoleId\": \"<role ID from Graph SP appRoles>\" }`. Requires AppRoleAssignment.ReadWrite.All permission. This is how Managed Identity permissions are assigned programmatically.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-approleassignments",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Look up the Graph service principal object ID (needed for appRoleAssignments): `GET /servicePrincipals?$filter=appId eq '00000003-0000-0000-c000-000000000000'`. The Graph API's fixed appId is always `00000003-0000-0000-c000-000000000000`. The `id` property of the returned object is the resourceId for appRoleAssignment calls.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Look up specific app role IDs for permissions like Sites.ReadWrite.All: `GET /servicePrincipals?$filter=appId eq '00000003-0000-0000-c000-000000000000'&$select=appRoles`. Iterate the `appRoles` array and find the entry where `value` matches the permission name (e.g., 'Sites.ReadWrite.All'). Its `id` is the `appRoleId` for the assignment.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/permissions-reference",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List Entra ID directory role assignments: `GET /roleManagement/directory/roleAssignments?$filter=principalId eq '{userId}'&$expand=roleDefinition`. Returns the Entra ID roles (e.g., Global Reader, Security Reader) assigned to a user or service principal. Requires RoleManagement.Read.Directory permission.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/rbacapplication-list-roleassignments",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Check group membership for a user or service principal: `POST /directoryObjects/{id}/getMemberObjects` with body `{ \"securityEnabledOnly\": false }`. Returns all group and role IDs the object is a direct or transitive member of. Faster than iterating all groups when checking permissions.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/directoryobject-getmemberobjects",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "When granting Graph permissions to a Managed Identity via PowerShell, combine the five steps: get MI service principal ID, get Graph SP object ID, get the app role ID for the target permission, POST appRoleAssignment. Wrap in a function `Grant-GraphPermission -PrincipalId $miObjectId -PermissionName 'Sites.ReadWrite.All'`.",
+    "Use $select on all list queries. Without $select, the API returns all default properties — for users this includes many fields that are rarely needed and inflate response size.",
+    "For audit reporting: `GET /auditLogs/directoryAudits?$filter=activityDateTime ge {dateTime}&$select=activityDateTime,activityDisplayName,initiatedBy,targetResources` returns Entra ID admin audit events. Requires AuditLog.Read.All permission."
+  ],
+  "caveats": [
+    "appRoleAssignment grants are tenant-wide and take effect immediately. Incorrect grants (wrong appRoleId or too-broad permissions) are a security risk. Always verify the permission name from the appRoles array before assigning.",
+    "Group member listing returns a maximum of 100 members per page by default. Large groups (>1000 members) require pagination via @odata.nextLink.",
+    "Directory role assignment queries require the caller to have RoleManagement.Read.Directory or higher. This permission requires admin consent and is not granted by default."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/user-list",
+    "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-approleassignments",
+    "https://learn.microsoft.com/en-us/graph/api/rbacapplication-list-roleassignments",
+    "https://learn.microsoft.com/en-us/graph/permissions-reference"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-oauth2-client-credentials",
+    "ms-graph-security-authorization",
+    "powershell-microsoftgraph-sdk-auth-sharepoint"
+  ],
+  "source_projects": ["shared-seed"]
+}

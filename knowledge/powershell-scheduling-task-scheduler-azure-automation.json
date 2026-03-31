@@ -1,0 +1,99 @@
+{
+  "id": "powershell-scheduling-task-scheduler-azure-automation",
+  "title": "PowerShell Scheduling - Windows Task Scheduler, Azure Automation Runbooks, And Managed Identity",
+  "source_family": "powershell-automation",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Scheduling unattended PowerShell data pipeline scripts on Windows or Azure",
+    "Azure Automation runbooks with Managed Identity for SharePoint and API access",
+    "Hybrid Runbook Workers for on-premises Qualys or internal resource access",
+    "Logging and monitoring scheduled script executions"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Register a daily scheduled task in Windows Task Scheduler via PowerShell: `$action = New-ScheduledTaskAction -Execute 'pwsh.exe' -Argument '-NonInteractive -NoProfile -File \"C:\\Scripts\\SecurityReport.ps1\"'; $trigger = New-ScheduledTaskTrigger -Daily -At '06:00'; $principal = New-ScheduledTaskPrincipal -UserId 'DOMAIN\\SvcAccount' -LogonType Password -RunLevel Highest; Register-ScheduledTask -TaskName 'SecurityReport' -Action $action -Trigger $trigger -Principal $principal`. Use `pwsh.exe` for PowerShell 7, `powershell.exe` for 5.1.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/register-scheduledtask",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Running as SYSTEM on Windows Task Scheduler does not have access to user-profile certificate stores or network credentials for SharePoint Online. Use a dedicated service account (domain or local) with `-LogonType Password` and a stored password, or use a gMSA (Group Managed Service Account) with `-LogonType ServiceAccount` for password-free service accounts.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Azure Automation Accounts support PowerShell 5.1 and PowerShell 7.2 runbooks. PowerShell 7.2 (LTS) is recommended for new runbooks. Import a runbook: `Import-AzAutomationRunbook -AutomationAccountName $aaName -ResourceGroupName $rg -Path $scriptPath -Type 'PowerShell7' -Force`. Publish it: `Publish-AzAutomationRunbook -AutomationAccountName $aaName -ResourceGroupName $rg -Name $runbookName`.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/automation-runbook-types",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Create a recurring Azure Automation schedule: `New-AzAutomationSchedule -AutomationAccountName $aaName -ResourceGroupName $rg -Name 'DailyAt0600' -StartTime (Get-Date '06:00').AddDays(1) -DayInterval 1 -TimeZone 'UTC'`. Link to a runbook: `Register-AzAutomationScheduledRunbook -AutomationAccountName $aaName -ResourceGroupName $rg -RunbookName $rbName -ScheduleName 'DailyAt0600'`.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/shared-resources/schedules",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Enable System-assigned Managed Identity on an Azure Automation Account in the portal (Identity > System assigned > On) or via PowerShell: `Set-AzAutomationAccount -AutomationAccountName $aaName -ResourceGroupName $rg -AssignSystemIdentity`. The identity gets an object ID used for RBAC role assignments.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/enable-managed-identity-for-automation",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "In a runbook using Managed Identity, connect to Azure and Microsoft Graph with no credentials: `Connect-AzAccount -Identity; Connect-MgGraph -Identity`. For PnP.PowerShell: `Connect-PnPOnline -Url $siteUrl -ManagedIdentity`. The Managed Identity must be granted the required permissions (SharePoint site admin, Graph app roles) before the runbook executes.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/enable-managed-identity-for-automation",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Azure Automation Hybrid Runbook Worker: for runbooks that need to reach on-premises resources (Qualys on-prem API gateway, internal SharePoint Server, or internal databases), deploy a Hybrid Worker on an on-premises Windows or Linux machine. The runbook runs locally on the Hybrid Worker but is managed, scheduled, and monitored from the Azure Automation Account.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/automation-hybrid-runbook-worker",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Logging in Azure Automation runbooks: `Write-Output` sends text to the runbook Output stream, visible in the Azure Portal job output and retained for 30 days. `Write-Warning` goes to the Warning stream. `Write-Verbose` goes to the Verbose stream (only visible if verbose logging is enabled on the runbook). Avoid Write-Host in runbooks; it also goes to Output but is not structured.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/automation-runbook-output-and-messages",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Modules in Azure Automation: the runtime sandbox only includes modules explicitly imported into the Automation Account. Import PnP.PowerShell, ImportExcel, or other required modules via: `New-AzAutomationModule -AutomationAccountName $aaName -ResourceGroupName $rg -Name 'PnP.PowerShell' -ContentLinkUri \"https://www.powershellgallery.com/api/v2/package/PnP.PowerShell\"`. Or import from the PowerShell Gallery directly in the portal.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/automation/shared-resources/modules",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For new implementations, prefer Azure Automation with Managed Identity over Windows Task Scheduler. Managed Identity eliminates credential management and Azure Automation provides centralized job history, alerting, and retry without infrastructure maintenance.",
+    "Use Hybrid Runbook Workers when Qualys is on-premises or when the script must reach resources not accessible from Azure (air-gapped networks, on-premises SharePoint Server). The Hybrid Worker handles network bridging while Azure Automation handles scheduling and monitoring.",
+    "Add structured logging to every runbook: write a start timestamp, data source summary (record counts extracted), and end timestamp to the Output stream. This creates an audit trail visible in the Azure Portal without needing external log storage.",
+    "For Windows Task Scheduler, use `-NonInteractive -NoProfile` flags on pwsh.exe to suppress interactive prompts and profile loading, which reduces startup time and prevents profile-level credential stores from interfering.",
+    "Test runbooks manually before scheduling: `Start-AzAutomationRunbook -AutomationAccountName $aaName -ResourceGroupName $rg -Name $rbName -Wait`. The `-Wait` flag blocks until the job completes and returns job output inline."
+  ],
+  "caveats": [
+    "Azure Automation sandbox has a 3-hour job timeout for PowerShell 7.2 runbooks. Long-running data extraction jobs must complete within this limit or be split into multiple smaller jobs.",
+    "Azure Automation sandbox does not have persistent local disk storage across job runs. Write all intermediate data to SharePoint, Azure Blob Storage, or Azure Automation variables.",
+    "Module versions in Azure Automation are locked at import time. If PnP.PowerShell or ImportExcel releases a breaking change, manually update the module in the Automation Account.",
+    "Windows Task Scheduler with a domain service account requires the account to have 'Log on as batch job' rights on the machine. Group Policy may need to be updated by an administrator.",
+    "Azure Automation Managed Identity Graph permissions must be assigned via `New-MgServicePrincipalAppRoleAssignment` — they cannot be assigned through the Azure Portal RBAC blade for Graph API permissions."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/automation/automation-runbook-types",
+    "https://learn.microsoft.com/en-us/azure/automation/shared-resources/schedules",
+    "https://learn.microsoft.com/en-us/azure/automation/enable-managed-identity-for-automation",
+    "https://learn.microsoft.com/en-us/azure/automation/automation-hybrid-runbook-worker",
+    "https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/register-scheduledtask"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "powershell-credential-management-key-vault",
+    "powershell-microsoftgraph-sdk-auth-sharepoint",
+    "powershell-pnp-sharepoint-operations",
+    "powershell-security-reporting-pipeline-playbook"
+  ],
+  "source_projects": ["shared-seed"]
+}

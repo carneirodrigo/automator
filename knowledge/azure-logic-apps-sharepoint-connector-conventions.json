@@ -1,0 +1,54 @@
+{
+  "id": "azure-logic-apps-sharepoint-connector-conventions",
+  "title": "Azure Logic Apps - SharePoint Connector Conventions",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps workflows that use the SharePoint Online connector for list or file operations"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The SharePoint Online connector exposes actions such as Create item, Update item, Delete item, Get items, Create file, Update file, Delete file, Get file content, and Get files (properties only).",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The SharePoint Online connector is a managed connector surface rather than a built-in Logic Apps operation.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Many Logic Apps connectors require creating a separate connection resource that grants access to the target service.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/custom-connector-overview",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use the SharePoint connector when designer simplicity and common list or file actions matter more than low-level Graph control.",
+    "Use Graph instead of the connector when you need richer SharePoint site discovery, drive semantics, or a single consistent Microsoft Graph auth and API model across the workflow.",
+    "When generating Logic Apps solutions, specify whether the target is a SharePoint list, a document library file, or metadata-only file properties because the connector uses different actions for each.",
+    "Treat the SharePoint connection as a managed resource dependency in deployment planning, not just a per-action setting."
+  ],
+  "caveats": [
+    "Connector behavior and available auth modes can differ from raw Microsoft Graph behavior.",
+    "Using the connector and Graph in the same workflow is possible, but it increases operational complexity unless there is a clear reason.",
+    "Managed connector networking and connection behavior differ from built-in operations in Standard logic apps."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/custom-connector-overview"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "ms-graph-sharepoint-data-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

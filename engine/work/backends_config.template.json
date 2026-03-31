@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "mode": "cli",
+  "provider": "anthropic",
+  "default_model": null,
+  "role_overrides": {}
+}

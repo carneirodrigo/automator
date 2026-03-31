@@ -1,0 +1,64 @@
+{
+  "id": "power-bi-reports-and-dashboards",
+  "title": "Power BI - Reports, Dashboards, And Authoring Conventions",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI report creation",
+    "Power BI dashboard creation and usage in the service"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "A Power BI report is a multi-perspective view into a semantic model with one or more pages of visualizations, text, and graphics.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-reports-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Reports can be created in Power BI Desktop and also in the Power BI service, including from semantic models, Excel workbooks, and paginated reports.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-reports-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Dashboards are a feature of the Power BI service, not Power BI Desktop, and a dashboard is a single canvas made of tiles pinned from reports, semantic models, and other content.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Because dashboards are limited to one page, they differ from reports, which can have many pages and many visuals per page.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Dashboard tiles can link to the underlying report, and dashboards are commonly used to monitor important metrics and navigate into deeper report detail.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use reports for analysis, multi-page storytelling, drill-down, and detailed exploration.",
+    "Use dashboards for a curated single-page overview of key metrics, alerts, and entry points into deeper reports.",
+    "If a user asks for a 'dashboard' but also wants detailed filtering, multiple pages, or extensive analysis, a report is usually the primary deliverable and the dashboard is optional on top.",
+    "A good Power BI design flow is semantic model first, then report pages, then optional dashboard pinning in the service."
+  ],
+  "caveats": [
+    "Not every report needs a dashboard. Dashboards are most useful for KPI-style monitoring and at-a-glance navigation.",
+    "Dashboard capabilities are service-centric, so a Desktop-only workflow cannot fully satisfy a dashboard request.",
+    "Pinned dashboard tiles are summaries and can lag behind what a user expects if the semantic model refresh strategy is weak."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-reports-overview",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-data-sources-and-refresh",
+    "power-bi-samples-and-prototyping-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

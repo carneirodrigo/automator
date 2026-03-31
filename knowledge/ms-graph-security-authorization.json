@@ -1,0 +1,122 @@
+{
+  "id": "ms-graph-security-authorization",
+  "title": "Microsoft Graph Security API - Authorization And Entra Role Requirements",
+  "source_family": "microsoft-graph",
+  "coverage_type": "auth",
+  "applies_to": [
+    "Microsoft Graph security API authentication and authorization planning",
+    "App-only and delegated security integrations",
+    "Graph Explorer and custom client access to Microsoft Graph security data"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Microsoft Graph security data is protected by both Graph permissions and Microsoft Entra roles.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Microsoft Graph Security API supports application-level authorization with no signed-in user and user-delegated authorization with a signed-in tenant user.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For delegated access, the signed-in user must be a member of the Security Reader or Security Administrator limited admin role in Microsoft Entra ID, in addition to the application having the required Graph permissions.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Graph Explorer does not support application-level authorization for Microsoft Graph security APIs.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Tenant admin consent is required per tenant and per application for Microsoft Graph security permissions, and changing the app registration permissions does not automatically update previously granted tenant consent snapshots.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The security authorization page states that GET operations require a *.Read.All permission and PATCH, POST, or DELETE operations require the corresponding *.ReadWrite.All permission.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The documented delegated security permission families on the authorization page include SecurityActions.Read.All, SecurityActions.ReadWrite.All, SecurityEvents.Read.All, SecurityEvents.ReadWrite.All, and ThreatIndicators.ReadWrite.OwnedBy.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Windows Defender Advanced Threat Protection data, Microsoft documents extra user-role requirements beyond general Graph security API roles and recommends app-only authentication to avoid delegated-role limitations.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/security-authorization",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authorization_model": {
+    "application_only": {
+      "best_for": [
+        "scheduled data extraction",
+        "daemon or SIEM integrations",
+        "cross-workflow automation",
+        "cases where application-managed RBAC is acceptable"
+      ],
+      "entra_user_role_required": false,
+      "notes": [
+        "Permissions are determined by the application permissions granted by tenant admin consent.",
+        "Graph Explorer cannot be used for this mode."
+      ]
+    },
+    "delegated": {
+      "best_for": [
+        "interactive analyst tools",
+        "user-scoped experiences",
+        "manual exploratory workflows"
+      ],
+      "entra_user_role_required": true,
+      "required_roles": [
+        "Security Reader",
+        "Security Administrator"
+      ],
+      "notes": [
+        "The app still needs tenant-admin-granted Graph permissions.",
+        "The signed-in user must belong to the tenant and hold the required Entra role."
+      ]
+    }
+  },
+  "implementation_notes": [
+    "Prefer app-only authentication for automation, SIEM-style collection, scheduled ingestion, and cross-tenant operational workflows. Pair this entry with ms-graph-oauth2-client-credentials for the token mechanics.",
+    "For delegated workflows, model authorization as a two-part gate: Graph permission grant on the application plus Security Reader or Security Administrator role assignment on the human user.",
+    "When a tenant admin adds new security permissions to an existing app registration, treat admin consent as stale until the tenant admin reconsents. Do not assume tokens will start carrying the new permissions automatically.",
+    "Graph Explorer is useful for delegated testing only. Do not plan Graph Explorer as the validation path for app-only security integrations.",
+    "If the requested data source originates from Defender for Endpoint or other Microsoft 365 Defender-backed providers, check whether the provider imposes extra RBAC or licensing constraints beyond baseline Graph security permissions."
+  ],
+  "common_failure_patterns": [
+    "Admin consent granted in one tenant does not imply consent in another tenant using the same app registration.",
+    "Adding a new security permission in the app registration without re-running tenant admin consent leaves existing tenants with older permission snapshots.",
+    "Delegated token acquisition succeeds but Graph security calls still fail because the user lacks the Security Reader or Security Administrator role.",
+    "A delegated test succeeds in Graph Explorer, but the production design fails because the intended workflow actually requires app-only authorization.",
+    "Provider-backed data can still be inaccessible after Graph consent if the downstream Microsoft security product requires additional role membership or licensing."
+  ],
+  "caveats": [
+    "This entry focuses on security-API authorization semantics, not the OAuth token-exchange mechanics.",
+    "Permission names on the authorization page are a route-planning baseline, but endpoint-specific least-privileged permissions should still be checked on the target API page when implementing a concrete workflow.",
+    "The Microsoft Learn page was last updated on November 7, 2024; endpoint-level pages may expose more current least-privileged permission names for newer security resources such as alerts_v2 or incidents."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/security-authorization",
+    "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-oauth2-client-credentials",
+    "ms-graph-security-permission-planning",
+    "ms-graph-security-api-overview",
+    "ms-graph-security-alerts-incidents",
+    "ms-graph-security-hunting-posture-and-ti"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "ms-graph-security-research"
+  ]
+}

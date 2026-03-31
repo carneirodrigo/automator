@@ -1,0 +1,77 @@
+{
+  "id": "microsoft-defender-endpoint-api-auth-conventions",
+  "title": "Microsoft Defender for Endpoint API - Auth, Base URI, And Versioning Conventions",
+  "source_family": "windows-security",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Microsoft Defender for Endpoint APIs",
+    "App-only and delegated access to Defender for Endpoint data"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-05-12T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Microsoft Defender for Endpoint API access requires OAuth 2.0 authentication through Microsoft Entra ID and supports both application context and user context access.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/apis-intro",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "When granting API permissions in Microsoft Entra ID, the resource is still discovered under the legacy name WindowsDefenderATP.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/api-hello-world",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The current service base URI is https://api.security.microsoft.com and OData-style queries use the /api prefix.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The API supports versioning, and v1.0 can be requested explicitly with URLs such as https://api.security.microsoft.com/api/v1.0/alerts.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For better performance, Microsoft documents regional service hosts such as us.api.security.microsoft.com, eu.api.security.microsoft.com, uk.api.security.microsoft.com, au.api.security.microsoft.com, swa.api.security.microsoft.com, ina.api.security.microsoft.com, and aea.api.security.microsoft.com.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Some Microsoft Defender for Endpoint APIs continue to require access tokens issued for the legacy resource https://api.securitycenter.microsoft.com, and a token with the wrong audience can fail with 403 even when the endpoint host is https://api.security.microsoft.com.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/api-hello-world",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Hello World flow for application context uses client credentials against the tenant OAuth endpoint and demonstrates requesting the legacy Defender resource audience.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/api-hello-world",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/apis-intro",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/api-hello-world",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/management-apis"
+  ],
+  "implementation_notes": [
+    "Prefer application context for unattended automation, including Logic Apps or other scheduled reporting workflows, unless a specific Defender API requires user context.",
+    "Check the Permissions section of the exact method you plan to call; Defender for Endpoint permission names differ by entity family such as Machine, Alert, Vulnerability, Recommendation, and Score.",
+    "If requests fail with 403 even though the permission grant looks correct, verify the token audience against the API family's documented expectation before debugging scopes further.",
+    "Pick a regional endpoint close to the workload when latency or throughput matters, but keep the documented base URI model in the knowledge so callers understand the canonical shape."
+  ],
+  "caveats": [
+    "The product name is Microsoft Defender for Endpoint, but some Entra app-registration and token-audience details still use legacy WindowsDefenderATP or securitycenter identifiers.",
+    "US Government customers use different URIs.",
+    "Permission grants alone are not enough in delegated flows; user roles and device group visibility can also limit data returned."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "microsoft-defender-endpoint-devices-vulnerabilities",
+    "defender-devices-inventory-playbook",
+    "defender-vulnerabilities-playbook",
+    "microsoft-defender-endpoint-reporting-and-score-apis"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "mde-api-research"
+  ]
+}

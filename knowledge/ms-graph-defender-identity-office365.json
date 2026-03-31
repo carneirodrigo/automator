@@ -1,0 +1,73 @@
+{
+  "id": "ms-graph-defender-identity-office365",
+  "title": "Microsoft Graph - Defender for Identity And Defender for Office 365 API Patterns",
+  "source_family": "microsoft-graph",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Extracting Defender for Identity sensor health and identity health issues",
+    "Querying Defender for Office 365 email threat data via Graph security alerts",
+    "Combining identity and email threat signals with endpoint data in security reports"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Defender for Identity data in Graph is under the `/security/identities` namespace. Two endpoints: health issues at `GET /security/identities/healthIssues` and sensors at `GET /security/identities/sensors`. Both require `IdentityRiskEvent.Read.All` or `SecurityIdentitiesHealth.Read.All` application permission and a Defender for Identity plan or Microsoft 365 E5/A5 license.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List Defender for Identity health issues: `GET /security/identities/healthIssues`. Returns a collection with `id`, `displayName`, `healthIssueType` (Sensor, DirectoryServices, etc.), `severity` (low, medium, high), `status` (open, closed), `domainNames`, `description`, and `recommendations`. Filter open high-severity issues: `$filter=status eq 'open' and severity eq 'high'`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/security-identitycontainer-list-healthissues",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List Defender for Identity sensors: `GET /security/identities/sensors`. Returns each sensor's `id`, `displayName`, `sensorType` (AdConnectIntegrated, AdFsIntegrated, DomainControllerIntegrated, etc.), `status` (running, stopped, disconnected), `version`, `domainName`, and `healthStatus`. Use this to audit sensor coverage across domain controllers.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/security-identitycontainer-list-sensors",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Defender for Office 365 alerts surface through the unified alerts endpoint `/security/alerts_v2`. Filter by service source: `GET /security/alerts_v2?$filter=serviceSource eq 'microsoftDefenderForOffice365'`. Alert categories include phishing, malware, suspicious email, BEC (business email compromise). Each alert has `evidence` array with affected mailboxes, users, and email metadata.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-alert",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Other available `serviceSource` filter values for alerts_v2: `microsoftDefenderForEndpoint`, `microsoftDefenderForIdentity`, `microsoftDefenderForCloudApps`, `microsoftDefenderForOffice365`, `microsoft365Defender`, `azureActiveDirectory`, `microsoftSecurityExpertsDR`. Use these to segregate alerts by source in security dashboards.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-alert",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Required permissions for Defender for Identity and Office 365 alert data: `SecurityAlert.Read.All` (application) for alerts_v2, `IdentityRiskEvent.Read.All` for identity-specific risk events, `SecurityIdentitiesHealth.Read.All` for health issues and sensors. All require admin consent.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For a unified security dashboard, collect alerts from all service sources via a single `GET /security/alerts_v2` call with a date filter, then group by `serviceSource` in the reporting layer. This is more efficient than separate calls per product.",
+    "Defender for Identity sensor health is a useful operational metric to include in security reports: it shows whether MDI coverage is complete across all domain controllers. Include sensor count, running percentage, and open health issues in the executive summary.",
+    "Combine Defender for Identity health issues with Defender for Endpoint device data for a holistic identity + endpoint risk view in Power BI."
+  ],
+  "caveats": [
+    "Defender for Identity APIs require an active Defender for Identity subscription. Tenants without MDI configured will receive empty results, not an error.",
+    "Defender for Office 365 alert evidence arrays can be large (many affected mailboxes). Use $select to limit fields and avoid context overload when storing to SharePoint.",
+    "Identity health issues and sensor endpoints are in v1.0 GA but availability in GCC High/DoD clouds should be verified before deployment in government tenants."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/security-identitycontainer-list-healthissues",
+    "https://learn.microsoft.com/en-us/graph/api/security-identitycontainer-list-sensors",
+    "https://learn.microsoft.com/en-us/graph/api/resources/security-alert"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-security-alerts-incidents",
+    "ms-graph-security-api-overview",
+    "microsoft-defender-endpoint-devices-vulnerabilities"
+  ],
+  "source_projects": ["shared-seed"]
+}

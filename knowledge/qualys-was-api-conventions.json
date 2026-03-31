@@ -1,0 +1,91 @@
+{
+  "id": "qualys-was-api-conventions",
+  "title": "Qualys WAS - Findings, Web Applications, And Report Conventions",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Qualys Web Application Scanning integrations",
+    "Qualys API Security workflows implemented through WAS objects"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Qualys WAS uses the tenant-specific Qualys API server URL and authenticates with the broader Qualys API model.",
+      "source_url": "https://docs.qualys.com/en/was/api/get_started/get_started.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS findings can be searched through POST /qps/rest/3.0/search/was/finding.",
+      "source_url": "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The WAS Search Findings API returns findings of type VULNERABILITY, SENSITIVE_CONTENT, or INFORMATION_GATHERED and includes the Qualys detection score (QDS) for WAS detections.",
+      "source_url": "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS findings support filters and response fields such as qid, name, webApp tags, status, severity, OWASP, WASC, CWE, firstDetectedDate, lastDetectedDate, lastTestedDate, and timesDetected.",
+      "source_url": "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS web applications can be searched through POST /qps/rest/3.0/search/was/webapp, and the response can include the TruRisk Score for the web application.",
+      "source_url": "https://docs.qualys.com/en/was/api/web_apps/search_webapps.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS scans can be searched through POST /qps/rest/3.0/search/was/wasscan, including by webApp tags.",
+      "source_url": "https://docs.qualys.com/en/was/api/scans/search_scan.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS scan results can be downloaded through GET /qps/rest/3.0/download/was/wasscan/<id> or the legacy 2.0 route.",
+      "source_url": "https://docs.qualys.com/en/was/api/scans/scan_results.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS reports can be searched through POST /qps/rest/3.0/search/was/report and downloaded through GET /qps/rest/3.0/download/was/report/<id>.",
+      "source_url": "https://docs.qualys.com/en/was/api/reports/search_report.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys documents API assets inside WAS, where the APIs tab shows API name, last scanned date, tags, open vulnerabilities, and TruRisk score, and WAS discovers endpoints from uploaded Swagger data when API scans run.",
+      "source_url": "https://docs.qualys.com/en/was/latest/api/view_apis.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/was/api/get_started/get_started.htm",
+    "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+    "https://docs.qualys.com/en/was/api/web_apps/search_webapps.htm",
+    "https://docs.qualys.com/en/was/api/scans/search_scan.htm",
+    "https://docs.qualys.com/en/was/api/scans/scan_results.htm",
+    "https://docs.qualys.com/en/was/api/reports/search_report.htm",
+    "https://docs.qualys.com/en/was/api/reports/download_report.htm",
+    "https://docs.qualys.com/en/was/latest/reports/reports/reports.htm",
+    "https://docs.qualys.com/en/was/latest/api/view_apis.htm"
+  ],
+  "implementation_notes": [
+    "Treat WAS as its own detection model. Its primary finding grain is a finding on a web application or API asset, not a host vulnerability instance.",
+    "WAS can support reportable vulnerability metrics similar to VMDR, but the dimensions are webApp or API asset, URL, finding type, status, severity, and application tags rather than host asset IDs.",
+    "Use Search Findings when the consumer wants machine-joinable records and trendable finding data. Use Search Report plus Download Report when the consumer wants generated report artifacts.",
+    "API Security should be treated as a WAS-adjacent workflow because Qualys surfaces API assets and endpoint discovery through the WAS application model."
+  ],
+  "caveats": [
+    "Do not mix WAS finding schemas with VMDR host-detection schemas in one parser.",
+    "WAS reports and WAS findings are separate surfaces; reports are generated artifacts, while findings are queryable entities.",
+    "Some API-security concepts are exposed through the WAS application model and UI guidance rather than only through a dedicated standalone API family."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-module-capability-map",
+    "qualys-was-reports-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-broader-capabilities-research"
+  ]
+}

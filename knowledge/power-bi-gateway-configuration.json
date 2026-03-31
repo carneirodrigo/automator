@@ -1,0 +1,87 @@
+{
+  "id": "power-bi-gateway-configuration",
+  "title": "Power BI On-Premises Data Gateway - Configuration, HA Clustering, And VNet Gateway",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Connecting Power BI to on-premises data sources (SQL Server, SharePoint Server, files)",
+    "High-availability gateway cluster setup for production environments",
+    "VNet data gateway for private Azure resources without public endpoint exposure",
+    "Troubleshooting gateway connectivity and authentication failures"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The On-premises data gateway (OPDG) is a Windows service installed on a machine with network access to on-premises resources. Download from https://aka.ms/opdg. The gateway machine must have outbound HTTPS access to Azure Service Bus (*.servicebus.windows.net) and Power BI service (*.analysis.windows.net) — no inbound firewall rules required.",
+      "source_url": "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-install",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Gateway high-availability (HA) cluster: install the gateway on a second machine and during setup choose 'Add to an existing cluster'. The cluster load-balances queries across all healthy nodes. A minimum of 2 nodes is required for HA. Nodes must be on the same Windows domain or workgroup and must be able to reach the same data sources.",
+      "source_url": "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-install",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Gateway service account: the OPDG Windows service runs under a local service account (NT SERVICE\\PBIEgwService by default). This account must have read access to on-premises data sources. For SQL Server sources, grant the service account db_datareader permission. For file shares, grant read access to the share.",
+      "source_url": "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-proxy",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "VNet data gateway (cloud-based, no on-premises install): for data sources in Azure VNets (Azure SQL with private endpoint, Azure Storage with private endpoint), use the Virtual Network data gateway. It runs as a managed service in Azure, associated with a subnet. Create in the Power Platform admin center under Data > Virtual network data gateways. Requires Power BI Premium or Premium Per User.",
+      "source_url": "https://learn.microsoft.com/en-us/data-integration/vnet/overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Data source credentials on the gateway: after registering a gateway, add data sources in the Power BI service under Settings > Manage gateways. Each data source requires credentials (Windows, Basic, OAuth2). Credentials are encrypted and stored in the Power BI service. The gateway decrypts them locally to connect to the data source.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-data-sources",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Gateway diagnostics and troubleshooting: gateway logs are stored at `%localappdata%\\Microsoft\\On-premises data gateway\\GatewayLogs`. Enable verbose logging in the gateway app (Diagnostics > Logging level: Verbose) to capture query details. Common issues: firewall blocking *.servicebus.windows.net (port 443 or 5671/5672), incorrect service account permissions, clock skew > 5 minutes on gateway machine.",
+      "source_url": "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-tshoot",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Gateway update policy: Microsoft releases gateway updates monthly. The gateway will show an update available notification. Auto-update is not enabled by default. Keep the gateway within 6 months of the current release; older versions may lose connectivity to the Power BI service.",
+      "source_url": "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-update",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "SharePoint Online as a Power BI data source does NOT require an on-premises gateway — it is a cloud source. An OPDG is only required for SharePoint Server (on-premises) or local file paths. For SharePoint Online Excel/CSV files used as data sources, connect directly in Power BI Desktop using the SharePoint Online List or SharePoint Folder connector.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-sharepoint-online-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For the security reporting pipeline where Power BI reads from SharePoint Online lists, no gateway is required. A gateway is only needed if Qualys or other sources are on-premises and Power BI needs to connect to them directly.",
+    "For HA production gateways, schedule gateway updates during off-peak hours. Updating one node at a time preserves cluster availability during the update window.",
+    "Use a dedicated service account (not a personal user account) for gateway registration. Personal accounts expire when the user leaves the organization, breaking all dependent data sources.",
+    "Test gateway connectivity to each data source after any network change (firewall rule update, DNS change, VPN reconfiguration). The gateway app's Test connection button provides a fast check without running a full Power BI refresh."
+  ],
+  "caveats": [
+    "VNet data gateway requires Premium capacity or Premium Per User. It is not available in the free or Pro tiers.",
+    "Gateway HA clusters require all nodes to run the same gateway version. Staggered updates may cause temporary version mismatch; upgrade all nodes within the same maintenance window.",
+    "The OPDG does not support data sources that require interactive authentication (e.g., MFA-enforced accounts). Use service accounts with MFA excluded via Conditional Access policy for gateway data source credentials."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-install",
+    "https://learn.microsoft.com/en-us/data-integration/gateway/service-gateway-tshoot",
+    "https://learn.microsoft.com/en-us/data-integration/vnet/overview",
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-data-sources"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-data-sources-and-refresh",
+    "power-bi-overview-and-routing"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,107 @@
+{
+  "id": "graph-attack-simulation-playbook",
+  "title": "Playbook - Microsoft Graph Attack Simulation Retrieval",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": ["Export attack simulation and simulation user results from Microsoft Graph"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Tenant licensing: Microsoft 365 E5 or Microsoft Defender for Office 365 Plan 2",
+    "Cloud environment must be Worldwide or GCC — Graph APIs for Attack Simulation are unavailable in GCC High and DoD",
+    "Admin consent for AttackSimulation.Read.All granted by Global Administrator or Privileged Role Administrator",
+    "Working app-only Graph token with the required security permissions",
+    "Simulation display name or simulation ID",
+    "CSV or downstream schema for flattened simulation user results"
+  ],
+  "required_permissions": [
+    "AttackSimulation.Read.All application permission for unattended access"
+  ],
+  "request_sequence": [
+    "Authenticate: POST https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token with client_credentials grant, scope=https://graph.microsoft.com/.default",
+    "List simulations: GET /v1.0/security/attackSimulation/simulations with optional OData filter (e.g. $filter=displayName eq '{name}')",
+    "If OData filter fails due to special characters in displayName, list all simulations (paginating with @odata.nextLink) and match client-side",
+    "Resolve the target simulation ID from displayName or other metadata",
+    "Get campaign overview: GET /v1.0/security/attackSimulation/simulations/{simulationId}/report/overview — returns resolvedTargetsCount, simulationEventsContent, trainingEventsContent, and recommendedActions; use as summary-level data for reporting",
+    "Get user results: GET /v1.0/security/attackSimulation/simulations/{simulationId}/report/simulationUsers with $top=100",
+    "Follow @odata.nextLink until exhausted to collect all user records",
+    "Flatten each userSimulationDetails record: promote simulationUser fields (userId, displayName, email) to top level, expand simulationEvents[] by eventName, derive training summary from trainingEvents[].latestTrainingStatus",
+    "Write to CSV with columns: simulationName, userEmail, userDisplayName, isCompromised, compromisedDateTime, reportedPhishDateTime, assignedTrainingsCount, completedTrainingsCount, inProgressTrainingsCount, plus event/training columns as needed"
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "Simulations are listed from /v1.0/security/attackSimulation/simulations.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Campaign overview metrics are available from /v1.0/security/attackSimulation/simulations/{simulationId}/report/overview.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/simulationreportoverview-get?view=graph-rest-1.0",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Simulation user results are returned from /v1.0/security/attackSimulation/simulations/{simulationId}/report/simulationUsers.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "The simulationUsers endpoint supports $count, $skipToken, and $top, but not $filter, $select, or $orderby.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Pagination uses @odata.nextLink and skip tokens rather than numeric skip offsets.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "userSimulationDetails CSV-relevant fields: isCompromised (Boolean), compromisedDateTime (DateTimeOffset), reportedPhishDateTime (DateTimeOffset), assignedTrainingsCount, completedTrainingsCount, inProgressTrainingsCount; simulationUser.email, simulationUser.displayName",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationdetails?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    },
+    {
+      "fact": "Key simulationEvents eventName values observed in production: SuccessfullyDeliveredEmail, EmailLinkClicked, ReportedPhish",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationeventinfo?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    },
+    {
+      "fact": "Attack sim Graph APIs are documented as unavailable in GCC High and DoD environments.",
+      "source_url": "https://learn.microsoft.com/en-us/office365/servicedescriptions/microsoft-defender-for-office-365-features",
+      "verified_date": "2026-03-23"
+    }
+  ],
+  "implementation_notes": [
+    "Apply filtering on simulations endpoint (supports $filter on displayName), not on simulationUsers (no $filter support).",
+    "Have a client-side fallback when displayName filtering is brittle due to special characters (parentheses, slashes in name).",
+    "Normalize nested training and event arrays explicitly before CSV export.",
+    "Recommended CSV column set: simulationName, userEmail, userDisplayName, isCompromised, compromisedDateTime, reportedPhishDateTime, assignedTrainingsCount, completedTrainingsCount, inProgressTrainingsCount — expand simulationEvents and trainingEvents as additional columns as required by consumer.",
+    "Token caching: expires_in is ~3599s — cache and refresh before expiry to avoid per-request token overhead.",
+    "Use report/overview for summary-level tenant metrics (total targeted, click rates, training completion); use simulationUsers for per-user export and downstream training tracking."
+  ],
+  "common_failures": [
+    "403 when AttackSimulation.Read.All is missing or not admin-consented",
+    "404 when the simulation ID is wrong or stale",
+    "Partial exports if the client ignores nextLink pagination",
+    "OData $filter rejection for displayName values containing parentheses or slashes — fall back to client-side match",
+    "Missing simulationUser fields (null userId/email) for guest or deleted accounts — guard with None checks before writing CSV",
+    "403 or empty data when calling from GCC High or DoD tenant — Attack Simulation Graph APIs are not supported in those clouds even if the Defender portal product is available",
+    "Incomplete user data when on-premises mailboxes are in scope — expected reduced reporting behavior, not an auth error; document in prerequisites and troubleshooting"
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/simulationreportoverview-get?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationdetails?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/attacksimulationuser?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationeventinfo?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/usertrainingeventinfo?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/office365/servicedescriptions/microsoft-defender-for-office-365-features"
+  ],
+  "last_verified": "2026-03-27T00:00:00Z",
+  "related_entries": [
+    "ms-graph-attack-simulation-api",
+    "ms-graph-api-conventions",
+    "ms-graph-oauth2-client-credentials"
+  ],
+  "source_projects": ["shared-seed", "ms-attack-sim-results", "implementation-guide-smoke"]
+}

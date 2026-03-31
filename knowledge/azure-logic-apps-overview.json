@@ -1,0 +1,77 @@
+{
+  "id": "azure-logic-apps-overview",
+  "title": "Azure Logic Apps - Platform, Hosting Models, And Core Concepts",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Azure Logic Apps solution design",
+    "Choosing the correct Logic Apps hosting model before implementation"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Azure Logic Apps is a cloud platform for creating and running automated workflows across cloud, on-premises, and hybrid systems with low-code and no-code tools.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Azure Logic Apps provides more than 1,400 prebuilt connectors.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Azure Logic Apps distinguishes built-in connector operations, which run natively with the Logic Apps runtime, from managed connector operations, which are Microsoft-managed connectors hosted in Azure.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Built-in connector availability differs between Consumption and Standard workflows, and some built-in connectors are available only in one hosting model.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A Consumption logic app resource supports a single workflow hosted in multitenant Azure Logic Apps, while a Standard logic app resource supports multiple workflows hosted in single-tenant Azure Logic Apps, App Service Environment v3, or a partially connected environment.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Standard logic apps support both stateful and stateless workflows inside one logic app resource.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Single-tenant Azure Logic Apps supports direct access to resources in Azure virtual networks and keeps workflow data in the same region where the logic app is deployed.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare"
+  ],
+  "implementation_notes": [
+    "Choose Consumption when you need the simplest multitenant, pay-per-execution model and only one workflow per resource is acceptable.",
+    "Choose Standard when you need single-tenant isolation, multiple workflows per resource, integrated virtual-network access, or more control over runtime and performance settings.",
+    "Treat built-in operations and managed connectors differently in architecture and security planning because they run in different places and have different connection behavior.",
+    "After choosing the hosting model, validate the connector strategy separately because built-in connector availability and behavior differ between Consumption and Standard."
+  ],
+  "caveats": [
+    "Consumption and Standard have materially different deployment, hosting, networking, and billing behavior; do not treat them as equivalent runtimes.",
+    "Data residency expectations differ between multitenant and single-tenant models.",
+    "Feature selection should account for whether the required connector or operation is built-in, managed, or only available under a specific hosting model."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-built-in-connectors",
+    "azure-logic-apps-limits-and-networking",
+    "azure-logic-apps-solution-playbook",
+    "power-platform-api-auth-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "id": "power-automate-github-connector-conventions",
+  "title": "Power Automate - GitHub Connector Patterns And Constraints",
+  "source_family": "power-platform",
+  "coverage_type": "workflow",
+  "applies_to": ["Power Automate", "GitHub connector", "GitHub REST API", "cloud flows"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-23T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Microsoft publishes an official GitHub connector for Power Automate listed as Standard tier (not Premium). It exposes a Get all issues of a repository action with parameters: owner, repository name, milestone, state, assignee, creator, mentioned, labels, sort, direction, since, per_page, and page.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/github/",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "The GitHub connector is throttled at 100 API calls per connection per 60 seconds.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/github/",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub connector authentication is a delegated GitHub connection managed by Power Automate. The exact OAuth scopes requested behind the connection setup are not published in the connector reference documentation.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/github/",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "The HTTP with Microsoft Entra ID connector is specifically for resources authenticated by Microsoft Entra ID and is NOT the correct connector for GitHub's native token-based API authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/webcontentsv2/",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Power Automate Data Operations available for reshaping GitHub issue JSON inside cloud flows: Parse JSON, Select, Filter array, Create HTML table, Create CSV table, Join, and Compose.",
+      "source_url": "https://learn.microsoft.com/en-us/power-automate/data-operations",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Power Automate outbound synchronous HTTP call timeout limit is 120 seconds per single request.",
+      "source_url": "https://learn.microsoft.com/en-us/power-automate/limits-and-config",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "When no suitable connector is available, the HTTP connector is the next-best method for one-off Power Automate API integrations, but connector-based automation is preferred first per Microsoft planning guidance.",
+      "source_url": "https://learn.microsoft.com/en-us/power-automate/guidance/planning/determine-automation-methods",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/connectors/github/",
+    "https://learn.microsoft.com/en-us/power-automate/guidance/planning/determine-automation-methods",
+    "https://learn.microsoft.com/en-us/training/modules/http-connectors/",
+    "https://learn.microsoft.com/en-us/power-automate/data-operations",
+    "https://learn.microsoft.com/en-us/connectors/webcontentsv2/",
+    "https://learn.microsoft.com/en-us/power-automate/limits-and-config"
+  ],
+  "implementation_notes": [
+    "Recommended default flow shape: manual/scheduled trigger -> GitHub Get all issues of a repository -> optional Parse JSON -> Filter array (exclude pull requests) -> Select (reshape fields) -> Create HTML table or structured array.",
+    "Connector authentication is a Power Automate GitHub connection owned by the connection reference, not an inline token in the flow body. Do not document or screenshot tokens inside action definitions.",
+    "Avoid specifying exact connector OAuth scope strings in runbooks since they are not published; describe auth as a delegated GitHub connection managed by the connector.",
+    "For advanced scenarios requiring exact Link header pagination or x-ratelimit-* header inspection, use a raw HTTP action instead of the connector — the connector does not reliably expose raw response headers.",
+    "For raw HTTP fallback: use Authorization: Bearer <token>, Accept: application/vnd.github+json, X-GitHub-Api-Version: 2022-11-28, and a valid User-Agent header.",
+    "For raw HTTP PAT-based flows targeting private repos, prefer fine-grained PATs scoped to the target repository with Issues: read.",
+    "Large repositories (>100 issues) require explicit paging loops; loop over the page parameter until the response is empty."
+  ],
+  "caveats": [
+    "Connector does not expose raw pagination (Link) or rate-limit (x-ratelimit-*) headers; raw HTTP fallback required for advanced header-driven pagination control.",
+    "Connector OAuth scopes are opaque — the connector reference does not publish the exact GitHub scopes it requests.",
+    "GitHub connector response may include pull requests in the issues list; use Filter array to exclude objects containing a pull_request key.",
+    "HTTP with Microsoft Entra ID is a wrong connector choice for GitHub — it is Entra-scoped only."
+  ],
+  "last_verified": "2026-03-23T00:00:00Z",
+  "related_entries": ["github-rest-api-issues-conventions", "power-automate-graph-connector-conventions"],
+  "source_projects": ["implementation-guide-smoke-codex-2"]
+}

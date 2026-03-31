@@ -1,0 +1,93 @@
+{
+  "id": "azure-logic-apps-monitoring-observability",
+  "title": "Azure Logic Apps - Monitoring, Observability, And Failure Alerting",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Monitoring daily Logic Apps data pipelines in production",
+    "Querying run history and diagnosing action failures via KQL",
+    "Setting up failure alerts for security data pipelines",
+    "Application Insights integration for Logic Apps workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Enable diagnostics for Consumption Logic Apps: in the portal go to Diagnostics settings > Add diagnostic setting. Send WorkflowRuntime logs and AllMetrics to a Log Analytics workspace. Categories: WorkflowRuntime covers run start/end, action start/end, and trigger events.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Standard Logic Apps have built-in Application Insights support configured at resource creation. Enable or update via the portal under Settings > Application Insights or set APPLICATIONINSIGHTS_CONNECTION_STRING in app settings. Traces, dependencies, and custom events are emitted automatically.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-single-tenant-workflows-azure-portal",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "KQL query to find failed workflow runs in Log Analytics: `AzureDiagnostics | where ResourceProvider == 'MICROSOFT.LOGIC' | where category == 'WorkflowRuntime' | where status_s == 'Failed' | project TimeGenerated, resource_workflowName_s, error_message_s, runId_s | order by TimeGenerated desc`.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps-log-analytics",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "KQL query to find failed actions within runs: `AzureDiagnostics | where ResourceProvider == 'MICROSOFT.LOGIC' | where category == 'WorkflowRuntime' | where OperationName == 'Microsoft.Logic/workflows/workflowActionCompleted' | where status_s == 'Failed' | project TimeGenerated, resource_actionName_s, error_code_s, error_message_s, runId_s`.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps-log-analytics",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Run history retention: Consumption Logic Apps retain run history for 90 days in the portal. Standard Logic Apps retain history for 60 days by default, configurable up to 90 days via host.json `runHistoryRetentionInDays`. Log Analytics / App Insights retention is governed by the workspace retention setting (default 30 days, configurable to 730 days).",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Create an Azure Monitor alert rule for Logic App failures: in the portal go to the Logic App > Alerts > New alert rule. Condition: metric 'Runs Failed' > 0, aggregation period 5 minutes. Action group: email, SMS, or webhook to Teams/Slack. This fires within minutes of a failed run without polling the run history API.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Available metrics for Consumption Logic Apps in Azure Monitor: Runs Started, Runs Completed, Runs Succeeded, Runs Failed, Runs Skipped, Runs Throttled, Action Latency, Trigger Latency, Billable Action Executions, Billable Trigger Executions. All metrics available with 1-minute granularity.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Add custom tracking properties to Logic Apps actions to improve log correlation: in the action properties, add a 'Tracked Properties' object with key-value pairs such as `{\"correlationId\": \"@{triggerBody()?['id']}\", \"dataSource\": \"Qualys\"}`. Tracked properties appear as custom dimensions in Application Insights and as columns in Log Analytics.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps-log-analytics",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Query Logic Apps run duration distribution in KQL: `AzureDiagnostics | where ResourceProvider == 'MICROSOFT.LOGIC' | where OperationName == 'Microsoft.Logic/workflows/workflowRunCompleted' | extend durationMs = todouble(end_t - start_t) / 10000 | summarize avg(durationMs), percentiles(durationMs, 50, 95, 99) by resource_workflowName_s`.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps-log-analytics",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For security data pipelines that run daily, set up two alert rules: one for Runs Failed > 0 (immediate notification) and one for Runs Succeeded = 0 over a 25-hour window (catches silent non-starts).",
+    "Use a Log Analytics workspace shared across all related Logic Apps so cross-workflow correlation queries work — for example, correlating a Qualys extraction failure with a downstream SharePoint write failure.",
+    "Add a consistent 'pipelineRun' tracked property across all actions in a workflow. Set it to the trigger timestamp at the start. This lets you filter all logs for a specific execution with a single KQL filter.",
+    "For Standard Logic Apps, use the built-in monitoring dashboard in the portal (Overview > Runs history) for day-to-day operations. Use KQL in Log Analytics for trend analysis and alerting."
+  ],
+  "caveats": [
+    "Diagnostics settings must be configured before data is sent to Log Analytics. Logs are not retroactively populated; historical runs before settings were enabled will not appear.",
+    "Consumption Logic App metrics are available in Azure Monitor immediately; Log Analytics ingestion has a 2-5 minute latency.",
+    "Standard Logic Apps in single-tenant mode emit telemetry in the OpenTelemetry format; queries may require slightly different KQL schemas compared to Consumption.",
+    "Run history in the portal is limited to 1000 runs for Consumption. For workflows with higher frequency, rely on Log Analytics for complete history."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/monitor-logic-apps-log-analytics",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview-and-hosting-models",
+    "azure-logic-apps-reliability-error-handling"
+  ],
+  "source_projects": ["shared-seed"]
+}

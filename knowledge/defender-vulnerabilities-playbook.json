@@ -1,0 +1,63 @@
+{
+  "id": "defender-vulnerabilities-playbook",
+  "title": "Playbook - Defender For Endpoint Vulnerability Retrieval",
+  "source_family": "windows-security",
+  "coverage_type": "workflow",
+  "applies_to": ["Retrieve Defender for Endpoint machine vulnerability and recommendation data"],
+  "verification_status": "current",
+  "fresh_until": "2026-05-04T18:40:00Z",
+  "prerequisites": [
+    "Working Defender API token with vulnerability-management permissions",
+    "Decision on whether the output is machine-centric, software-centric, or recommendation-centric",
+    "Downstream join strategy keyed by machine ID, software ID, or CVE ID"
+  ],
+  "required_permissions": [
+    "Threat and Vulnerability Management read permissions appropriate to the target endpoint",
+    "If using delegated auth, ensure Defender role alignment in addition to token scopes"
+  ],
+  "request_sequence": [
+    "Retrieve machine/software vulnerability rows: GET /api/vulnerabilities/machinesVulnerabilities",
+    "Apply OData filters for CVE, machineId, productName, severity, or vendor as needed",
+    "Optionally enrich with software detail endpoints such as GET /api/Software/{id}",
+    "Optionally pull recommendations through the recommendations endpoints",
+    "Join and normalize in your own pipeline rather than expecting one endpoint to return every dimension"
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The vulnerabilities-by-machines API supports OData filtering on fields including cveId, machineId, productName, severity, and productVendor.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-vulnerabilities-by-machines",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "The vulnerabilities-by-machines API also supports paging controls such as $top and $skip.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-vulnerabilities-by-machines",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Software details can be retrieved separately from software resource endpoints.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-software-by-id",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "implementation_notes": [
+    "Keep vulnerability extraction machine-aware from the start so later remediation reporting is easier.",
+    "Filter early by severity or product family when producing periodic reports.",
+    "Do not mix attack simulation into this playbook; that is a Graph security workflow."
+  ],
+  "common_failures": [
+    "403 from missing TVM-specific permissions even when machine inventory works",
+    "Huge result sets if no OData filtering is applied",
+    "Data duplication if you flatten machine/software rows without a clear primary key strategy"
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-vulnerabilities-by-machines",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-software-by-id",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-recommendations"
+  ],
+  "last_verified": "2026-03-20T18:40:00Z",
+  "related_entries": [
+    "microsoft-defender-endpoint-devices-vulnerabilities",
+    "microsoft-defender-endpoint-api-auth-conventions"
+  ],
+  "source_projects": ["shared-seed"]
+}

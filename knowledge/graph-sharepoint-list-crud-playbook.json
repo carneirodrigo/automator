@@ -1,0 +1,92 @@
+{
+  "id": "graph-sharepoint-list-crud-playbook",
+  "title": "Playbook - Microsoft Graph SharePoint List And List Item CRUD",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Create, read, update, and delete SharePoint lists and list items through Microsoft Graph"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Microsoft Entra app with Graph token acquisition working",
+    "SharePoint site hostname and site-relative path, site ID, or site-discovery strategy",
+    "Permissions aligned to list creation or list item access requirements"
+  ],
+  "required_permissions": [
+    "List creation: least privileged delegated or application permission is Sites.Manage.All",
+    "List item read and write patterns typically require Sites.Read.All or Sites.ReadWrite.All depending on operation",
+    "For unattended automation, use application permissions with admin consent where required"
+  ],
+  "request_sequence": [
+    "Resolve the target site by path, search, tenant enumeration, or direct site ID.",
+    "List available lists if needed: GET /sites/{site-id}/lists.",
+    "Create a new list when required: POST /sites/{site-id}/lists with displayName, list template, and optional columns.",
+    "Read items: GET /sites/{site-id}/lists/{list-id}/items?expand=fields.",
+    "Create an item: POST /sites/{site-id}/lists/{list-id}/items with a body containing fields.",
+    "Update an item: PATCH /sites/{site-id}/lists/{list-id}/items/{item-id}/fields with changed columns only.",
+    "Delete an item: DELETE /sites/{site-id}/lists/{list-id}/items/{item-id}."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "Lists can be enumerated from a site with GET /sites/{site-id}/lists.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/list-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "List creation uses POST /sites/{site-id}/lists, and if the list facet or template is unspecified the list defaults to the genericList template, which includes a Title column.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/list-create?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "List items can be listed and expanded with fields through the list item APIs.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "List item creation uses POST to the list items collection, with column values inside the fields object.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-create?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "List item updates are performed against the item fields resource with PATCH semantics.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-update?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "List item deletion uses DELETE /sites/{site-id}/lists/{list-id}/items/{item-id} and returns 204 No Content on success.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-delete?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Expand fields when reading items so column values arrive in one pass.",
+    "Treat internal field names as the write contract, not display labels.",
+    "Create the list only once and then cache site ID and list ID for repeat operations.",
+    "If concurrency matters, use the if-match header with item deletion or updates to avoid accidental overwrites or deletes on stale data."
+  ],
+  "common_failures": [
+    "403 when the token lacks the required Sites scopes for list creation or item writes.",
+    "400 when the request uses display names instead of internal field names.",
+    "404 when the resolved site ID or list ID does not belong to the intended tenant site.",
+    "412 Precondition Failed when using if-match with a stale eTag."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/list-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/list-create?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-create?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-update?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-delete?view=graph-rest-1.0"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-sharepoint-data-conventions",
+    "graph-sharepoint-site-discovery-playbook",
+    "ms-graph-api-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "sharepoint-graph-research"
+  ]
+}

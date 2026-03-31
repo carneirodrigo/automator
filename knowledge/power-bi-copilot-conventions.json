@@ -1,0 +1,71 @@
+{
+  "id": "power-bi-copilot-conventions",
+  "title": "Power BI - Copilot Capabilities, Requirements, And Routing",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI Copilot planning",
+    "AI-assisted report creation and insights in Power BI",
+    "Copilot readiness and enablement checks"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Power BI learning path includes a dedicated Copilot path covering Copilot overview, enablement, report creation, narratives, DAX generation, report chat, semantic model evaluation, prompting guidance, and data preparation for AI.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI Copilot capabilities span chat-based analysis, DAX generation, AI-assisted report creation, and AI-written narratives.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-introduction",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Copilot requires administrator enablement in Microsoft Fabric and an organizational capacity such as paid Fabric capacity F2 or higher or Power BI Premium capacity P1 or higher; Pro or PPU alone is not sufficient.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-create-report",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Copilot isn't supported on trial SKUs or trial capacities and is not yet supported for sovereign clouds according to the requirements page surfaced by the Power BI Copilot documentation.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-create-report",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Using Copilot in Power BI Desktop requires access to at least one workspace on a paid Fabric or Premium capacity with Copilot enabled, and the tenant-level Fabric Copilot setting must also be enabled.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-power-bi-desktop",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "selection_rules": [
+    "Use Copilot guidance when the user wants AI-assisted authoring, summarization, DAX help, or natural-language report interaction.",
+    "Do not route a request to Copilot-first patterns unless capacity, tenant settings, and supported-region prerequisites are satisfied.",
+    "Use normal report-authoring guidance instead of Copilot guidance when the environment lacks the required capacity or admin enablement."
+  ],
+  "implementation_notes": [
+    "Treat Copilot as an accelerator layered on top of Power BI modeling and reporting, not a substitute for a sound semantic model.",
+    "Before planning a Copilot-enabled implementation, confirm tenant enablement, supported capacity, supported region, and workspace access.",
+    "If results quality matters, include data-preparation guidance. Microsoft explicitly links Copilot usefulness to prepared data and business context."
+  ],
+  "caveats": [
+    "Copilot availability is environment-dependent and can fail for governance or capacity reasons even when users have normal Power BI access.",
+    "Some Copilot experiences are preview-only or have different workspace and billing behavior.",
+    "A Copilot-enabled environment can still produce weak results if the semantic model and business metadata are poorly prepared."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-introduction",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-create-report",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/copilot-power-bi-desktop"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-learning-path-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-modeling-dax-and-relationships"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "id": "defender-devices-inventory-playbook",
+  "title": "Playbook - Defender For Endpoint Device Inventory And Onboarding Counts",
+  "source_family": "windows-security",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Retrieve Defender for Endpoint machine inventory for automation or reporting",
+    "Count onboarded devices for security reports and dashboards"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-05-12T00:00:00Z",
+  "prerequisites": [
+    "Defender for Endpoint app registration and token flow working",
+    "Machine.Read or Machine.Read.All-equivalent permission grant verified for the chosen auth mode",
+    "Filtering criteria such as onboarding status, device group, risk, or last seen date"
+  ],
+  "required_permissions": [
+    "Application or delegated machine-read permissions",
+    "Delegated flows additionally require a user role with at least view access and device group visibility"
+  ],
+  "request_sequence": [
+    "Acquire a token for the Defender for Endpoint API audience expected by the target API family.",
+    "List devices: GET https://api.security.microsoft.com/api/machines.",
+    "Apply OData filters such as onboardingStatus, healthStatus, riskScore, or lastSeen where useful.",
+    "Follow pagination or iterate with $top and $skip as documented.",
+    "Compute onboarded-device counts from the filtered machine set or persist detailed machine rows for downstream reporting.",
+    "Fetch per-machine enrichment only when needed to avoid overfetching."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "Device inventory is exposed at GET /api/machines.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The machines API supports OData operators including $filter, $top, and $skip.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The machines API supports filtering on fields including computerDnsName, id, version, deviceValue, machineTags, onboardingStatus, lastSeen, and exposureLevel.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The machines API returns up to 10,000 devices by default with a maximum page size of 10,000.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Delegated access also depends on Defender role permissions and device group visibility, not only token scopes.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "For onboarded-device counts, filter server-side on onboardingStatus whenever the reporting question is specifically about onboarded devices.",
+    "Persist machine ID as the durable join key for later joins to alerts, vulnerabilities, recommendations, or device-group score data.",
+    "Use server-side filters first because machine inventories can become large.",
+    "For monthly reporting, store extracted snapshots or period-end counts; the machines API is a live inventory surface and not a built-in historical trend endpoint."
+  ],
+  "common_failures": [
+    "401 from wrong token audience.",
+    "403 from missing Defender role visibility or permission grant.",
+    "Incomplete inventories when the client only reads the first page.",
+    "Confusing current live inventory with a historical month-end population count."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machine-by-id",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/apis-intro"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "microsoft-defender-endpoint-api-auth-conventions",
+    "microsoft-defender-endpoint-devices-vulnerabilities",
+    "microsoft-defender-endpoint-reporting-and-score-apis"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "mde-api-research"
+  ]
+}

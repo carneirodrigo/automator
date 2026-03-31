@@ -1,0 +1,66 @@
+{
+  "id": "bitsight-portfolio-entity-management",
+  "title": "BitSight Portfolio And Entity Management - Listing, Attributes, And Bulk Operations",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Retrieving the full monitored company portfolio and entity metadata",
+    "Enriching BitSight data with company attributes for segmentation in reports",
+    "Managing portfolio membership and identifying new or removed companies"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "List all monitored portfolio companies: `GET https://api.bitsighttech.com/ratings/v1/companies`. Returns a `results` array (paginated via `links.next`). Each company entry includes: `guid`, `name`, `shortname`, `rating`, `rating_date`, `industry_percentile`, `industry` (category string), `primary_domain`, `size` (employee range), `founded`, and `factors` array.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Company detail fields (from `GET .../companies/{guid}`): beyond the portfolio listing, detail includes `display_url`, `slug`, `confidence`, `rating_details` (per-factor breakdown), `country_code`, `type` (Company/Subsidiary/etc.), and `tags` (custom tags assigned in the BitSight portal).",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Industry and size segmentation: the `industry` field is a human-readable string (e.g., 'Technology', 'Financial Services', 'Healthcare'). The `size` field is a range string (e.g., '1,000-4,999', '10,000+'). Use these for grouping in Power BI reports — group companies by industry tier and show average rating and rating distribution per tier.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Detect portfolio changes between pipeline runs: on each run, compare the set of GUIDs returned by `GET /ratings/v1/companies` with the previous run's GUID set (stored in SharePoint or a text file). New GUIDs = added companies; GUIDs absent = removed companies. Log additions and removals for audit trail.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Custom tags on companies: if your BitSight portal has custom tags assigned to companies (e.g., 'Critical Vendor', 'Tier 1'), the `tags` field in company details returns these. Use tags to drive tier-based alerting thresholds in automation: Critical Vendor companies trigger alerts at rating < 600, Standard companies at rating < 500.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Build a `BitSightCompanies` SharePoint lookup list with CompanyGuid, CompanyName, Industry, Size, PrimaryDomain, Tags, AddedDate, and IsActive flag. Use this as a dimension table in the Power BI semantic model, joined to ratings and findings fact tables on CompanyGuid.",
+    "Refresh the company dimension table weekly rather than daily — company metadata (name, industry, size) changes infrequently. Daily pipeline runs only need to update the rating values.",
+    "Use the Tags field to drive different alert thresholds per company tier. Store the tier logic in a SharePoint configuration list (`CompanyTier`, `RatingAlertThreshold`) rather than hardcoding in the pipeline script."
+  ],
+  "caveats": [
+    "Portfolio membership is controlled in the BitSight portal and via the subscription. Companies cannot be added or removed via the public API in most subscription tiers — this must be done through the portal or BitSight support.",
+    "The `industry` field values are controlled by BitSight's taxonomy and may not match your internal industry classification. Create a mapping table in SharePoint to normalise to your internal categories.",
+    "GUIDs are stable identifiers but company names can change (e.g., post-acquisition). Always join on GUID, not on name."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-current-ratings-api",
+    "bitsight-historical-ratings-trend-analysis",
+    "powershell-bitsight-http-client-patterns",
+    "powershell-sharepoint-data-staging-upsert"
+  ],
+  "source_projects": ["shared-seed"]
+}

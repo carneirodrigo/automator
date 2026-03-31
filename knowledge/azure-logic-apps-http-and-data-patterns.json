@@ -1,0 +1,322 @@
+{
+  "id": "azure-logic-apps-http-and-data-patterns",
+  "title": "Azure Logic Apps - HTTP, Request Trigger, And Data-Shaping Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Programmatic Logic Apps that ingest data from external APIs",
+    "Logic Apps workflows that transform API responses before storage"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Every Logic Apps workflow starts with a trigger as the first step. The trigger defines the schedule or condition that starts the workflow, and one or more subsequent actions define the tasks the workflow performs.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-trigger-action-workflow?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In the designer, Logic Apps organizes available operations as collections or connectors. Collections and connectors can include triggers, actions, or both, and the add-operation gallery lists available connectors and collections separately.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-trigger-action-workflow?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The workflow designer allows adding an action either under the last workflow step or between existing steps.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-trigger-action-workflow?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft advises avoiding Unicode characters in trigger or action names because they can result in dropped logs exported through diagnostic settings.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/add-trigger-action-workflow?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A Logic Apps workflow can expose a synchronous HTTPS endpoint by using a request-based trigger such as Request or HTTP webhook, and the generated callback URL uses a Shared Access Signature for authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Request trigger can accept a JSON schema so that the designer generates tokens for request properties, and the trigger can also accept GET parameters or relative path parameters.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Request trigger expects POST by default, but you can configure it to require a different single HTTP method.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "GET parameters can be read in downstream actions by using expressions such as triggerOutputs()['queries']['parameter-name'].",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Relative path parameters can be added to the Request trigger and then referenced directly as trigger outputs in downstream actions.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Response built-in action works only when the workflow uses the Request trigger.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Request-trigger schema enforcement, you can add required and additionalProperties settings in the schema and turn on Schema Validation in the trigger settings; when the request body doesn't match the schema, the trigger returns HTTP 400 Bad Request.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Request trigger expects inbound requests over HTTPS only.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Standard workflows, the generated callback URL uses the azurewebsites.net host pattern and includes SAS query parameters such as api-version, sp, sv, and sig.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Standard workflows, the Request trigger URL is associated with the workflow's storage account and changes if the storage account changes.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The built-in Recurrence trigger can start workflows on a schedule, but advanced scheduling options work only with built-in polling triggers and not with Microsoft-managed polling connectors.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Schedule built-in trigger family includes both Recurrence and Sliding Window. Recurrence runs at regular intervals and does not process missed recurrences after disruptions, while Sliding Window processes missed recurrences and handles data in continuous chunks.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/concepts-schedule-automated-recurring-tasks-workflows",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Recurrence trigger applies to Consumption and Standard stateful workflows, but it is currently unavailable for Standard stateless workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Supported Recurrence interval ranges are: Month 1-16, Week 1-71, Day 1-500, Hour 1-12,000, Minute 1-72,000, and Second 1-9,999,999.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "If you use a future start time with Day, Week, or Month frequency, the recurrence should be set up in advance or the first recurrence can be skipped; the page specifies at least 24 hours for Day, 7 days for Week, and one month for Month.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Unless you specify a start date and time, the first recurrence runs immediately when you save the workflow or deploy the logic app resource.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "If you don't specify advanced scheduling options such as At these hours and At these minutes, later recurrences are based on the last run time and can drift due to factors such as storage latency.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "To honor daylight saving time, you should specify a time zone; otherwise DST events can shift when triggers run.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Sliding Window supports start date, time zone, and a delay duration for each recurrence, but it does not support advanced schedules such as specific hours of the day, minutes of the hour, or days of the week.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/concepts-schedule-automated-recurring-tasks-workflows",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Recurrence trigger definition can include a schedule object with hours, minutes, weekDays, or monthDays, and using monthDays: [-1] in code view schedules a run on the last day of each month.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "When recurrence criteria use expressions or parameter references, the trigger definition can include an evaluatedRecurrence property that contains the evaluated values.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For built-in recurring triggers, future runs follow the configured schedule and time zone, but without advanced scheduling options the next run is based on the last trigger execution and can drift.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/concepts-schedule-automated-recurring-tasks-workflows",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For managed recurring triggers such as Microsoft-managed polling connectors, advanced scheduling options are not supported, and subsequent runs depend on interval, frequency, last execution, retries, storage latency, and daylight-saving behavior.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/concepts-schedule-automated-recurring-tasks-workflows",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps can call external REST APIs through the built-in HTTP action or HTTP trigger.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The HTTP built-in trigger polls an endpoint as the first workflow step and its response determines whether the workflow runs, while the HTTP built-in action calls an endpoint from elsewhere in the workflow and its response determines how the remaining actions run.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Trigger and action outputs from HTTP operations include headers, body, and status code.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The HTTP + Swagger built-in operations can call REST APIs described by a Swagger file, but they support only OpenAPI 2.0 and not OpenAPI 3.0.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http-swagger",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In a Standard single-tenant logic app, TLS certificate authentication requires the app setting WEBSITE_LOAD_ROOT_CERTIFICATES with the trusted certificate thumbprint, and client-certificate or Microsoft Entra OAuth with certificate credentials requires WEBSITE_LOAD_USER_PROFILE set to 1.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For stateful workflows in both multitenant and single-tenant Azure Logic Apps, HTTP-based actions follow the asynchronous operation pattern by default, while stateless workflows in single-tenant Azure Logic Apps don't use that polling pattern and return 202 responses as-is.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The HTTP action has an Asynchronous pattern setting that is enabled by default and can be turned off to stop polling location headers and use synchronous behavior instead.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Pagination can be enabled for the HTTP action when the response uses nextLink or @odata.nextLink, causing Logic Apps to follow those links automatically.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Retry-After header can control the interval between retry attempts for HTTP actions, including responses such as 429 Too Many Requests and 202 Accepted.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "To send multipart/form-data with an HTTP action, the request body uses a JSON object with $content-type and $multipart metadata; application/x-www-form-urlencoded requests require an explicit content-type header.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Azure Logic Apps omits or ignores several HTTP headers in generated requests, including most Accept-* headers, Allow, many Content-* headers, Expires, Host, Last-Modified, Origin, Set-Cookie, and Transfer-Encoding.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "If a workflow with a Request trigger includes a Response action but doesn't return a response before the inbound request timeout expires, the caller receives HTTP 504 Gateway Timeout; if no Response action exists, the workflow immediately returns HTTP 202 Accepted.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In complex workflows with branches, if all Response actions are skipped at runtime, the caller receives HTTP 502 Bad Gateway even if the workflow finishes successfully.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In a Standard stateless workflow, the Response action must appear last in the workflow, and Azure Logic Apps doesn't run that action until all other actions finish running.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Azure Logic Apps automatically removes some headers from generated response messages, including Allow, Cookie, Expires, Last-Modified, Set-Cookie, Transfer-Encoding, and most Content-* headers except supported cases.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The HTTP action can throw a BadRequest error when the outgoing Content-Type is application/json but the backend response body doesn't actually contain valid JSON.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http?tabs=standard",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps data operations include Parse JSON, Compose, Select, Filter array, and Create CSV table, and Parse JSON is the recommended way to create dynamic tokens from JSON responses.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Select creates an output array with the same number of items as the source array, typically by mapping source values into JSON objects with named properties.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Filter array evaluates each item in an array and can use item() in conditions to keep only matching values or objects.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Join creates a string from array items by separating them with a specified delimiter.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Create CSV table and Create HTML table can turn arrays into tabular output, and Microsoft recommends using Parse JSON first when you want user-friendly tokens for JSON object properties.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Model workflow authoring as trigger first, then actions. If a design starts without a clear trigger choice, the workflow shape is still underspecified.",
+    "Prefer ASCII names for triggers and actions. Avoid Unicode in operation names because exported diagnostics can drop those names.",
+    "Use the Request trigger when the workflow must be callable programmatically from another service. Use Recurrence when the workflow must poll or run on a schedule.",
+    "If an inbound workflow must send a synchronous business response, include a Response action explicitly and design the workflow so at least one response path is always executed.",
+    "Use schema validation when the inbound contract must be strict. Enforce required fields and additionalProperties rules in the JSON schema rather than assuming callers behave correctly.",
+    "Treat the generated Request URL as environment-specific infrastructure. In Standard workflows, storage-account changes can invalidate the callable URL.",
+    "Use Recurrence only on Consumption or Standard stateful workflows. If the workflow must be stateless in Standard, choose another trigger strategy.",
+    "Choose Sliding Window instead of Recurrence when missed intervals must be replayed and the workload is naturally processed in time chunks.",
+    "Always set a start time deliberately for production schedules unless immediate execution is desired at save or deploy time.",
+    "For day- or week-based schedules that must stay aligned to wall-clock time, specify At these hours, At these minutes, and a time zone rather than relying only on interval plus frequency.",
+    "Do not assume managed polling connectors behave like built-in schedule triggers. If exact schedule control matters, prefer built-in schedule triggers and perform the downstream call inside the workflow.",
+    "Use code view for recurrence shapes that the designer doesn't surface cleanly, such as last-day-of-month scheduling with monthDays: [-1].",
+    "Choose the expected HTTP method deliberately. If the endpoint is intended for URL-style parameter passing, GET plus explicit parameter handling is often simpler than forcing everything into POST bodies.",
+    "Use relative path parameters when the endpoint should look like a resource path, and use GET query parameters when the endpoint acts more like a filtered function call.",
+    "Use the HTTP trigger for recurring outbound polling of an endpoint and the HTTP action for point-in-workflow calls after earlier steps have prepared input.",
+    "For Standard workflows that use certificate-based outbound auth, include required app settings such as WEBSITE_LOAD_ROOT_CERTIFICATES or WEBSITE_LOAD_USER_PROFILE in deployment artifacts, not only in manual portal setup.",
+    "Plan explicitly for async behavior. Stateful workflows poll location headers by default; stateless workflows do not. Choose the asynchronous pattern setting based on the API's real behavior.",
+    "Turn on built-in HTTP pagination only when the API uses nextLink or @odata.nextLink. Otherwise, implement paging manually.",
+    "Use Retry-After-aware designs for APIs that signal rate limiting or delayed completion through 429 or 202 responses.",
+    "When posting files or forms, choose multipart/form-data or application/x-www-form-urlencoded deliberately and shape the HTTP body exactly as the connector expects.",
+    "After calling an external API with HTTP, add Parse JSON so downstream actions can reference strongly named fields instead of raw body expressions.",
+    "When handling request parameters directly in the workflow, use triggerOutputs() expressions for query parameters and direct trigger outputs for relative-path parameters.",
+    "Use Compose, Select, and Filter array to normalize API payloads before persisting to SharePoint. This is especially important when the external API response is nested or contains arrays that map to multiple SharePoint rows or files.",
+    "Use Select when the downstream system needs a predictable projected shape but still expects an array with one output row per source item.",
+    "Use Filter array when you need declarative record filtering before writes, and use Join or table actions only when the next step expects a rendered string or report-like payload rather than normalized rows.",
+    "Use HTTP + Swagger only when the target API has a maintained OpenAPI 2.0 description and that designer experience materially helps. Otherwise, the generic HTTP action is the safer default."
+  ],
+  "caveats": [
+    "Request-trigger callback URLs contain SAS authentication material, so they must be handled as secrets.",
+    "The callback URL format differs between Standard and Consumption, so do not hardcode one URL pattern across hosting models.",
+    "Request-trigger URLs in Standard workflows can also change when the backing storage account changes.",
+    "Inbound request-response workflows can return 504 or 502 even when internal processing succeeds if response timing or branching is designed poorly.",
+    "Response-header behavior in Logic Apps is not a perfect pass-through of all HTTP headers.",
+    "Recurrence can drift if you depend only on interval and frequency without advanced schedule fields.",
+    "Future start times on day, week, and month schedules can miss the first intended run if the workflow is configured too late.",
+    "DST handling depends on providing a time zone; otherwise seasonal clock changes can shift runtime behavior.",
+    "Recurrence and Sliding Window differ materially in catch-up behavior after outages or disabled periods.",
+    "Managed recurring connector triggers can drift more than built-in schedule triggers because their next run depends on connector-side execution factors in addition to interval and frequency.",
+    "The HTTP trigger and action are generic and flexible, but response shape and pagination behavior depend entirely on the external API.",
+    "Some request headers are stripped or ignored by Logic Apps, so strict low-level HTTP behavior can differ from a raw curl or SDK client.",
+    "Stateful versus stateless Standard workflows differ materially in HTTP async behavior.",
+    "Certificate-based outbound authentication in Standard workflows can fail unless the required environment settings are deployed with the app.",
+    "OpenAPI 3.0 documents are not supported by HTTP + Swagger built-in operations.",
+    "Data operation actions can be convenient for reporting or notification payloads, but they are not a substitute for proper normalized persistence when you need long-term analytics."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/add-trigger-action-workflow",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/concepts-schedule-automated-recurring-tasks-workflows",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-reqres",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http-swagger",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-control-flow-and-state",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "ms-graph-sharepoint-data-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

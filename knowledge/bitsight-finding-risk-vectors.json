@@ -1,0 +1,72 @@
+{
+  "id": "bitsight-finding-risk-vectors",
+  "title": "BitSight Finding Risk Vectors - Exploited, Malware, SSL, Open Ports, And Patching",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Extracting granular BitSight findings per risk vector for detailed vendor assessments",
+    "Building per-category risk breakdowns in Power BI (Compromised Systems, Diligence, User Behavior)",
+    "Prioritising vendor remediation requests based on specific finding types"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Findings endpoint: `GET https://api.bitsighttech.com/ratings/v1/companies/{guid}/findings`. Returns paginated findings for a company. Each finding includes `risk_vector` (category slug), `risk_vector_label` (display name), `severity` (minor/moderate/material/severe), `details`, `assets` (affected IPs/domains), `first_seen`, `last_seen`, and `remaining_count`.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Risk vector category groups: Compromised Systems (botnet_infections, spam_propagation, malware_servers, potentially_exploited), Diligence (ssl_certificates, ssl_configurations, open_ports, web_application_headers, patching_cadence, insecure_systems, application_security, server_software, dkim, spf), User Behavior (file_sharing), Public Disclosures (data_breaches). Each category contributes a sub-score to the overall rating.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Filter findings by risk vector: `GET .../findings?risk_vector=potentially_exploited`. Returns only findings in that risk vector. High-value risk vectors for security reports: `potentially_exploited` (active compromise indicators), `ssl_configurations` (weak ciphers/protocols), `open_ports` (exposed attack surface), `patching_cadence` (unpatched software).",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Filter by severity: `GET .../findings?severity=severe,material`. Severity levels from highest to lowest: severe, material, moderate, minor. For vendor risk assessments, focus on severe and material findings. Add `&risk_vector=potentially_exploited` to further narrow to the most critical active compromise signals.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Finding `assets` field: an array of affected asset objects with `asset` (IP or domain string), `asset_type` ('ip' or 'domain'), `importance` ('high'/'medium'/'low'), and in some risk vectors, `port`, `protocol`, and `evidence` fields containing technical details (e.g., SSL cipher name, open port number, malware family name).",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Aggregate findings count per risk vector for a company: the `factors` array in the company detail response (`GET /ratings/v1/companies/{guid}`) already contains the per-risk-vector score and finding count without needing to call the findings endpoint. Use factors for summary metrics; use findings for detailed evidence.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For Power BI dashboards: store finding counts per risk vector per company from the `factors` array (available in every company detail call). Only call the findings endpoint when a user drills through to see individual finding evidence — this avoids making hundreds of per-company finding API calls in the daily pipeline.",
+    "For vendor remediation letters: extract severe/material findings per risk vector for the target company, format as a structured table (Risk Vector, Severity, Asset, First Seen, Evidence), and include in the report email or SharePoint document.",
+    "Map BitSight risk vector slugs to display-friendly names for reports: `$rvLabels = @{ 'potentially_exploited'='Potentially Exploited'; 'ssl_configurations'='SSL/TLS Configuration'; 'open_ports'='Open Ports'; 'patching_cadence'='Patching Cadence' }`. Use this hashtable for label substitution when building SharePoint list rows or Power BI dimension tables."
+  ],
+  "caveats": [
+    "Finding data available via the API depends on the BitSight subscription tier. Some risk vectors (e.g., potentially_exploited) require higher-tier subscriptions. Verify available risk vectors by calling the findings endpoint without filters and inspecting the returned risk_vector values.",
+    "The findings API can return large result sets for companies with many findings. Always paginate via links.next and set a practical per_page limit (e.g., 100) to manage response size.",
+    "Finding `last_seen` dates indicate when BitSight last observed the finding. Findings not observed in recent scans may still appear in the API with an older `last_seen`. Consider findings with `last_seen` older than 30 days as potentially resolved but not yet confirmed."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-findings-api",
+    "bitsight-current-ratings-api",
+    "bitsight-portfolio-entity-management",
+    "powershell-bitsight-http-client-patterns"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,67 @@
+{
+  "id": "power-bi-overview-and-routing",
+  "title": "Power BI - Platform Overview And Capability Routing",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI solution planning",
+    "Routing report, dashboard, semantic model, and refresh requests to the correct Power BI capability"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI documentation covers cloud capabilities in Microsoft Fabric, standalone desktop and on-premises applications, and guidance for report creators, modelers, consumers, developers, and admins.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI documentation organizes work by scenario such as creating reports and dashboards, connecting to data, viewing reports, on-premises deployments, and embedded analytics.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI Desktop is the free Windows authoring application for interactive reports and semantic models, while the Power BI service is the cloud experience for collaboration, dashboards, workspaces, refresh, and sharing.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Reports connect to semantic models that contain the data, while dashboards are single-page canvases in the Power BI service that surface tiles pinned from reports and other sources.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-reports-overview",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "module_selection_rules": [
+    "Use Power BI Desktop when the request is about full report authoring, data modeling, pbix files, or advanced report design.",
+    "Use the Power BI service when the request is about dashboards, workspaces, sharing, apps, semantic model refresh, or browser-based report editing.",
+    "Use semantic model and data-source guidance when the request is about how reports connect to data or stay current.",
+    "Use samples guidance when the request is about learning, prototyping, validating layouts, or bootstrapping a report from an existing example.",
+    "Use the learning-path routing entry when the request is better described by persona or scenario such as admin, developer, DirectQuery, print-ready reporting, goals and metrics, or collaborator workflows."
+  ],
+  "implementation_notes": [
+    "Treat reports, dashboards, semantic models, and refresh as separate but connected Power BI concepts. A good implementation guide or automation plan should name which artifact is being created or managed at each step.",
+    "When a user says 'Power BI dashboard', confirm whether they truly need a service dashboard or whether a report page is the better artifact.",
+    "When a user asks to 'build a Power BI report', assume a semantic model or data source path is required even if the request only mentions visuals."
+  ],
+  "caveats": [
+    "Power BI Desktop and the Power BI service overlap, but they do not have identical creation features.",
+    "Dashboards are service-only constructs, while reports exist in both Desktop and the service.",
+    "Fabric-related capabilities may appear in Power BI documentation, but not every Power BI task requires Fabric-specific features."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-reports-overview",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-learning-path-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-data-sources-and-refresh",
+    "power-bi-samples-and-prototyping-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

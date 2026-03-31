@@ -1,0 +1,87 @@
+{
+  "id": "azure-logic-apps-service-bus-outlook-connectors",
+  "title": "Azure Logic Apps - Service Bus And Outlook Connector Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Queue-based pipeline decoupling using Azure Service Bus in Logic Apps",
+    "Sending formatted report emails and attachments via Office 365 Outlook connector",
+    "Dead-letter handling and poison message management in Logic Apps Service Bus workflows",
+    "Large attachment handling in Outlook connector"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Service Bus connector options: managed connector (both Consumption and Standard, uses connection string or managed identity) and built-in Service Bus connector (Standard only, runs in-process, higher performance, supports managed identity natively). Prefer built-in for Standard Logic Apps.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Service Bus trigger modes: 'When a message is received in a queue (auto-complete)' — message is deleted on receive. 'When a message is received in a queue (peek-lock)' — message is locked and must be explicitly completed or abandoned. Use peek-lock for reliable processing where incomplete runs should not lose the message.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Complete a Service Bus message after successful processing using peek-lock: add a 'Complete the message in a queue' action at the end of the success path, passing the Lock Token from the trigger output: `@triggerBody()?['LockToken']`. In the error handler scope, add 'Abandon the message in a queue' to release the lock and allow redelivery.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Dead-letter queue handling: Service Bus moves messages to the dead-letter sub-queue (suffix /$deadletterqueue) after MaxDeliveryCount retries. Create a separate Logic App workflow that triggers on the dead-letter queue to log, alert, or reprocess dead-lettered messages.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-dead-letter-queues",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Send a message to Service Bus from Logic Apps: use 'Send message' action. Set Content Type to 'application/json' for JSON payloads. Use Label/Subject property to categorize messages (e.g., 'qualys-detection', 'bitsight-rating'). Correlation ID can be set to trace a message through multiple processing stages.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Office 365 Outlook connector — send email with attachment: use 'Send an email (V2)' action. Attachments is an array: `[ { \"Name\": \"report.xlsx\", \"ContentBytes\": \"@{base64(body('Get_file_content'))}\", \"ContentType\": \"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\" } ]`. ContentBytes must be base64-encoded.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/office365/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Office 365 Outlook connector — attachment size limit: the managed connector supports attachments up to 35MB per message. For larger files, share a SharePoint or OneDrive link in the email body rather than attaching the file directly. Use the SharePoint connector to get a sharing link: 'Create sharing link for a file or folder'.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/office365/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Office 365 Outlook connector throttling: 300 calls per connection per 60 seconds. For workflows that send emails to many recipients or in a foreach loop, this limit applies per connection object. The connector also enforces a 10MB inline content limit per action call; use chunked transfer for larger bodies.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/office365/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For daily security pipelines, Service Bus is most valuable as a buffer between extraction (Qualys, BitSight) and staging (SharePoint). If extraction takes longer than expected, the queue absorbs the backpressure without losing data.",
+    "Use peek-lock mode for all production Service Bus triggers in Logic Apps. Auto-complete drops the message immediately on receive; if the workflow fails mid-execution the data is lost.",
+    "For email delivery of Excel reports, prefer uploading the file to SharePoint first (Add-PnPFile or SharePoint connector), then including the SharePoint direct link in the email. This avoids the 35MB attachment limit and keeps a durable copy of the report.",
+    "Set a meaningful Label/Subject on Service Bus messages during the send action. This enables downstream workflows to branch processing based on message type without parsing the body."
+  ],
+  "caveats": [
+    "The built-in Service Bus connector (Standard only) requires the Standard Logic App to have network access to the Service Bus namespace. For VNet-integrated Logic Apps, ensure the Service Bus private endpoint is reachable.",
+    "Peek-lock duration defaults to 30 seconds on most queues. If the Logic App workflow takes longer than the lock duration to process, the message becomes available again and may be processed a second time. Extend the lock or increase the queue lock duration to match workflow processing time.",
+    "Office 365 Outlook connector requires a licensed Office 365 user account. Service account mailboxes used for automation must have an Exchange Online license assigned."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus",
+    "https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-dead-letter-queues",
+    "https://learn.microsoft.com/en-us/connectors/office365/"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-concurrency-rate-limit-management",
+    "azure-logic-apps-reliability-error-handling",
+    "azure-logic-apps-built-in-connectors"
+  ],
+  "source_projects": ["shared-seed"]
+}

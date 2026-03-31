@@ -1,0 +1,82 @@
+{
+  "id": "azure-logic-apps-solution-playbook",
+  "title": "Playbook - Azure Logic Apps Solution Selection And Build Flow",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Choosing and designing Azure Logic Apps implementations",
+    "Routing between Logic Apps and adjacent Microsoft automation platforms"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Clear statement of workload type: integration, orchestration, connector workflow, B2B, or API mediation",
+    "Decision on whether multitenant Consumption or single-tenant Standard is required",
+    "Security and network constraints for the target environment",
+    "Authentication plan for all downstream systems"
+  ],
+  "required_permissions": [
+    "Azure subscription permissions to deploy Logic App resources",
+    "Connector- or target-specific permissions for every downstream system",
+    "Managed identity RBAC assignments when identity-based auth is used"
+  ],
+  "request_sequence": [
+    "Decide whether the workload belongs in Azure Logic Apps instead of Power Automate. Prefer Logic Apps for Azure-centric integrations, enterprise orchestration, stronger networking control, and managed identity patterns.",
+    "Choose hosting model: Consumption for multitenant single-workflow scenarios or Standard for single-tenant, multi-workflow, and advanced networking scenarios.",
+    "Map each workflow step to built-in operations versus managed connectors so runtime location, connection model, and security boundaries are explicit.",
+    "For the selected hosting model, verify whether any required service should use a built-in connector, a service provider connector, or only a managed connector.",
+    "If the target system is not covered by existing connectors, decide whether the right pattern is a plain custom API called over HTTP, a custom connector, or an API Management-fronted API.",
+    "Plan authentication for each target system, preferring managed identity where supported.",
+    "Review limits, recurrence behavior, callback requirements, and network restrictions before finalizing the design.",
+    "Choose deployment model for production work: ARM or other infrastructure automation for Consumption, and Standard deployment or DevOps guidance for single-tenant workflows.",
+    "Add testing strategy using workflow-definition tests, workflow-run tests, or mock outputs where appropriate."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The documentation positions Azure Logic Apps for automated workflows, business processes, and enterprise orchestrations across cloud and on-premises systems.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The docs explicitly separate Consumption creation and Standard creation paths and provide dedicated deployment, DevOps, and testing guidance for Standard workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Single-tenant versus multitenant is a first-class concept in Logic Apps documentation, not an implementation detail.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use this playbook as a routing aid for future projects. It should help the engine infer when Logic Apps is the right automation platform and which hosting model to select.",
+    "When a user asks for service-to-service automation with Azure-native security, Logic Apps with managed identity is often a better fit than connector-driven delegated Power Automate patterns.",
+    "When a request is heavily tied to business-user approvals or Microsoft 365 maker experiences, Power Automate may still be the better platform. Logic Apps should be preferred when Azure resource control, networking, DevOps, or enterprise integration are dominant.",
+    "Connector choice is a second decision after hosting-model selection. Standard often unlocks built-in service-provider connectors that materially change performance, auth, and deployment shape."
+  ],
+  "caveats": [
+    "This playbook is for capability selection and design. Deeper per-connector behavior must still be checked in the corresponding Logic Apps connector docs.",
+    "Logic Apps and Power Automate overlap conceptually, but their runtime, governance, identity, and networking models differ significantly."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-built-in-connectors",
+    "azure-logic-apps-custom-api-patterns",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-limits-and-networking",
+    "power-platform-api-auth-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

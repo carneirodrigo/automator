@@ -1,0 +1,81 @@
+{
+  "id": "power-bi-advanced-dax-calculation-groups",
+  "title": "Power BI Advanced DAX - Calculation Groups, Aggregation Tables, And Query Performance",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Reducing measure proliferation with calculation groups for time intelligence",
+    "Improving query performance with aggregation tables for large security datasets",
+    "Analysing and optimising slow DAX queries using DAX Studio",
+    "Calculation groups for switching between rating metrics (BitSight, Qualys, Defender)"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Calculation groups are a table-like object in a Tabular model containing calculation items (DAX expressions) that modify how measures are evaluated. Create them in Tabular Editor (free) or Tabular Editor 3. Example: a 'Time Intelligence' calculation group with items: Current Period, Prior Period, Period-over-Period %, YTD, Rolling 90 Days. Each item uses CALCULATE with a modifier applied to any measure in the model.",
+      "source_url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Calculation group precedence: when multiple calculation groups apply to a measure, the Precedence property determines which executes first (lower number = higher precedence). For security reports with both a 'Time Intelligence' group and a 'Metric Switch' group, set Metric Switch to precedence 1 (innermost) and Time Intelligence to 2 (outermost) so time modifiers wrap metric selection.",
+      "source_url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Aggregation tables: import a pre-aggregated summary table alongside the detail table. In the model, set the detail table's storage mode to DirectQuery and the aggregation table's mode to Import. Define aggregations mapping detail columns to aggregate columns. Power BI automatically routes queries hitting aggregated granularity to the faster Import table, and falls back to DirectQuery only for queries below the aggregation grain.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/aggregations-auto",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "DAX Studio (free tool): connect to a Power BI Desktop file or Premium XMLA endpoint. Use Server Timings to capture storage engine (SE) vs formula engine (FE) time split. High SE time indicates large data scans; optimise with aggregations or columnar compression. High FE time indicates complex DAX logic; simplify measures or use variables.",
+      "source_url": "https://daxstudio.org/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Use DAX variables to improve measure readability and performance: `VAR TotalVulnerabilities = SUM(Qualys[CriticalCount]) + SUM(Qualys[HighCount]) RETURN DIVIDE(SUM(Qualys[CriticalCount]), TotalVulnerabilities, 0)`. Variables are evaluated once and cached within the measure execution — reusing a variable avoids recalculating the same expression multiple times.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "CALCULATE context transition: when a measure is called inside an iterator (SUMX, AVERAGEX), each row context is automatically converted to a filter context via CALCULATE. This is a major source of unexpected results in security dashboards — for example, a measure that works on a table total but returns wrong values inside a SUMX loop. Use EARLIER() or explicit variable capture to avoid context transition issues.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Optimise RANKX performance: RANKX iterates over all values in a table for every row in the visual. For a security report ranking companies by BitSight rating, materialise the rank as a calculated column rather than a measure if the dataset is static (refreshed, not DirectQuery): `CompanyRank = RANKX(ALL(BitSight[CompanyName]), [OverallRating],, DESC, Dense)`. Calculated columns are pre-computed at refresh time.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For security reporting: create a 'Metric Type' calculation group that switches between Average Rating, Minimum Rating, and Count Below Threshold. Combine with a slicer so report consumers can flip between aggregation types without the report author needing to create three separate measures per entity.",
+    "Use DAX Studio's 'All Queries' trace to capture every query sent by a Power BI report while interacting with it. This identifies which visuals generate expensive queries, enabling targeted optimisation.",
+    "For large Qualys datasets (>1M detection rows), create an aggregation table summarised at Host + Severity + Month grain. Set the detail table to Import mode. This keeps detailed drillthrough working while making dashboard-level aggregations instantaneous."
+  ],
+  "caveats": [
+    "Calculation groups require compatibility level 1500 or higher in the Tabular model. Power BI Desktop models use 1550+ by default; older PBIX files may need to be upgraded.",
+    "Calculation groups disable implicit measures (auto-generated SUM/COUNT from data view). After adding a calculation group, all measures must be explicit. This is intentional but surprises users who rely on implicit measures.",
+    "Aggregation tables must match the granularity of the model relationships exactly. Mismatched granularity causes the aggregation to be ignored silently, falling back to DirectQuery on every query."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+    "https://learn.microsoft.com/en-us/power-bi/enterprise/aggregations-auto",
+    "https://daxstudio.org/",
+    "https://learn.microsoft.com/en-us/dax/calculate-function-dax"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-semantic-modeling-dax",
+    "power-bi-directquery-composite-direct-lake",
+    "power-bi-premium-capacity-xmla"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,81 @@
+{
+  "id": "bitsight-company-details-ratings-history",
+  "title": "BitSight Company Details API - One-Year Ratings History And Risk Vector Context",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "BitSight rating history extraction for one company",
+    "BitSight trend reporting that needs one year of daily ratings and risk vector context"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Company Details endpoint is GET https://api.bitsighttech.com/ratings/v1/companies/{company_guid}.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The endpoint returns company details including current rating, rating history, risk vector grades, company information, and relationship details.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The response includes a ratings array containing one year of daily security ratings, starting with the most recent entry.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Each ratings entry includes rating_date, rating, range, and rating_color.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The response includes rating_details by risk vector, including grade, percentile, category, beta, and display_url fields.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The fields query parameter can limit the response to selected values such as industry_average and industry_percentile.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "historical_fields": [
+    "guid",
+    "name",
+    "rating",
+    "rating_details",
+    "ratings[].rating_date",
+    "ratings[].rating",
+    "ratings[].range",
+    "ratings[].rating_color",
+    "industry_average",
+    "industry_percentile"
+  ],
+  "implementation_notes": [
+    "Use this endpoint when the report needs daily rating history for a single company and current risk vector context in one response family.",
+    "Flatten the ratings array into one row per company per rating_date before loading it into SharePoint or Power BI.",
+    "Keep the top-level current rating separate from the historical ratings array so reports can distinguish current-state KPIs from time-series facts.",
+    "If the workflow already has company GUIDs from a portfolio or current-ratings pull, this endpoint is the natural follow-up for detailed trend analysis."
+  ],
+  "caveats": [
+    "This endpoint is company-specific, so portfolio-wide trend reporting still requires iterating across company GUIDs that your BitSight tenant can access.",
+    "The one-year ratings history is bounded to the period returned by the endpoint; longer-term history requires persisted extracts or report artifacts saved over time."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+    "https://help.bitsighttech.com/hc/en-us/articles/231656647-Companies-API-Endpoint",
+    "https://help.bitsighttech.com/hc/en-us/articles/360036566794-Parameters"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-api-auth-conventions",
+    "bitsight-current-ratings-api",
+    "bitsight-ratings-powerbi-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "bitsight-ratings-research"
+  ]
+}

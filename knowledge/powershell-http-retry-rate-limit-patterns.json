@@ -1,0 +1,94 @@
+{
+  "id": "powershell-http-retry-rate-limit-patterns",
+  "title": "PowerShell HTTP Retry And Rate-Limit Handling - Exponential Backoff And Circuit Breaker",
+  "source_family": "powershell-automation",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "PowerShell scripts calling Microsoft Graph, Qualys, BitSight, or SharePoint APIs",
+    "Handling 429 throttling and transient 5xx errors in Invoke-RestMethod calls",
+    "Building resilient API wrappers with retry and circuit-breaker logic"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Core retry wrapper pattern for Invoke-RestMethod in PowerShell: wrap in a do-while loop with try/catch. Track attempt count and success flag. On 429 or 5xx, extract Retry-After header or apply exponential backoff, then continue. On success or non-retryable error, exit the loop.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/retry",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Accessing the response status code and headers in a caught exception (PowerShell 7+): `$statusCode = $_.Exception.Response.StatusCode.Value__; $retryAfterHeader = $_.Exception.Response.Headers.GetValues('Retry-After') | Select-Object -First 1`. In PowerShell 5.1, use `-ResponseHeadersVariable` on successful calls and inspect the variable.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-restmethod",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Exponential backoff with jitter: `$delay = [Math]::Min([Math]::Pow(2, $attempt) * $baseDelaySecs, $maxDelaySecs) + (Get-Random -Minimum 0.0 -Maximum 1.0)`. Recommended values: `$baseDelaySecs = 2`, `$maxDelaySecs = 64`, `$maxAttempts = 5`. Jitter prevents synchronized retries when multiple script instances are running.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/retry",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Retryable vs non-retryable status codes: retry on 429 (Too Many Requests), 500 (Internal Server Error), 502 (Bad Gateway), 503 (Service Unavailable), 504 (Gateway Timeout). Do not retry on 400 (Bad Request), 401 (Unauthorized — refresh token once and retry), 403 (Forbidden — do not retry), 404 (Not Found — do not retry). Retrying 4xx errors other than 429 and 401 wastes quota.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/retry",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Microsoft Graph throttling: returns HTTP 429 with a Retry-After header (value in seconds). Always honor the header value rather than applying a fixed backoff. Graph SDK cmdlets (Invoke-MgGraphRequest) handle throttling automatically with built-in retry; this is a reason to prefer SDK cmdlets over raw Invoke-RestMethod for Graph calls.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/throttling",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "SharePoint Online throttling: returns HTTP 429 or 503 with a Retry-After header. PnP.PowerShell cmdlets automatically handle throttling with built-in retry. For raw REST calls to SharePoint, implement the same explicit retry pattern as for Graph.",
+      "source_url": "https://learn.microsoft.com/en-us/sharepoint/dev/general-development/how-to-avoid-getting-throttled-or-blocked-in-sharepoint-online",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Qualys throttling: returns HTTP 429 with no guaranteed Retry-After header. Default backoff strategy: 60 seconds on first 429, then exponential. Qualys also returns 503 during maintenance windows; retry up to 3 times with 30-second intervals before escalating.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "BitSight throttling: returns HTTP 429 when the hourly rate limit (~15,000 requests/hour) is exceeded. Honor the Retry-After header if present. For portfolio-wide pulls, add a 250ms sleep between company detail calls (`Start-Sleep -Milliseconds 250`) to stay well within the rate limit.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Circuit-breaker pattern: track consecutive failures in a script-level counter. If failures exceed a threshold (e.g., 5 consecutive), set a `$circuitOpen = $true` flag and stop retrying for a cooldown period (e.g., 300 seconds). Log a warning and return a structured error result rather than crashing. Resume after cooldown. This prevents runaway loops that exhaust API rate limits.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Encapsulate all retry logic in a single `Invoke-ApiRequest` function that accepts URI, method, headers, and optional body. All API calls throughout the script should go through this function. This keeps retry logic centralized and testable.",
+    "Complete reference implementation of the retry wrapper:\n```powershell\nfunction Invoke-ApiRequest {\n  param($Uri, $Method='GET', $Headers, $Body, [int]$MaxAttempts=5, [int]$BaseDelay=2)\n  $attempt = 0\n  do {\n    $attempt++\n    try {\n      $params = @{ Uri=$Uri; Method=$Method; Headers=$Headers; ErrorAction='Stop' }\n      if ($Body) { $params.Body=$Body; $params.ContentType='application/json' }\n      return Invoke-RestMethod @params\n    } catch {\n      $code = $_.Exception.Response.StatusCode.Value__\n      $retryable = $code -in @(429,500,502,503,504)\n      if (-not $retryable -or $attempt -ge $MaxAttempts) { throw }\n      $after = try { [int]($_.Exception.Response.Headers.GetValues('Retry-After') | Select-Object -First 1) } catch { [Math]::Min([Math]::Pow(2,$attempt)*$BaseDelay, 64) }\n      Write-Warning \"HTTP $code on attempt $attempt — retrying in ${after}s\"\n      Start-Sleep -Seconds $after\n    }\n  } while ($true)\n}\n```",
+    "For 401 responses, refresh the access token once and retry before treating it as a non-retryable error. Add a `$tokenRefreshed` flag to avoid infinite refresh loops."
+  ],
+  "caveats": [
+    "PowerShell 5.1 does not expose response headers on caught exceptions. Use a try/catch that calls Invoke-RestMethod with -ResponseHeadersVariable on the success path, and implement a fixed exponential backoff on the error path.",
+    "Start-Sleep blocks the thread. For high-concurrency scripts using PowerShell jobs or runspaces, prefer async sleep patterns to avoid blocking all threads during backoff.",
+    "Do not retry within a PnP.PowerShell or Microsoft.Graph SDK command that already has built-in retry. Double-retrying can result in duplicate writes or unexpected state."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/architecture/patterns/retry",
+    "https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker",
+    "https://learn.microsoft.com/en-us/graph/throttling",
+    "https://learn.microsoft.com/en-us/sharepoint/dev/general-development/how-to-avoid-getting-throttled-or-blocked-in-sharepoint-online"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "powershell-qualys-http-client-patterns",
+    "powershell-bitsight-http-client-patterns",
+    "powershell-microsoftgraph-sdk-auth-sharepoint",
+    "ms-graph-api-conventions",
+    "qualys-api-auth-conventions"
+  ],
+  "source_projects": ["shared-seed"]
+}

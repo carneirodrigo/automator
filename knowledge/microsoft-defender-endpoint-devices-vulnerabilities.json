@@ -1,0 +1,58 @@
+{
+  "id": "microsoft-defender-endpoint-devices-vulnerabilities",
+  "title": "Microsoft Defender for Endpoint - Devices And Vulnerability APIs",
+  "source_family": "windows-security",
+  "coverage_type": "endpoint",
+  "applies_to": ["Device inventory and vulnerability retrieval in Microsoft Defender for Endpoint"],
+  "verification_status": "current",
+  "fresh_until": "2026-05-04T18:10:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Device inventory is exposed through the machines collection under the Defender for Endpoint API, with requests rooted at https://api.security.microsoft.com/api/machines.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "The machines API supports OData operators such as $filter, $top, and $skip for inventory retrieval.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Vulnerability data can be retrieved as a machine-and-software view from the vulnerabilities-by-machines API, which supports OData filtering on fields such as cveId, machineId, productName, severity, and productVendor.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-vulnerabilities-by-machines",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Software inventory details are available through software resources such as GET /api/Software/{Id}.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-software-by-id",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Security recommendation data is exposed through recommendation APIs under the same API family and is part of Defender for Endpoint threat and vulnerability management workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-recommendations",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machine-by-id",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-vulnerabilities-by-machines",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-software-by-id",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-all-recommendations"
+  ],
+  "implementation_notes": [
+    "Treat machine inventory and vulnerability feeds as separate resources and join them by machine identifiers in your own pipeline.",
+    "Expect large result sets; design around server-side filtering and pagination rather than full dumps where possible.",
+    "For attack simulation data, use Microsoft Graph security attackSimulation endpoints rather than Defender for Endpoint APIs."
+  ],
+  "caveats": [
+    "Permission scopes differ between machine, software, and recommendation endpoints.",
+    "Some vulnerability-management resources have plan or licensing constraints."
+  ],
+  "last_verified": "2026-03-20T18:10:00Z",
+  "related_entries": [
+    "microsoft-defender-endpoint-api-auth-conventions",
+    "ms-graph-attack-simulation-api"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,81 @@
+{
+  "id": "power-bi-paginated-reports-playbook",
+  "title": "Playbook - Power BI Paginated Reports And Report Builder",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Print-ready Power BI outputs",
+    "Power BI Report Builder workflows",
+    "Pixel-precise report design and export scenarios"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Paginated reports are optimized for printing and sharing, can render all rows across as many pages as necessary, and are authored with Power BI Report Builder.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-online-course",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI Report Builder is the standalone authoring tool for paginated reports that are later published to the Power BI service.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-online-course",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "With a free license, users can publish paginated reports to My Workspace; publishing to other workspaces requires Pro or PPU and at least a contributor role in the workspace, and Build permission on the dataset is required.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-download-rdl",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI service list view can create a paginated report from an existing Power BI report or dataset by choosing Create paginated report.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-download-rdl",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Paginated report data design begins with data sources and datasets; each dataset has a query and each data region expands as needed to display the dataset results.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder-data",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft guidance recommends paginated reports for print-ready, PDF-oriented, precision-layout, and operational reporting scenarios where interactive Power BI report pages are not the right fit.",
+      "source_url": "https://learn.microsoft.com/ms-my/power-bi/guidance/report-paginated-or-power-bi",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "workflow_sequence": [
+    "Choose paginated reports when the output must print cleanly, export as a document, or preserve exact layout across pages.",
+    "Author the .rdl report in Power BI Report Builder.",
+    "Define data sources, datasets, parameters, and report layout in Report Builder.",
+    "Preview locally and verify pagination, formatting, and export behavior.",
+    "Publish to My Workspace or a shared workspace in the Power BI service, subject to license and workspace-role requirements.",
+    "Share, embed, or automate exports only after the paginated output is stable."
+  ],
+  "implementation_notes": [
+    "Use paginated reports for invoices, statements, forms, compliance-ready output, and large tabular exports.",
+    "Do not force a standard Power BI interactive report to behave like a print document if the business requirement is document-first.",
+    "When a user asks for PDF-ready output, exact page headers and footers, or full-table export fidelity, route to Report Builder and paginated reports first.",
+    "Treat paginated reports and standard Power BI reports as complementary artifacts, not interchangeable ones."
+  ],
+  "caveats": [
+    "Paginated reports are a different authoring and layout model from Power BI Desktop report pages.",
+    "Interactive exploratory analytics is usually better served by standard Power BI reports than by paginated reports.",
+    "License, workspace role, and dataset Build permission can block otherwise valid paginated-report designs."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+    "https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-online-course",
+    "https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-download-rdl",
+    "https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder-data",
+    "https://learn.microsoft.com/ms-my/power-bi/guidance/report-paginated-or-power-bi"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-learning-path-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-embedding-and-apis"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

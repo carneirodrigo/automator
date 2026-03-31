@@ -1,0 +1,64 @@
+{
+  "id": "microsoft-defender-endpoint-reporting-and-score-apis",
+  "title": "Microsoft Defender for Endpoint - Reporting, Score, And Export APIs",
+  "source_family": "windows-security",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Defender for Endpoint reporting-oriented APIs",
+    "Exposure score, device secure score, and export-style reporting workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-05-12T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The exposed APIs list includes score methods such as get exposure score and get device secure score.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Device secure score is retrieved through GET https://api.security.microsoft.com/api/configurationScore.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-device-secure-score",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The device secure score API requires Score.Read.All for application access or Score.Read for delegated access.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/get-device-secure-score",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The exposed APIs list includes export assessment per-device methods and properties, including export software vulnerabilities assessment and delta export software vulnerabilities assessment.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The exposed APIs list also includes export device health methods and properties.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use /api/machines for detailed current inventory counts and use score APIs when the report needs a summarized security posture metric instead of raw machine rows.",
+    "Use export-style APIs when the reporting workload is bulk assessment extraction rather than interactive entity lookup.",
+    "For dashboards, combine a live inventory metric such as onboarded device count with a summarized score metric such as configurationScore when the audience needs both coverage and posture."
+  ],
+  "caveats": [
+    "Score and export endpoints have different permission names and response shapes from the machine inventory APIs.",
+    "The exposed APIs list is a routing index; implementation still needs the exact endpoint docs for any export method before coding.",
+    "Current score endpoints are current-state metrics, not full historical trend feeds."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-device-secure-score",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machine-group-exposure-score"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "microsoft-defender-endpoint-api-auth-conventions",
+    "defender-devices-inventory-playbook",
+    "defender-vulnerabilities-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "mde-api-research"
+  ]
+}

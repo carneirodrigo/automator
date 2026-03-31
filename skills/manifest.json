@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "id": "anthropic--docx",
+      "name": "docx",
+      "description": "Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx files). Triggers include: any mention of 'Word doc', 'word document', '.docx', or requests to produce professional documents with formatting like tables of contents, headings, page numbers, or letterheads. Also use when extracting or reorganizing content from .docx files, inserting or replacing images in documents, performing find-and-replace in Word files, working with tracked changes or comments, or converting content into a polished Word document. If the user asks for a 'report', 'memo', 'letter', 'template', or similar deliverable as a Word or .docx file, use this skill. Do NOT use for PDFs, spreadsheets, Google Docs, or general coding tasks unrelated to document generation.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "anthropic--docx/SKILL.md",
+      "file_hash": "sha256:cfbabd72b1aec7dfaad988fb6e5e16b27dc744b9a00cae15db9045e95f53903e",
+      "char_count": 19181
+    },
+    {
+      "id": "anthropic--pdf",
+      "name": "pdf",
+      "description": "Use this skill whenever the user wants to do anything with PDF files. This includes reading or extracting text/tables from PDFs, combining or merging multiple PDFs into one, splitting PDFs apart, rotating pages, adding watermarks, creating new PDFs, filling PDF forms, encrypting/decrypting PDFs, extracting images, and OCR on scanned PDFs to make them searchable. If the user mentions a .pdf file or asks to produce one, use this skill.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "anthropic--pdf/SKILL.md",
+      "file_hash": "sha256:9f78b8359fbd4943ad260a7a1e436e5a96503406d6c34e99f69223d647d85b9c",
+      "char_count": 7511
+    },
+    {
+      "id": "anthropic--xlsx",
+      "name": "xlsx",
+      "description": "Use this skill any time a spreadsheet file is the primary input or output. This means any task where the user wants to: open, read, edit, or fix an existing .xlsx, .xlsm, .csv, or .tsv file (e.g., adding columns, computing formulas, formatting, charting, cleaning messy data); create a new spreadsheet from scratch or from other data sources; or convert between tabular file formats. Trigger especially when the user references a spreadsheet file by name or path — even casually (like \"the xlsx in my downloads\") — and wants something done to it or produced from it. Also trigger for cleaning or restructuring messy tabular data files (malformed rows, misplaced headers, junk data) into proper spreadsheets. The deliverable must be a spreadsheet file. Do NOT trigger when the primary deliverable is a Word document, HTML report, standalone Python script, database pipeline, or Google Sheets API integration, even if tabular data is involved.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "anthropic--xlsx/SKILL.md",
+      "file_hash": "sha256:dd316db7785a6be12966c2a2d848931fbf5f518b3cdb0a66fa62ee835ead1cfc",
+      "char_count": 10423
+    },
+    {
+      "id": "openai--doc",
+      "name": "doc",
+      "description": "Use when the task involves reading, creating, or editing `.docx` documents, especially when formatting or layout fidelity matters; prefer `python-docx` plus the bundled `scripts/render_docx.py` for visual checks.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "openai--doc/SKILL.md",
+      "file_hash": "sha256:0a635585817d1ac96e8e512114d08258b70f9e54ce0052078a258291ac13a8ed",
+      "char_count": 2737
+    },
+    {
+      "id": "openai--pdf",
+      "name": "pdf",
+      "description": "Use when tasks involve reading, creating, or reviewing PDF files where rendering and layout matter; prefer visual checks by rendering pages (Poppler) and use Python tools such as `reportlab`, `pdfplumber`, and `pypdf` for generation and extraction.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "openai--pdf/SKILL.md",
+      "file_hash": "sha256:d108cf2b36355ab37eb5962933f4d09785ec002f3105c506129320209306b9d2",
+      "char_count": 2230
+    },
+    {
+      "id": "openai--playwright",
+      "name": "playwright",
+      "description": "Use when the task requires automating a real browser from the terminal (navigation, form filling, snapshots, screenshots, data extraction, UI-flow debugging) via `playwright-cli` or the bundled wrapper script.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "openai--playwright/SKILL.md",
+      "file_hash": "sha256:0ffaabcc8e0990627c4725f18bf1c7955534a796c1c199e872909de2013ce6a8",
+      "char_count": 3516
+    },
+    {
+      "id": "openai--spreadsheet",
+      "name": "spreadsheet",
+      "description": "Use when tasks involve creating, editing, analyzing, or formatting spreadsheets (`.xlsx`, `.csv`, `.tsv`) with formula-aware workflows, cached recalculation, and visual review.",
+      "roles": [],
+      "tags": [],
+      "version": "",
+      "source": "",
+      "path": "openai--spreadsheet/SKILL.md",
+      "file_hash": "sha256:36baea99e96c77c13d15d24f9d53cd072ccbc120e810bf4e68049edb5b0f1d65",
+      "char_count": 6742
+    }
+  ]
+}

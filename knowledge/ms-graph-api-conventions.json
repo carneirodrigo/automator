@@ -1,0 +1,58 @@
+{
+  "id": "ms-graph-api-conventions",
+  "title": "Microsoft Graph API - Auth And REST Conventions",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": ["Microsoft Graph REST API integrations"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-19T17:20:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Microsoft Graph requests use versioned REST URLs of the form https://graph.microsoft.com/{version}/{resource}, with v1.0 for generally available APIs and beta for preview APIs.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/use-the-api",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "App-only authentication for Microsoft Graph uses the OAuth 2.0 client credentials flow against Microsoft Entra ID and the scope https://graph.microsoft.com/.default.",
+      "source_url": "https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Microsoft Graph supports OData query parameters such as $select, $filter, $top, and $search, but support varies by resource and endpoint.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/query-parameters",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Paging commonly uses an @odata.nextLink value returned by the service; clients should follow the nextLink URL rather than constructing the next page request themselves.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/paging",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "When Microsoft Graph throttles a request it returns HTTP 429 Too Many Requests and the Retry-After header should be honored before retrying.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/throttling",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/use-the-api",
+    "https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow",
+    "https://learn.microsoft.com/en-us/graph/query-parameters",
+    "https://learn.microsoft.com/en-us/graph/paging",
+    "https://learn.microsoft.com/en-us/graph/throttling"
+  ],
+  "implementation_notes": [
+    "Default to v1.0 unless the target capability exists only in beta.",
+    "Treat nextLink as opaque and replay it exactly for subsequent pages.",
+    "Use $select aggressively to reduce payload size and lower the chance of throttling."
+  ],
+  "caveats": [
+    "Not every endpoint supports every OData parameter; always verify per-resource docs.",
+    "Beta APIs can change without the compatibility guarantees of v1.0."
+  ],
+  "last_verified": "2026-03-20T17:20:00Z",
+  "related_entries": [
+    "ms-graph-oauth2-client-credentials",
+    "ms-graph-attack-simulation-api"
+  ],
+  "source_projects": ["shared-seed"]
+}

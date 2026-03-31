@@ -1,0 +1,58 @@
+{
+  "id": "bitsight-api-auth-conventions",
+  "title": "BitSight API - Authentication And Request Conventions",
+  "source_family": "bitsight",
+  "coverage_type": "workflow",
+  "applies_to": ["BitSight ratings and portfolio APIs"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "BitSight API authentication uses HTTP Basic Authentication with the API token as the username and an empty password.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "All BitSight API requests must be made over HTTPS; HTTP requests fail.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "The BitSight API is REST-oriented and returns JSON by default for responses and errors, with XML available when specifically requested.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/231872628-API-Documentation-Overview",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "The main ratings API base URL is under https://api.bitsighttech.com/ratings/v... and some specialized feeds, such as infection alerts, use separate hostnames.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/231872628-API-Documentation-Overview",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "BitSight supports both company API tokens and user API tokens, with company tokens preferred for durable integrations because they are not tied to a single user account.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/25748078243735-API-Token-Types",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management",
+    "https://help.bitsighttech.com/hc/en-us/articles/25748078243735-API-Token-Types",
+    "https://help.bitsighttech.com/hc/en-us/articles/231872628-API-Documentation-Overview",
+    "https://help.bitsighttech.com/hc/en-us/articles/18061051106455-Current-Ratings-API-Endpoint"
+  ],
+  "implementation_notes": [
+    "Represent the token as a secret but send it in the Basic Auth username position with a blank password.",
+    "Prefer company tokens for long-lived service integrations so user offboarding does not break automation.",
+    "Check endpoint-specific docs for any separate token families or alternate hosts before assuming the ratings API hostname applies everywhere.",
+    "For ratings-centric work, treat https://api.bitsighttech.com/ratings/v1/current-ratings as the primary current-state security-rating surface."
+  ],
+  "caveats": [
+    "Not every BitSight API uses the same hostname; specialized APIs can have separate domains and token requirements.",
+    "Access to some datasets and endpoints is role- or license-dependent."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-current-ratings-api",
+    "bitsight-ratings-powerbi-playbook"
+  ],
+  "source_projects": ["shared-seed", "bitsight-ratings-research"]
+}

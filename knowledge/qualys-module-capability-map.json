@@ -1,0 +1,74 @@
+{
+  "id": "qualys-module-capability-map",
+  "title": "Qualys - Broader Module Capability Map Beyond VMDR",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Choosing the correct Qualys module or API family for a requested extraction task",
+    "Separating VMDR, WAS, reporting, and asset-centric workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Classic VM APIs expose host detections and report-management APIs, including list reports, launch report, launch report using asset tags, fetch report, and run asset search report.",
+      "source_url": "https://docs.qualys.com/en/vm/api/reports/reports/Reports.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Host Detection List API in the VM family is the source of current host vulnerability state and history for VMDR-style metrics.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Global IT Asset Inventory v2 is a gateway API that provides asset-centric data such as names, addresses, operating-system details, tags, and hostId or assetId values.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS exposes searchable findings, web applications, scans, downloadable scan results, and downloadable reports through its own QPS routes.",
+      "source_url": "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The WAS UI documents API assets with tags, open vulnerabilities, and TruRisk score, meaning API-security-oriented reporting can be rooted in WAS rather than VMDR.",
+      "source_url": "https://docs.qualys.com/en/was/latest/api/view_apis.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "module_selection_rules": [
+    "Use classic VM or VMDR host detections when the question is about host vulnerabilities, host severity counts, host status history, or tag-scoped host vulnerability metrics.",
+    "Use Global IT Asset Inventory when the question is about asset identity, tag membership, OS inventory, asset grouping, or joining host vulnerability facts to richer asset metadata.",
+    "Use classic VM report APIs when the request explicitly asks for Qualys-generated report artifacts or report schedules rather than raw rows.",
+    "Use WAS findings and WAS reports when the request is about web applications, API assets, application findings, URLs, web-app tags, or API-security-style vulnerability metrics.",
+    "Do not assume a single universal Qualys vulnerability schema. VMDR host detections and WAS findings are different reporting grains and should stay separate unless the consumer explicitly wants a cross-module aggregate."
+  ],
+  "implementation_notes": [
+    "This entry is a routing aid for future research and generation tasks. It tells the engine which Qualys API family is likely relevant before deeper extraction begins.",
+    "Asset data exists in more than one Qualys context. Global IT Asset Inventory is the broad host or device inventory surface, while WAS API assets are application or API-scan objects.",
+    "When a request says only 'Qualys report', the engine should clarify or infer whether the target is host security, asset inventory, or application security before choosing endpoints."
+  ],
+  "caveats": [
+    "The reviewed docs are enough to map the major module families, but they do not exhaust every Qualys product surface.",
+    "Broader modules such as cloud or container products may also be extractable, but they were not the focus of this pass and should be researched separately if needed."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/reports/reports/Reports.htm",
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+    "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+    "https://docs.qualys.com/en/was/latest/api/view_apis.htm"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-reporting-model",
+    "qualys-global-asset-inventory-join-conventions",
+    "qualys-was-api-conventions",
+    "qualys-was-reports-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-broader-capabilities-research"
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "id": "azure-logic-apps-custom-api-patterns",
+  "title": "Azure Logic Apps - Custom API, Custom Connector, And Async Action Or Trigger Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Calling custom web APIs and REST APIs from Azure Logic Apps",
+    "Designing custom APIs, triggers, or connector-adjacent patterns for Logic Apps"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "When a needed system is not available as a connector, Azure Logic Apps can call custom APIs that expose actions and optionally triggers for workflow use.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps-compatible custom APIs follow REST over HTTP, use JSON as the data exchange format, and work best when they also publish an OpenAPI document.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft documents that custom APIs can be called from Logic Apps with HTTP + Swagger, Azure API Management, or App Services.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Custom APIs and custom connectors both use REST, OpenAPI metadata, and JSON, but custom connectors are registered as Logic Apps connector resources in Azure and appear like first-class connectors in the designer.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Registered custom connectors are available only to the connector authors and logic app users who share the same Microsoft Entra tenant and Azure subscription in the region where the logic apps are deployed.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A standard custom API action is an HTTP method that accepts requests and returns responses, and by default the response must be returned within the Logic Apps request timeout limit unless an asynchronous pattern is used.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For long-running actions, the polling action pattern returns HTTP 202 Accepted with a required location header and an optional retry-after header, and the Logic Apps engine keeps polling the location URL until the API returns a non-202 response.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For long-running actions, the webhook action pattern uses subscribe and unsubscribe endpoints. Logic Apps sends a callback URL to the subscribe endpoint, waits, and resumes when the custom API posts to the callback URL.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The workflow designer does not discover webhook endpoints through Swagger, so webhook action patterns are configured by adding a Webhook action manually.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A polling trigger pattern returns HTTP 200 OK with payload when new data is found, or HTTP 202 Accepted with location and retry-after when no data is found; the location header should include a triggerState query parameter so the API can track the last trigger point.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Each polling request counts as an action execution even when no workflow instance is created, so Microsoft advises cleaning up data already read and passed to the logic app to avoid duplicate processing.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Webhook triggers use subscribe and unsubscribe endpoints and behave like push triggers that wait and listen for new data or events.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Choose a plain custom API plus HTTP or HTTP + Swagger when you only need a callable endpoint and do not need connector registration or first-class designer presence.",
+    "Choose a custom connector when the API should appear as a reusable connector resource in Azure for the same tenant and subscription audience.",
+    "For long-running work, prefer the documented asynchronous polling pattern when the API can expose job status, and prefer webhook when the API can safely store and call back to a Logic Apps callback URL.",
+    "For polling triggers, treat triggerState as the idempotency and watermark contract. Design it explicitly so the API can return only unseen data and advance state safely.",
+    "If you own both the workflow and the subscribed service in a webhook pattern, the unsubscribe path can sometimes be simplified, but the default design should still account for cancellation cleanup."
+  ],
+  "caveats": [
+    "Webhook action discovery is not automatic through Swagger in the designer.",
+    "Polling triggers can become expensive because every poll counts as an action execution even when nothing new is found.",
+    "A poorly designed polling trigger can reprocess the same data unless triggerState and cleanup behavior are implemented carefully.",
+    "Custom connector visibility is tenant, subscription, and region scoped rather than globally public by default."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-api-app"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-built-in-connectors",
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-examples-and-scenarios",
+    "azure-logic-apps-solution-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

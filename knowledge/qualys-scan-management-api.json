@@ -1,0 +1,71 @@
+{
+  "id": "qualys-scan-management-api",
+  "title": "Qualys Scan Management API - Launch, Monitor, And Retrieve Scan Results",
+  "source_family": "qualys",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Triggering Qualys VMDR scans programmatically from PowerShell or Logic Apps",
+    "Monitoring scan job status and waiting for completion before extracting detections",
+    "Selecting scanner appliances and option profiles for targeted scans"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Launch a scan: `POST https://{qualysBase}/api/2.0/fo/scan/?action=launch` with form-encoded body: `scan_title=MyAutomatedScan&ip=192.168.1.0/24&option_title=Initial+Options&iscanner_name=ScannerAppliance1`. Returns XML with `<VALUE>job_ref</VALUE>` — the scan reference ID used to track the job. Required headers: Authorization (Basic), X-Requested-With, Content-Type: application/x-www-form-urlencoded.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Launch scan targeting asset tags: `target_from=tags&use_ip_nt_range_tags=0&tag_include_selector=all&tag_set_by=id&tag_set_include=12345,67890`. This is preferred over IP-based targeting for environments where IPs change or assets are grouped by function (e.g., tag 'Production Servers', tag 'DMZ').",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List scan jobs and check status: `GET https://{qualysBase}/api/2.0/fo/scan/?action=list&scan_ref={scanRef}`. Returns XML with STATUS/STATE element: `Running`, `Finished`, `Canceled`, `Error`. Poll this endpoint until STATE is `Finished` before calling the detection API. Recommended polling interval: 60 seconds.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Retrieve scan raw results (XML report): `GET https://{qualysBase}/api/2.0/fo/scan/?action=fetch&scan_ref={scanRef}&mode=brief`. Returns XML scan report. `mode=brief` returns a summary; `mode=extended` returns full detection details per host. Use this for storing scan evidence; use the detection API for structured data extraction.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List available option profiles: `GET https://{qualysBase}/api/2.0/fo/subscription/option_profile/?action=list`. Returns all option profiles defined in the subscription. Option profile name or ID is required when launching scans. Pre-validate the profile exists before embedding it in automation scripts.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List scanner appliances: `GET https://{qualysBase}/api/2.0/fo/appliance/?action=list`. Returns each scanner's `ID`, `NAME`, `STATUS` (Online/Offline), `RUNNING_SLICES_COUNT`. Use scanner name in scan launch calls. Always verify scanner status is Online before launching. External Scanner (Qualys cloud scanner) can be used for internet-facing assets without a local appliance.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Wrap scan launch and wait in a PowerShell function: launch scan, capture scan_ref, then loop polling the status API every 60 seconds until STATE is 'Finished' or a timeout (e.g., 4 hours) is reached. After 'Finished', call the detection API filtered by `scan_ref` to get this scan's detections specifically.",
+    "Use tag-based targeting rather than IP ranges for production automation. Tags persist across IP changes and are easier to maintain as the environment scales.",
+    "For the daily reporting pipeline, scans are typically pre-scheduled in the Qualys portal and the PowerShell script only needs to extract detections. Only trigger scans programmatically if on-demand scanning is a specific requirement."
+  ],
+  "caveats": [
+    "Scan launching requires API access enabled in the Qualys subscription and the API user to have 'Launch Scans' permission in their role.",
+    "Concurrent scan limits depend on the Qualys subscription tier. Launching too many scans simultaneously may return an error or queue the scan. Check scanner availability before launching.",
+    "The scan_ref is a session-scoped identifier. After the scan is purged from Qualys history (retention policy), the reference is no longer valid for status queries."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/2.0/"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-vmdr-api-conventions",
+    "qualys-api-auth-conventions",
+    "powershell-qualys-http-client-patterns"
+  ],
+  "source_projects": ["shared-seed"]
+}

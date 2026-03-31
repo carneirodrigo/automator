@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "runtime_capability_request.schema.json",
+  "title": "Runtime Capability Request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "capability": {
+      "type": "string",
+      "enum": [
+        "list_projects",
+        "resolve_project",
+        "init_project",
+        "load_task_state",
+        "save_task_state",
+        "load_memory",
+        "save_memory",
+        "load_artifact",
+        "persist_artifact",
+        "read_file",
+        "write_file",
+        "run_command",
+        "validate_schema",
+        "test_credentials",
+        "load_secrets",
+        "save_secret",
+        "fetch_skill",
+        "http_request_with_secret_binding",
+        "validate_logic_app_workflow",
+        "deploy_logic_app_definition",
+        "create_sharepoint_list_schema",
+        "create_powerbi_import_bundle",
+        "powerbi_import_artifact",
+        "powerbi_trigger_refresh",
+        "powerbi_check_refresh_status"
+      ]
+    },
+    "arguments": {
+      "type": "object"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "capability",
+    "arguments",
+    "reason"
+  ]
+}

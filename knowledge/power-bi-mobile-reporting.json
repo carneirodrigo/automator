@@ -1,0 +1,66 @@
+{
+  "id": "power-bi-mobile-reporting",
+  "title": "Power BI - Mobile-Optimized Reporting",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI mobile report design",
+    "Phone-oriented report layouts",
+    "Optimizing Power BI reports for iOS and Android apps"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI mobile-optimized views display in the Power BI mobile apps for iOS and Android when a report page has a mobile layout and the phone is in portrait orientation.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-about?mobileclient=ios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Reports viewed through a web browser always display in the standard, non-optimized view rather than the phone-optimized mobile layout.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-about?mobileclient=ios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Mobile layout view is available in both Power BI Desktop and the Power BI service and supports dragging visuals to a phone canvas, auto-create layout generation, grid controls, and layout switching.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-mobile-layout-view",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft recommends building desktop and mobile layouts together, focusing on the most important content, avoiding side-by-side visuals except for simple elements, and using standard mobile visual sizes.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-best-practices",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Mobile-optimized report pages are indicated with a special icon in the Power BI mobile apps.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-about?mobileclient=ios",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Treat mobile layout as a distinct design surface, not a scaled-down desktop page.",
+    "Prioritize a short top-to-bottom narrative for mobile users and remove low-value visuals from the mobile view.",
+    "Use auto-create mobile layout as a starting point, then refine for readability and interaction quality.",
+    "If the audience is primarily mobile, bake mobile layout decisions into initial report design instead of adding them at the end."
+  ],
+  "caveats": [
+    "Mobile layout benefits only Power BI mobile apps, not browser-based viewing.",
+    "A report can be technically mobile-optimized and still perform poorly if it carries too many heavy visuals.",
+    "Mobile usability and desktop usability often require different layout decisions."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-about?mobileclient=ios",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-mobile-layout-view",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-create-mobile-optimized-report-best-practices"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-learning-path-routing",
+    "power-bi-reports-and-dashboards"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

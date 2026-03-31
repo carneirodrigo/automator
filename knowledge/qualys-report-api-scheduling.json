@@ -1,0 +1,72 @@
+{
+  "id": "qualys-report-api-scheduling",
+  "title": "Qualys Report API - Launch, List, Fetch, And Scheduled Report Delivery",
+  "source_family": "qualys",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Generating Qualys reports programmatically in PDF, CSV, or Excel format",
+    "Automating report delivery to email recipients or SharePoint via API",
+    "Fetching completed reports from Qualys for downstream processing"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Launch a report: `POST https://{qualysBase}/api/2.0/fo/report/?action=launch` with form body: `template_id={id}&output_format=pdf&report_title=WeeklyVMReport`. Returns XML with `<VALUE>report_id</VALUE>`. Report ID is used to check status and fetch the file. Content-Type must be `application/x-www-form-urlencoded`.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Supported output formats: `pdf`, `html`, `mht`, `xml`, `csv`, `docx`. CSV is the most useful for PowerShell-based downstream processing. PDF and DOCX are best for stakeholder distribution. Specify format via `output_format` parameter in the launch request.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Check report status: `GET https://{qualysBase}/api/2.0/fo/report/?action=list&id={reportId}`. STATUS/STATE values: `Running`, `Finished`, `Canceled`, `Errors`. Poll every 30-60 seconds until `Finished`.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Fetch a completed report: `GET https://{qualysBase}/api/2.0/fo/report/?action=fetch&id={reportId}`. Returns the report file as a binary stream. In PowerShell: `Invoke-WebRequest -Uri $fetchUrl -Headers $headers -OutFile $localPath`. Use `-OutFile` to save directly to disk rather than loading into memory.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List report templates: `GET https://{qualysBase}/api/2.0/fo/report/template/?action=list`. Returns template IDs, names, and types. Template ID is required for the launch call. Templates are defined in the Qualys portal under Reports > Templates. Validate that the intended template ID exists before embedding it in automation scripts.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Delete a report after fetching (housekeeping): `GET https://{qualysBase}/api/2.0/fo/report/?action=delete&id={reportId}`. Reports count against a per-subscription storage quota. Delete reports after successfully downloading them to avoid quota exhaustion in automated pipelines.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For automated PDF delivery to stakeholders: launch report, poll until finished, fetch with Invoke-WebRequest -OutFile, upload to SharePoint document library with Add-PnPFile, then send email via Graph with a SharePoint link. Delete the report from Qualys after successful upload.",
+    "For CSV-based downstream processing: fetch the CSV report, import with Import-Csv in PowerShell, transform and normalise columns, then write to SharePoint list via PnP batches.",
+    "Prefer the detection API (VMDR host detection export) over report API for structured data pipelines — the detection API returns more granular data and is easier to paginate. Use the report API when the formatted PDF/DOCX output itself is the deliverable."
+  ],
+  "caveats": [
+    "Report generation is asynchronous and can take several minutes for large datasets. Always poll status before fetching.",
+    "Reports are stored in Qualys with a retention policy. Automated pipelines should fetch and delete reports promptly to avoid quota issues.",
+    "CSV report format from Qualys uses Windows line endings (CRLF) and may include a BOM. Use `Import-Csv` in PowerShell which handles these automatically, or specify `-Encoding UTF8` if using other parsers."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/2.0/"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-vmdr-api-conventions",
+    "qualys-reporting-model",
+    "powershell-qualys-http-client-patterns",
+    "powershell-sharepoint-data-staging-upsert"
+  ],
+  "source_projects": ["shared-seed"]
+}

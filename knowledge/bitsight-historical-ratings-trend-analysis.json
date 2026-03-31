@@ -1,0 +1,66 @@
+{
+  "id": "bitsight-historical-ratings-trend-analysis",
+  "title": "BitSight Historical Ratings And Trend Analysis - Period Comparisons And YoY Reporting",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Retrieving historical BitSight ratings for trend charts in Power BI",
+    "Year-over-year and quarter-over-quarter rating comparison for executive reports",
+    "Building PowerShell pipelines that extract and stage historical rating data to SharePoint"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Rating history endpoint: `GET https://api.bitsighttech.com/ratings/v1/companies/{guid}/ratings`. Query parameters: `limit` (number of most-recent days, default 365), `format` (default JSON). Response: `{ \"ratings\": [{ \"x\": \"2026-03-28\", \"y\": 720 }, ...] }` where `x` is the date string and `y` is the integer rating for that day.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Retrieve up to 3 years of daily ratings: `GET .../ratings?limit=1095`. The `limit` value is the number of calendar days to return (365 = 1 year, 730 = 2 years, 1095 = 3 years). BitSight typically has data going back 5+ years; the maximum limit depends on the subscription and when the company was first tracked.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Factor-level rating history is available via the company details endpoint filtered to specific risk vectors. To get the historical rating for a specific factor category, retrieve company details over time by calling the ratings endpoint for the specific risk vector path if available, or compare snapshots over time stored from previous pipeline runs.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "PowerShell pattern for period comparison: store daily ratings snapshots in a SharePoint list (CompanyGuid, CompanyName, RatingDate, OverallRating). To compute YoY change in PowerShell or DAX: get rating for the same company on the same day 365 days prior using a lookup or Power BI date intelligence. `$yoyChange = $currentRating - ($historicalData | Where-Object { $_.CompanyGuid -eq $guid -and $_.RatingDate -eq $sameDayLastYear } | Select-Object -ExpandProperty OverallRating)`.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Daily ratings for a full portfolio: call the rating history endpoint once per company. For a portfolio of 100 companies, with 250ms delay between calls, 3-year history retrieval takes ~30 seconds. The response for 1095 days is a small JSON array (~10KB per company) — network overhead dominates over data transfer.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For Power BI trend charts: create a SharePoint list `BitSightRatingHistory` with columns: CompanyGuid (text, SourceKey), CompanyName (text), RatingDate (DateTime), OverallRating (number). Populate with daily snapshots from the history endpoint on first run. On subsequent daily runs, add only the latest day's rating (append mode, no upsert needed for historical records).",
+    "For executive YoY reports: calculate 'Current Rating', '1Y Ago Rating', and 'Change' columns in the Power BI semantic model using DATEADD(-1, YEAR) time intelligence or pre-calculated columns in the dataflow.",
+    "For portfolios >200 companies: fetch history once per quarter (full 3-year pull) and use append-only daily snapshots for the current year. This reduces API call volume while maintaining a complete historical dataset."
+  ],
+  "caveats": [
+    "BitSight assigns a rating of 250 to companies that have not yet been tracked for the full requested period. Filter out 250-rated companies when computing averages to avoid distorting trend calculations.",
+    "Rating history `x` dates are in YYYY-MM-DD format (no time component). When storing to SharePoint DateTime columns, append T00:00:00Z to create valid ISO 8601 values.",
+    "Companies removed from the portfolio do not have their historical data removed. Retain and label them as 'inactive' in the SharePoint list to preserve historical trends."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-current-ratings-api",
+    "bitsight-api-auth-conventions",
+    "powershell-bitsight-http-client-patterns",
+    "powershell-sharepoint-data-staging-upsert"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,111 @@
+{
+  "id": "ms-graph-sharepoint-data-conventions",
+  "title": "Microsoft Graph SharePoint - Site, List, Drive, And CRUD Conventions",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "SharePoint Online access through Microsoft Graph",
+    "Site discovery plus list, file, and folder CRUD workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The SharePoint API in Microsoft Graph supports access to sites, lists, and drives, provides read-only support for site resources, and read-write support for lists, listItems, driveItems, and tenant-level SharePoint settings.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The SharePoint API does not support creating new sites through Microsoft Graph.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Sites can be addressed by SharePoint ID, hostname plus server-relative path, or URL-derived path forms such as /sites/{hostname}:/{relative-path}.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Tenant site discovery supports both free-text search with GET /sites?search={query} and broad enumeration with GET /sites/getAllSites.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/site-search?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Subsites can be enumerated with GET /sites/{site-id}/sites.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/site-list-subsites?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Document libraries are exposed as drives under a site, and files or folders are represented as driveItems.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "SharePoint list items can be represented as listItems, and items in document libraries can be represented either as listItems or driveItems.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/listitem?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Files up to 250 MB can be uploaded in a single PUT to the driveItem content endpoint, while larger uploads should use createUploadSession.",
+      "source_url": "https://learn.microsoft.com/graph/api/driveitem-put-content?tabs=http&view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Deleting a driveItem through the standard delete API moves the item to the recycle bin instead of permanently deleting it.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-delete?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "SharePoint lists can be created through POST /sites/{site-id}/lists, while list items can be created, updated, listed, and deleted through the list item APIs.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/list-create?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-get?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-search?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-getallsites?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-list-subsites?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/list-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/list-create?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/listitem?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-create?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-update?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-delete?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/drive-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/driveitem?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-list-children?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-post-children?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-put-content?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-update?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-delete?view=graph-rest-1.0"
+  ],
+  "implementation_notes": [
+    "For site discovery, choose between path-based resolution, free-text search, or tenant-wide enumeration depending on whether the caller already knows the site path.",
+    "For tabular SharePoint business data, prefer lists and listItems. For documents and folders, prefer drives and driveItems.",
+    "Normalize around site ID plus drive ID or list ID after discovery so downstream CRUD flows do not repeatedly resolve by path.",
+    "Use $select and $expand aggressively on SharePoint resources because references are hidden by default and the docs recommend selecting only the data you need.",
+    "Use document-library driveItems for files and folders even though document-library entries can also appear as listItems."
+  ],
+  "caveats": [
+    "The Graph SharePoint surface does not create sites. Site provisioning must use another supported mechanism.",
+    "Permission requirements vary materially across discovery, list CRUD, and file CRUD. Keep least-privilege scopes tied to the actual operation.",
+    "List schemas are site-specific; field internal names must be discovered per list before writing item data."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-api-conventions",
+    "ms-graph-oauth2-client-credentials",
+    "graph-sharepoint-list-crud-playbook",
+    "graph-sharepoint-file-transfer-playbook",
+    "graph-sharepoint-site-discovery-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "sharepoint-graph-research"
+  ]
+}

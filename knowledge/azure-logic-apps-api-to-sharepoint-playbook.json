@@ -1,0 +1,89 @@
+{
+  "id": "azure-logic-apps-api-to-sharepoint-playbook",
+  "title": "Playbook - Azure Logic Apps From External APIs To SharePoint Storage",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps workflows that retrieve data from external APIs and store results in SharePoint lists or document libraries"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Decision on trigger model: Request for programmatic invocation or Recurrence for scheduled execution",
+    "Authentication plan for the source API",
+    "Authentication plan for SharePoint target access",
+    "Target SharePoint site, list, or document library resolution strategy"
+  ],
+  "required_permissions": [
+    "Permissions for the source API according to that API's auth model",
+    "SharePoint connector or Graph permissions sufficient for the target list or document library",
+    "Managed identity or connection permissions for every Azure resource or connector involved"
+  ],
+  "request_sequence": [
+    "Start the workflow with either a Request trigger for programmatic calls or a Recurrence trigger for scheduled polling.",
+    "Call the source API with the built-in HTTP action or another appropriate connector.",
+    "Parse and normalize the response by using Parse JSON plus data operations such as Select or Filter array.",
+    "Decide how to store the result in SharePoint: list items for tabular records, or files in a document library for documents, raw payloads, CSV, or transformed files.",
+    "If writing structured rows, use SharePoint list operations through the SharePoint connector or Microsoft Graph list APIs.",
+    "If writing files, use SharePoint file operations through the SharePoint connector, or use Microsoft Graph driveItem APIs when the workflow already uses Graph or needs finer file semantics.",
+    "Handle paging, duplicate detection, and update-vs-create rules explicitly so repeated runs do not create uncontrolled duplicates."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The SharePoint connector supports actions such as Create file, Update file, Delete file, Get files (properties only), Create item, Update item, Delete item, and Get items.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps built-in HTTP operations can call external APIs, and Parse JSON can turn a JSON payload into typed tokens for downstream actions.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Request trigger creates a callable endpoint for a workflow, while the Recurrence trigger is the built-in scheduling trigger for time-based execution.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Logic Apps programmatic API patterns, managed identity is the preferred authentication model whenever the target connector or destination supports Microsoft Entra authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use SharePoint lists when the API response maps naturally to rows and columns that need update or delete semantics. Use SharePoint files when the result is a document, attachment, exported CSV, raw JSON snapshot, or large payload artifact.",
+    "If the workflow already relies on Microsoft Graph for SharePoint site, list, or drive resolution, keep the write path in Graph rather than mixing two models without a reason. Otherwise, the SharePoint connector can be the simpler designer-first option.",
+    "For idempotent loads, persist a source-system key in a SharePoint column so later runs can find and update an existing item instead of always creating a new one.",
+    "For list writes, normalize the payload before entering any foreach loop. For file writes, decide on naming and overwrite behavior up front.",
+    "If the source API needs app-only auth and the SharePoint target can also be reached with Entra-backed auth, Logic Apps with managed identity is usually a better fit than delegated connector platforms."
+  ],
+  "common_failures": [
+    "Using a list for payloads that really belong in a file or document library, leading to awkward schema or size problems.",
+    "Ignoring source API pagination and only persisting the first page.",
+    "Recreating duplicate SharePoint items because the workflow has no source-key or upsert strategy.",
+    "Using a connector auth mode that cannot satisfy the required service-to-service pattern.",
+    "Writing directly to SharePoint without first shaping nested API data, resulting in unusable list rows."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-recurrence",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+    "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+    "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-http-and-data-patterns",
+    "ms-graph-sharepoint-data-conventions",
+    "graph-sharepoint-list-crud-playbook",
+    "graph-sharepoint-file-transfer-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

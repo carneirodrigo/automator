@@ -1,0 +1,170 @@
+{
+  "id": "qualys-vmdr-detection-and-kb-metrics",
+  "title": "Qualys VMDR - Detection And KnowledgeBase Metrics Extraction",
+  "source_family": "qualys",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Qualys VMDR vulnerability metrics by asset, asset scope, and tag",
+    "Snapshot and period-based reporting built from classic VM APIs"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Host Detection List API returns the latest vulnerability data and complete host vulnerability statuses NEW, ACTIVE, FIXED, and REOPENED, plus history information.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Detection records include fields such as UNIQUE_VULN_ID, QID, TYPE, SEVERITY, RESULTS, STATUS, FIRST_FOUND_DATETIME, LAST_FOUND_DATETIME, TIMES_FOUND, LAST_UPDATE_DATETIME, and LAST_PROCESSED_DATETIME in the sample XML output.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Host wrapper fields in host detection output include IP, tracking information, DNS data, NETBIOS, LAST_SCAN_DATETIME, and LAST_VM_SCANNED_DATE; the API can also show ASSET_ID when show_asset_id=1 is requested.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The KnowledgeBase API route used by integrations is /api/2.0/fo/knowledge_base/vuln/, and its details parameter supports Basic, All, or None, where All returns full vulnerability details.",
+      "source_url": "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The KnowledgeBase API supports filters such as ids, id_min, id_max, is_patchable, last_modified_after/before, and published_after/before.",
+      "source_url": "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "KnowledgeBase vulnerability output includes fields such as QID, VULN_TYPE, SEVERITY_LEVEL, TITLE, and other metadata fields referenced by the XML examples and parameter descriptions.",
+      "source_url": "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Vulnerability Details UI page documents QID, Title, QDS, and Severity as first-class columns for the vulnerability view, reinforcing that these are the primary dimensions for dashboard-like vulnerability reporting.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys severity levels are KB-centric service-assigned values that can also be customer-edited by managers in the KnowledgeBase.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/knowledgebase/severity_levels.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "reporting_fields": {
+    "detection_host_fields": [
+      "ID",
+      "ASSET_ID",
+      "IP",
+      "TRACKING_METHOD",
+      "DNS_DATA.HOSTNAME",
+      "DNS_DATA.DOMAIN",
+      "DNS_DATA.FQDN",
+      "NETBIOS",
+      "OS",
+      "LAST_SCAN_DATETIME",
+      "LAST_VM_SCANNED_DATE"
+    ],
+    "detection_fields": [
+      "UNIQUE_VULN_ID",
+      "QID",
+      "TYPE",
+      "SEVERITY",
+      "PORT",
+      "PROTOCOL",
+      "SSL",
+      "RESULTS",
+      "STATUS",
+      "FIRST_FOUND_DATETIME",
+      "LAST_FOUND_DATETIME",
+      "LAST_FIXED_DATETIME",
+      "LAST_UPDATE_DATETIME",
+      "LAST_PROCESSED_DATETIME",
+      "TIMES_FOUND",
+      "QDS"
+    ],
+    "knowledgebase_fields": [
+      "QID",
+      "VULN_TYPE",
+      "SEVERITY_LEVEL",
+      "TITLE",
+      "CATEGORY",
+      "DISCOVERY",
+      "PATCHABLE",
+      "PUBLISHED_DATETIME",
+      "LAST_SERVICE_MODIFICATION_DATETIME",
+      "CODE_MODIFIED_DATETIME",
+      "CVE_ID_LIST or CVE_LIST",
+      "VENDOR_REFERENCE_LIST",
+      "CVSS",
+      "THREAT_INTELLIGENCE"
+    ]
+  },
+  "filtering_and_incremental_sync": {
+    "detection_filters": [
+      "qids",
+      "severities",
+      "status",
+      "detection_updated_since",
+      "detection_updated_before",
+      "max_days_since_detection_updated",
+      "vm_processed_after",
+      "vm_processed_before",
+      "vm_scan_since",
+      "show_qds",
+      "qds_min",
+      "qds_max",
+      "use_tags",
+      "tag_set_include",
+      "tag_set_exclude",
+      "tag_include_selector",
+      "tag_exclude_selector"
+    ],
+    "knowledgebase_filters": [
+      "details",
+      "ids",
+      "id_min",
+      "id_max",
+      "is_patchable",
+      "last_modified_after",
+      "last_modified_before",
+      "published_after",
+      "published_before"
+    ],
+    "recommended_incremental_strategy": [
+      "Use detection_updated_since/before for change windows when the report is about status transitions or latest changed findings.",
+      "Use vm_processed_after/before when the report window should align to host vulnerability processing time.",
+      "Refresh KB details separately and only for QIDs present in the scoped detection set, unless a full KB sync is explicitly required."
+    ]
+  },
+  "implementation_notes": [
+    "Normalize one row per detection instance per asset. UNIQUE_VULN_ID should be retained when present so repeated detections of the same QID on the same host can still be reasoned about safely.",
+    "Join detection rows to KB rows by QID to obtain title, KB severity, CVEs, vendor references, and other descriptive metadata required for executive reporting.",
+    "If the user asks for reports by vulnerability name, use KB TITLE as the canonical name dimension rather than detection RESULTS text.",
+    "For current-state reports, filter to statuses that remain open in the current extraction. For activity reports, use the relevant detection timestamps and status transitions inside the requested period.",
+    "Treat SEVERITY from the detection feed and SEVERITY_LEVEL from KnowledgeBase as related but not identical dimensions; preserve both."
+  ],
+  "caveats": [
+    "Qualys does not document a dedicated VMDR dashboard metrics endpoint in the reviewed sources, so the rollups must be computed externally.",
+    "The reviewed docs show the fields needed for reporting, but they do not define one universal rule for whether a user means first-found, last-found, fixed-date, or last-updated when asking for a period summary. The report builder must make that timestamp choice explicit.",
+    "KB metadata is not a substitute for current detection state. A QID can exist in the KnowledgeBase even when it is not currently detected in the requested asset scope."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+    "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+    "https://docs.qualys.com/en/vm/latest/knowledgebase/severity_levels.htm"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-api-conventions",
+    "qualys-global-asset-inventory-join-conventions",
+    "qualys-vmdr-reporting-model",
+    "qualys-vmdr-metrics-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

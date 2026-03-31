@@ -1,0 +1,69 @@
+{
+  "id": "qualys-vmdr-powerbi-playbook",
+  "title": "Playbook - Qualys VMDR To Power BI Reporting",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI reports and dashboards built from Qualys VMDR vulnerability data",
+    "Qualys severity, status, title, QID, tag, and time-based trend reporting with or without SharePoint staging"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Tenant platform identified and Qualys API server or gateway URLs resolved correctly",
+    "Access to host detections, KnowledgeBase metadata, and any asset inventory or tag metadata needed for scoping",
+    "Decision on whether Power BI should read from SharePoint staging, another persisted store, or a more direct import pipeline"
+  ],
+  "required_permissions": [
+    "Qualys API permissions for detections, KnowledgeBase, and any required asset inventory routes",
+    "Power BI authoring and refresh permissions appropriate to the target workspace and semantic model",
+    "SharePoint permissions if SharePoint is used as the persistence or refresh source"
+  ],
+  "request_sequence": [
+    "Extract host detections from the Qualys VMDR host detection API with the tag, asset, severity, status, and date filters needed for the report scope.",
+    "Enrich referenced QIDs from the KnowledgeBase API so the reporting model has stable vulnerability title, severity, CVE, and remediation-oriented metadata.",
+    "If tag or asset grouping needs richer host context, join in asset inventory data or host-level tag output before shaping the analytical table.",
+    "Persist normalized rows to SharePoint lists, files, or another store when the report needs durable history or easier refresh management.",
+    "Build the Power BI semantic model from the normalized table, not from Qualys XML directly, and create visuals for severity counts, status counts, title or QID rankings, and monthly or quarterly trends.",
+    "Use Qualys launched reports only when the user explicitly wants a Qualys-generated artifact; do not treat launched reports as the primary analytical dataset."
+  ],
+  "implementation_notes": [
+    "The preferred analytical grain is one vulnerability detection instance on one asset, enriched by KnowledgeBase data and optional asset metadata.",
+    "If the user asks for a specific Qualys dashboard by name, interpret that as a request for equivalent metrics and filters unless a separate product-specific export surface is documented. The reviewed sources do not document a stable 'dashboard by name' API for VMDR.",
+    "For point-in-time reporting, use current detection state and extraction timestamp. For prior-month or prior-quarter reporting, persist recurring extracts and state which timestamp basis drives the period logic.",
+    "SharePoint staging is usually the safer Power BI source because it preserves history, simplifies refresh, and decouples Power BI from Qualys XML parsing.",
+    "If a project needs a Qualys-produced PDF or CSV as an attachment or operator artifact, the classic report APIs can launch reports directly by asset tag using tag names or IDs."
+  ],
+  "caveats": [
+    "Qualys detection APIs provide current and timestamped detection facts, but true trend reporting still depends on storing prior extracts or well-defined period logic in the consumer.",
+    "Classic report APIs are useful for generated artifacts, but they are weaker than normalized detection rows for flexible Power BI filtering and modeling.",
+    "Power BI dashboards are service objects built on top of reports and semantic models; the main design task here is shaping a stable dataset before dashboard creation."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/api/assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+    "https://docs.qualys.com/en/vm/api/reports/reports/Reports.htm",
+    "https://docs.qualys.com/en/vm/api/reports/reports/launch_report_tags.htm",
+    "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/power-bi-reports-overview",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-global-asset-inventory-join-conventions",
+    "qualys-vmdr-reporting-model",
+    "qualys-vmdr-metrics-playbook",
+    "azure-logic-apps-qualys-playbook",
+    "power-bi-reports-and-dashboards",
+    "power-bi-data-sources-and-refresh",
+    "power-bi-rest-api-automation"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "id": "powershell-microsoftgraph-sdk-auth-sharepoint",
+  "title": "PowerShell Microsoft.Graph SDK - Authentication And SharePoint Operations",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Unattended PowerShell scripts calling Microsoft Graph",
+    "Writing data to SharePoint lists from PowerShell",
+    "Uploading files to SharePoint document libraries from PowerShell",
+    "Azure Automation runbooks using Graph API"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Microsoft.Graph PowerShell SDK v2 is the current recommended module. Install the full umbrella module with `Install-Module Microsoft.Graph -Scope CurrentUser` or individual sub-modules such as `Microsoft.Graph.Sites`, `Microsoft.Graph.Files`, and `Microsoft.Graph.Authentication` to reduce footprint.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/microsoftgraph/overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "For app-only (unattended) authentication, Connect-MgGraph supports three methods: client secret via ClientSecretCredential, X.509 certificate via -CertificateThumbprint or -CertificateName, and Managed Identity via -Identity when running on Azure-hosted compute. Certificate-based is preferred for production; Managed Identity is preferred when running in Azure Automation or Azure Functions.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/microsoftgraph/app-only",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Client secret authentication pattern: `$credential = New-Object System.Net.NetworkCredential($clientId, (ConvertTo-SecureString $clientSecret -AsPlainText -Force)); Connect-MgGraph -TenantId $tenantId -ClientSecretCredential $credential`. Requires Microsoft.Graph.Authentication module.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/microsoftgraph/app-only",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Certificate-based app-only auth: `Connect-MgGraph -TenantId $tenantId -ClientId $appId -CertificateThumbprint $thumbprint`. The certificate must be installed in the local machine or current user certificate store, and the public key must be uploaded to the app registration in Entra ID.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/microsoftgraph/app-only",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Managed Identity auth (Azure Automation, Azure Functions): `Connect-MgGraph -Identity`. No credential management needed. The Managed Identity must be granted the required Microsoft Graph application permissions via `New-MgServicePrincipalAppRoleAssignment`.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/microsoftgraph/app-only",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "SharePoint site ID resolution: `$site = Get-MgSite -SiteId \"$tenantName.sharepoint.com:/sites/$siteName:\"`. The SiteId format uses the host:path URL encoding with a trailing colon. Returns the site object with the canonical `id` property needed for subsequent calls.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/site-get",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List discovery: `Get-MgSiteList -SiteId $siteId` returns all lists on a site. Filter by display name: `Get-MgSiteList -SiteId $siteId -Filter \"displayName eq 'MyList'\"`. Returns the list `id` required for item operations.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/list-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Retrieve all list items (with paging handled automatically): `Get-MgSiteListItem -SiteId $siteId -ListId $listId -All -ExpandProperty fields`. Without `-All`, only the first page (up to 200 items by default) is returned. Without `-ExpandProperty fields`, field values are not included.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Create a list item: `New-MgSiteListItem -SiteId $siteId -ListId $listId -Fields @{ Title = 'value'; CustomColumn = 'value' }`. The Fields hashtable must use internal (programmatic) column names, not display names.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-create",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Update a list item: `Update-MgSiteListItem -SiteId $siteId -ListId $listId -ListItemId $itemId -Fields @{ CustomColumn = 'new value' }`. Only include the fields being changed; omitted fields are left unchanged.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-update",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Delete a list item: `Remove-MgSiteListItem -SiteId $siteId -ListId $listId -ListItemId $itemId`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-delete",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Small file upload to SharePoint document library (< 4MB): get the drive ID with `Get-MgSiteDrive -SiteId $siteId`, then upload with `Set-MgDriveItemContent -DriveId $driveId -DriveItemId \"root:/$fileName:\" -InFile $localFilePath`. For files > 4MB, create an upload session with `New-MgDriveItemUploadSession`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/driveitem-put-content",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Use `-NoWelcome` with Connect-MgGraph in automated scripts to suppress the interactive consent prompt and welcome banner: `Connect-MgGraph -TenantId $tenantId -ClientId $appId -CertificateThumbprint $thumbprint -NoWelcome`.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/microsoftgraph/app-only",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Resolve $siteId and $listId once in a discovery run and cache them as constants in the script rather than resolving on every execution. Site and list IDs are stable and do not change.",
+    "Prefer individual sub-modules over the umbrella Microsoft.Graph module to reduce installation size and import time. For SharePoint work, `Microsoft.Graph.Sites` and `Microsoft.Graph.Files` are sufficient.",
+    "Discover internal column names before writing: `Get-MgSiteListColumn -SiteId $siteId -ListId $listId | Select-Object DisplayName, Name` — the `Name` property is the internal name to use in Fields hashtables.",
+    "For Azure Automation, use `-Identity` with Managed Identity and assign Graph application permissions using `New-MgServicePrincipalAppRoleAssignment` targeting the Automation Account's service principal.",
+    "After Connect-MgGraph, always call `Get-MgContext` to verify the connected tenant and scopes before executing sensitive operations."
+  ],
+  "caveats": [
+    "Internal column names differ from display names and may contain underscores or encoded characters. Always verify with Get-MgSiteListColumn before first write.",
+    "Microsoft.Graph SDK v2 requires PowerShell 5.1+ on Windows or PowerShell 7.2+ cross-platform. PowerShell 7.2 LTS is recommended.",
+    "The `-All` switch retrieves all pages but can be slow for large lists. For lists with thousands of items, use `-Filter` to narrow the query before paginating.",
+    "Application permissions (Sites.ReadWrite.All) grant access to all sites in the tenant. Use delegated permissions or site-scoped app registration for tighter scope in production.",
+    "ClientSecretCredential constructor syntax varies between SDK versions. Prefer certificate-based or Managed Identity auth to avoid version compatibility issues."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/powershell/microsoftgraph/overview",
+    "https://learn.microsoft.com/en-us/powershell/microsoftgraph/app-only",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-create",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-update",
+    "https://learn.microsoft.com/en-us/graph/api/driveitem-put-content"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-sharepoint-list-item-crud-playbook",
+    "ms-graph-sharepoint-drive-file-crud-playbook",
+    "powershell-pnp-sharepoint-operations",
+    "powershell-sharepoint-data-staging-upsert",
+    "ms-graph-oauth2-client-credentials"
+  ],
+  "source_projects": ["shared-seed"]
+}

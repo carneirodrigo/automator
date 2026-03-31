@@ -1,0 +1,90 @@
+{
+  "id": "azure-logic-apps-built-in-connectors",
+  "title": "Azure Logic Apps - Built-In Connectors, Service Providers, And Hosting Differences",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Choosing built-in versus managed connectors in Azure Logic Apps",
+    "Deciding connector strategy for Consumption versus Standard workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Built-in connectors run natively on the Azure Logic Apps runtime, and some built-in connectors do not require you to create a connection before you use them.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For some services, Azure Logic Apps offers both a built-in connector and a managed connector version. Microsoft states that in most cases the built-in version provides better performance, capabilities, pricing, or similar advantages.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The available built-in connector gallery differs between Consumption and Standard workflows, and some built-in connectors are available only in one hosting model.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The built-in operations collections available in both Consumption and Standard include Batch Operations, Control, Data Operations, Date Time, Flat File, HTTP, Inline Code, Integration Account, Liquid Operations, Request, Schedule, Variables, and XML Operations.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Consumption includes built-in connectors such as Azure API Management and Azure App Service that Standard does not, while Standard includes many built-in connectors that Consumption does not, such as Azure Blob Storage, Azure Cosmos DB, Azure Event Hubs, Azure Service Bus, FTP, SFTP, SMTP, SQL Server, and Azure Key Vault.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In Standard workflows, some built-in connectors are informally known as service providers. These are based on the Azure Functions extensibility model, run in the same process as the redesigned Logic Apps runtime, and can offer authentication choices such as connection string, Microsoft Entra ID, or managed identity.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Built-in connectors that are not service providers are implemented directly as jobs in the Logic Apps runtime, and Microsoft gives Schedule, HTTP, Request, and XML operations as examples.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Standard workflows can create custom built-in connectors by using the built-in connector extensibility model, while Consumption workflows cannot create custom built-in connectors and instead use custom managed connectors.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Sliding Window is documented as a built-in Schedule trigger only for Consumption workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Azure Logic Apps built-in connector in Consumption, and Workflow Operations in Standard, can call other workflows that start with the Request trigger.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/built-in",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Choose connector strategy explicitly during design. Do not treat built-in and managed connectors as interchangeable even when they target the same service.",
+    "When Standard offers a built-in connector for a service you need, treat it as the default starting point and compare the managed connector only if a required feature is missing.",
+    "Use Consumption-friendly built-ins such as Azure API Management or Azure App Service only when the hosting model is already compatible. Do not assume the same connector path exists in Standard.",
+    "For Standard workflows, distinguish service provider connectors from generic built-in operations. Service providers are the relevant branch when you need runtime-local service access patterns and alternative auth choices such as managed identity.",
+    "If a project needs a custom runtime-local connector, that is a Standard-only design and should route into the built-in connector extensibility model rather than a Consumption design."
+  ],
+  "caveats": [
+    "Connector availability depends on hosting model. A design that works in Standard can fail in Consumption simply because the built-in connector does not exist there.",
+    "Built-in connectors and managed connectors can differ in behavior, auth options, performance profile, and pricing. They should be validated independently.",
+    "The built-in connector gallery is current but expandable, so exact connector availability can change over time."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/connectors/built-in"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-solution-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "id": "ms-graph-security-hunting-posture-and-ti",
+  "title": "Microsoft Graph Security - Hunting, Secure Score, And Threat Intelligence",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Threat hunting, posture analytics, and threat intelligence workflows in Microsoft Graph security"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Advanced hunting lets you explore up to 30 days of raw data in Microsoft 365 Defender by calling runHuntingQuery with a KQL query.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Advanced hunting query limits include up to 100,000 rows, at least 45 calls per minute per tenant, a three-minute timeout, and an overall result-size limit of 50 MB.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A 429 response from advanced hunting indicates allocated CPU-resource limits were reached, either by request volume or running time.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The older Defender-specific advanced hunting APIs are retired and stop returning data on February 1, 2027.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Secure score data is exposed through secureScore and secureScoreControlProfile entities and is intended for security analytics, score trending, and projecting changes after adopting controls.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Threat intelligence APIs expose finished intelligence such as articles and intel profiles, machine intelligence such as indicators of compromise and reputation verdicts, and enrichment data such as passive DNS, cookies, components, and trackers.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-threatintelligence?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Microsoft Graph API for Microsoft Defender Threat Intelligence requires both an active Defender Threat Intelligence Portal license and an API add-on license for the tenant.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-threatintelligence?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The overview lists health issues and sensors under /security/identities and identityAccounts as part of the Graph security API surface for Microsoft Defender for Identity scenarios.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "primary_routes": [
+    "POST /v1.0/security/runHuntingQuery",
+    "GET /v1.0/security/secureScores",
+    "GET /v1.0/security/secureScoreControlProfiles",
+    "PATCH /v1.0/security/secureScoreControlProfiles/{id}",
+    "GET /v1.0/security/threatIntelligence/*",
+    "GET /v1.0/security/identities/healthIssues",
+    "GET /v1.0/security/identities/sensors"
+  ],
+  "implementation_notes": [
+    "Use runHuntingQuery when the user needs flexible cross-table threat hunting or custom detections rather than fixed entity collections.",
+    "Use secureScore and secureScoreControlProfiles for posture reporting, remediation planning, and score-trend dashboards.",
+    "Treat threat intelligence as a licensed premium surface and check entitlement before planning any extraction workflow.",
+    "Use identities health issues and sensors when the request is about Defender for Identity operational health rather than incidents or user risk."
+  ],
+  "caveats": [
+    "Advanced hunting limits are strict enough that heavy automation must include request budgeting, query optimization, and 429 handling.",
+    "Threat intelligence licensing is separate from general Graph security access.",
+    "Secure score controls and hunting queries have very different data shapes from alerts or incidents; keep them in distinct schemas."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-security-runhuntingquery?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-list-securescores?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-list-securescorecontrolprofiles?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-update-securescorecontrolprofile?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/security-threatintelligence?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-identitycontainer-list-healthissues?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-identitycontainer-list-sensors?view=graph-rest-1.0"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-security-api-overview",
+    "ms-graph-security-alerts-incidents",
+    "ms-graph-attack-simulation-api"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "ms-graph-security-research"
+  ]
+}

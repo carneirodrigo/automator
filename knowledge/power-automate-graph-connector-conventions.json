@@ -1,0 +1,71 @@
+{
+  "id": "power-automate-graph-connector-conventions",
+  "title": "Power Automate - Microsoft Graph Connector Patterns And Constraints",
+  "source_family": "power-platform",
+  "coverage_type": "workflow",
+  "applies_to": ["Power Automate Premium flows calling Microsoft Graph via built-in and custom connectors"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-22T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The 'HTTP with Microsoft Entra ID' connector (webcontentsv2) is a Premium Power Automate connector that acts on behalf of a signed-in user via delegated OAuth — it does NOT support app-only or service-principal Graph access natively.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/webcontentsv2/",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "HTTP with Microsoft Entra ID connector throttling limit: 100 API calls per connection per 60 seconds.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/webcontentsv2/",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "The older 'HTTP with Microsoft Entra ID (preauthorized)' connector (webcontents) is also delegated, on-behalf-of-user access for Microsoft services including Microsoft Graph.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/webcontents/",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Power Automate custom connector OAuth 2.0 configuration uses the authorization code method via APIHub; client credentials (app-only) flow is not a natively documented pattern for custom connectors in Power Automate.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/custom-connectors/troubleshoot-oauth2",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Microsoft publishes an official tutorial for building a Power Automate custom connector that calls Microsoft Graph using Microsoft Entra ID OAuth 2.0 delegated permissions.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/tutorials/power-automate",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Power Automate supports flows owned and run by service principal application users, but this governs flow ownership and runtime identity within Power Platform — it does not enable app-only Graph calls through the native HTTP with Microsoft Entra ID connector.",
+      "source_url": "https://learn.microsoft.com/en-us/power-automate/service-principal-support",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Microsoft Graph supports JSON batching with up to 20 requests per batch, which can reduce connector round-trips in Power Automate flows that need to query multiple simulations in parallel.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/json-batching",
+      "verified_date": "2026-03-23"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/connectors/webcontentsv2/",
+    "https://learn.microsoft.com/en-us/connectors/webcontents/",
+    "https://learn.microsoft.com/en-us/connectors/custom-connectors/troubleshoot-oauth2",
+    "https://learn.microsoft.com/en-us/graph/tutorials/power-automate",
+    "https://learn.microsoft.com/en-us/power-automate/service-principal-support",
+    "https://learn.microsoft.com/en-us/graph/json-batching"
+  ],
+  "implementation_notes": [
+    "Use the delegated HTTP with Microsoft Entra ID connector as the primary no-code path for Graph calls in Power Automate; budget for a user-cached connection per environment.",
+    "For high-volume flows approaching the 100 calls/60s throttling limit, consider Graph JSON batching (up to 20 requests per batch) to reduce connector round-trips.",
+    "If strict non-user authentication is required, use an external intermediary (Azure Function, Logic App with Managed Identity, or script service) rather than expecting app-only calls from native Power Automate connectors.",
+    "Both the built-in connector and a custom Graph connector require the user to grant OAuth consent and create a connection; admin consent for the app registration does not substitute for the per-user connection creation step in Power Automate."
+  ],
+  "caveats": [
+    "The native Power Automate connector model for Graph is delegated OAuth — any implementation guide claiming 'service account' or 'app-only' behavior through these connectors is inaccurate without an external intermediary.",
+    "Premium licensing is required for the HTTP with Microsoft Entra ID connector and custom connectors — this must be called out as a prerequisite before documenting connector-based flows."
+  ],
+  "last_verified": "2026-03-23T00:00:00Z",
+  "related_entries": [
+    "power-platform-api-auth-conventions",
+    "ms-graph-api-conventions",
+    "ms-graph-attack-simulation-api"
+  ],
+  "source_projects": ["implementation-guide-smoke"]
+}

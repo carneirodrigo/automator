@@ -1,0 +1,66 @@
+{
+  "id": "microsoft-security-sharepoint-powerbi-playbook",
+  "title": "Playbook - Microsoft Security To SharePoint To Power BI Reporting",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "End-to-end reporting pipelines that combine Microsoft security data, SharePoint staging, and Power BI reporting"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Decision on which Microsoft security surfaces provide the required metrics",
+    "SharePoint target lists or document libraries designed for staging",
+    "Power BI reporting artifact strategy defined",
+    "Logic Apps or equivalent orchestration path selected"
+  ],
+  "required_permissions": [
+    "Microsoft Graph permissions for attack simulation or other Graph security resources",
+    "Defender for Endpoint permissions for machine, vulnerability, or score APIs",
+    "SharePoint write permissions through Graph or the SharePoint connector",
+    "Power BI permissions for report consumption or REST-based provisioning when automation is needed"
+  ],
+  "request_sequence": [
+    "Split the data requirements by vendor surface rather than assuming one Microsoft security API covers everything.",
+    "For phishing simulation reporting, retrieve data from Microsoft Graph attackSimulation APIs.",
+    "For onboarded-device counts or device inventory, retrieve data from Microsoft Defender for Endpoint APIs such as /api/machines.",
+    "Normalize each feed into a staging schema with explicit extraction timestamps and business observation dates.",
+    "Store normalized rows in SharePoint lists for tabular metrics or SharePoint files for exported payloads and snapshots.",
+    "Build Power BI semantic models and reports on top of the SharePoint staging layer, or automate report lifecycle through the Power BI REST API if full provisioning is required.",
+    "Refresh Power BI on the cadence required by the reporting audience and monitor refresh history."
+  ],
+  "implementation_notes": [
+    "This is the recommended integration shape when the goal is cross-surface Microsoft security reporting and the organization already uses SharePoint and Power BI.",
+    "Use SharePoint as the decoupling layer when the reporting logic needs stable snapshots, simplified Power BI ingestion, or a low-friction operational handoff.",
+    "For device counts by month, store periodic snapshots because live inventory APIs are current-state only.",
+    "For attack simulation, store both summary metrics and simulation-level detail as needed; the report audience determines whether you need one row per simulation or one row per user result."
+  ],
+  "caveats": [
+    "There is no single Microsoft security API that cleanly returns both Defender for Endpoint device counts and phishing simulation results.",
+    "Direct Power BI provisioning is a separate concern from data extraction and staging; use the REST automation layer only when the project truly needs it.",
+    "Historical reporting requires persisted snapshots or staged period extracts even when the source APIs are rich."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/resources/attacksimulationroot?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/exposed-apis-list",
+    "https://learn.microsoft.com/en-us/defender-endpoint/api/get-machines",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+    "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/groups",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-attack-simulation-api",
+    "defender-devices-inventory-playbook",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "azure-logic-apps-defender-endpoint-playbook",
+    "power-bi-rest-api-automation",
+    "ms-graph-sharepoint-data-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "microsoft-security-reporting-research"
+  ]
+}

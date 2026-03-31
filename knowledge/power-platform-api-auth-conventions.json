@@ -1,0 +1,55 @@
+{
+  "id": "power-platform-api-auth-conventions",
+  "title": "Power Platform And Dataverse APIs - Authentication And Request Conventions",
+  "source_family": "power-platform",
+  "coverage_type": "workflow",
+  "applies_to": ["Power Platform management APIs", "Dataverse Web API"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-19T17:20:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Microsoft Power Platform API is a RESTful web API with request URLs of the form https://api.powerplatform.com/{namespace}/{resource}?api-version={version}.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-platform/",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Power Platform API callers must register an app and obtain authentication tokens for a user or service before calling the API.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-platform/",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Current Power Platform API guidance states the API uses delegated permissions for user-context apps, while service principal identities are granted scoped RBAC roles instead of application permissions.",
+      "source_url": "https://learn.microsoft.com/en-us/power-platform/admin/programmability-authentication-v2",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "To use a service principal with Power Platform management APIs, the application must first be registered with Power Platform by an administrator; the service principal cannot register itself.",
+      "source_url": "https://learn.microsoft.com/en-us/power-platform/admin/powerplatform-api-create-service-principal",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Dataverse Web API authentication uses OAuth, and Dataverse documentation recommends MSAL for application authentication with the Web API endpoint.",
+      "source_url": "https://learn.microsoft.com/en-us/power-apps/developer/data-platform/authenticate-oauth",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/power-platform/",
+    "https://learn.microsoft.com/en-us/power-platform/admin/programmability-authentication-v2",
+    "https://learn.microsoft.com/en-us/power-platform/admin/powerplatform-api-create-service-principal",
+    "https://learn.microsoft.com/en-us/power-apps/developer/data-platform/authenticate-web-api",
+    "https://learn.microsoft.com/en-us/power-apps/developer/data-platform/authenticate-oauth"
+  ],
+  "implementation_notes": [
+    "Distinguish between Power Platform management APIs at api.powerplatform.com or api.bap.microsoft.com and Dataverse environment-specific Web API calls.",
+    "For unattended admin automation, model service-principal registration as a prerequisite step rather than assuming app registration alone is sufficient.",
+    "Use MSAL-based token acquisition for Dataverse and newer Power Platform integrations."
+  ],
+  "caveats": [
+    "Service principal support is not universal across all Power Platform surfaces; some areas still have user-context or product-specific limitations.",
+    "Dataverse and Power Platform management APIs share Microsoft Entra authentication patterns but have different endpoint layouts and authorization requirements."
+  ],
+  "last_verified": "2026-03-20T17:20:00Z",
+  "related_entries": [],
+  "source_projects": ["shared-seed"]
+}

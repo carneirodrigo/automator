@@ -1,0 +1,70 @@
+{
+  "id": "azure-logic-apps-security-and-identity",
+  "title": "Azure Logic Apps - Security, Access, And Managed Identity Conventions",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Securing Azure Logic Apps",
+    "Using managed identity with Logic Apps for service-to-service access"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Logic Apps security guidance covers access control, data protection, encryption, secure communication, and network controls for workflows and connections.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Azure Logic Apps supports both system-assigned and user-assigned managed identities for authenticating access to Azure resources and services that support Microsoft Entra authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A managed identity removes the need to store credentials, secrets, or Microsoft Entra tokens in workflow definitions or connection settings when the target service supports Entra authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Managed identity authentication works only with connectors and destination services that support Microsoft Entra authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In Standard logic app workflows, the default internal API connection authentication uses the system-assigned managed identity, and this connection authentication can be changed to a user-assigned identity for finer control.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For Standard logic app workflows in single-tenant Azure Logic Apps, network restrictions for connections follow Azure App Service-style restrictions and require connector-specific service tags and FQDN allowances.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config"
+  ],
+  "implementation_notes": [
+    "Prefer managed identity for Azure-native and Entra-integrated targets whenever the connector or destination supports it; this is the default secure automation pattern for Logic Apps.",
+    "Treat connection authentication separately for built-in and managed connectors. Some connectors can use managed identity directly while others still need connection resources or other auth methods.",
+    "For API-ingestion workflows that later persist to SharePoint or another Microsoft 365 target, verify whether the SharePoint connector path supports the desired auth model. If not, a Graph or HTTP path may be more predictable.",
+    "When documenting or generating Logic Apps solutions, always specify whether the workflow uses system-assigned or user-assigned managed identity and which Azure RBAC or resource permissions must be granted to that identity."
+  ],
+  "caveats": [
+    "Managed identity does not automatically solve authentication for every connector; support is per-connector and per-target.",
+    "Single-tenant networking and access restrictions require more explicit connector egress planning than multitenant Consumption workflows.",
+    "Security design must account for both workflow runtime access and connector callback or webhook behavior."
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-limits-and-networking",
+    "azure-logic-apps-solution-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

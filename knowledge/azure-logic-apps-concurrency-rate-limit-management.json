@@ -1,0 +1,87 @@
+{
+  "id": "azure-logic-apps-concurrency-rate-limit-management",
+  "title": "Azure Logic Apps - Concurrency Control, Rate-Limit Management, And Throttling Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Controlling parallel execution in Logic Apps foreach loops",
+    "Handling API rate limits from Qualys, BitSight, and Microsoft Graph",
+    "Managing concurrent workflow instances on shared triggers",
+    "Token refresh and credential expiry in long-running workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "For-Each loop concurrency: by default Logic Apps run foreach iterations in parallel (up to 20 concurrent for Consumption, 50 for Standard). Set a specific concurrency degree in the loop settings: in the designer, select the foreach action > Settings > Concurrency Control > On, set degree from 1 (sequential) to the desired value. Sequential processing (degree 1) is required when the downstream API enforces strict per-user rate limits.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Trigger concurrency: for recurrence and polling triggers, enable concurrency control to limit how many simultaneous workflow instances can run. In the trigger settings, set Concurrency Control > On > Degree. Default unlimited. Set to 1 to ensure only one pipeline instance runs at a time — important for daily security data pipelines that write to shared SharePoint lists.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Handling 429 Too Many Requests from external APIs: the HTTP action has a built-in retry policy. Set it to 'Exponential Interval' with Count=4, Interval=PT5S, Maximum=PT1H, Minimum=PT5S. Logic Apps will automatically retry on 408, 429, and 5xx responses using exponential backoff. Accessible via HTTP action Settings > Retry Policy.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-exception-handling",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Respect the Retry-After header from throttled APIs: after the HTTP action returns 429, use a Condition to check the header: `@outputs('HTTP_Action')['headers']['Retry-After']`. Then add a Delay action with duration set to that value before retrying via a scope-based loop. The built-in retry policy does not automatically parse Retry-After; custom handling is needed for APIs like Microsoft Graph that specify exact retry windows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-exception-handling",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Logic Apps itself can be throttled by Azure when it exceeds action execution rate limits. Consumption: 100,000 actions per 5 minutes per region. Standard: governed by the App Service Plan SKU. Throttled runs appear in metrics as 'Runs Throttled'. Mitigation: use batching to reduce action count, or split large foreach loops across multiple workflow runs via a queue.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Token refresh for long-running workflows: OAuth access tokens expire (typically 1 hour for Entra ID tokens). If a workflow runs longer than token lifetime, subsequent HTTP calls fail with 401. Pattern: use a child workflow or inline token refresh action that calls the token endpoint again before each major API segment. Cache the new token in a workflow variable.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-http-endpoint",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Queue-based debouncing for high-frequency triggers: instead of triggering directly on each event, route events to an Azure Service Bus queue and use a Logic App with a Service Bus trigger that processes items at a controlled rate. Set the trigger polling interval to manage throughput. This decouples the ingestion rate from the processing rate.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/connectors/connectors-create-api-servicebus",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Managed connector connection throttling: managed connectors (SharePoint, Office 365) have per-connection call limits enforced by the connector gateway. SharePoint connector: 600 calls per 60 seconds per connection. If a foreach loop hits this, spread connections across multiple connection objects or reduce foreach concurrency to stay within limits.",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/sharepointonline/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For daily Qualys/BitSight pipelines: set trigger concurrency to 1 to guarantee no overlapping runs. If the previous day's run is still executing when the next trigger fires, the new instance is queued (up to the waiting runs limit, default 10).",
+    "When iterating over a large array (e.g., 500 Qualys hosts) in a foreach, start with concurrency degree 5 and monitor throttling metrics. Increase only if 429s are absent and the external API supports it.",
+    "For Microsoft Graph calls within foreach loops, prefer Invoke-MgGraphRequest style or Graph batch requests (up to 20 per batch) rather than individual HTTP actions to stay within Graph's 10,000 requests per 10-minute throttle.",
+    "When building retry logic manually for APIs without standard Retry-After headers (e.g., Qualys), use a Do-Until loop with a condition on the HTTP status code and a Delay action with a fixed 60-second interval."
+  ],
+  "caveats": [
+    "The built-in retry policy retries on transient failures but does NOT parse Retry-After header values. For APIs like Graph that specify exact retry windows, implement custom retry logic.",
+    "Setting foreach concurrency to 1 (sequential) on a large array can significantly increase total workflow duration. Evaluate whether the API rate limit actually requires sequential processing before applying.",
+    "Waiting runs for Consumption Logic Apps are limited to 10 by default. If the trigger fires more than 10 times while a run is in progress (e.g., catch-up after a failure), excess triggers are dropped."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-exception-handling",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-reliability-error-handling",
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-monitoring-observability"
+  ],
+  "source_projects": ["shared-seed"]
+}

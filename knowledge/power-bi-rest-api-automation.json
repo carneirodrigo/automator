@@ -1,0 +1,86 @@
+{
+  "id": "power-bi-rest-api-automation",
+  "title": "Power BI - REST API Automation For Workspaces, Imports, Reports, Dashboards, And Refresh",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Programmatic Power BI provisioning and lifecycle management",
+    "Automating Power BI workspaces, imports, reports, dashboards, and dataset refresh"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Power BI REST API includes workspace operations such as Create Group, Get Groups, Update Group, and workspace user-management operations.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/groups",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Imports API can create new content by importing PBIX, JSON, XLSX, and RDL files, and it also supports temporary upload locations for large PBIX files between 1 GB and 10 GB.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/imports/post-import",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Reports API supports operations such as clone report and export report.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/reports",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Dashboards API supports creating, listing, and deleting dashboards, and listing or cloning tiles.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/dashboards",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Dataset refresh is triggered through POST /v1.0/myorg/datasets/{datasetId}/refreshes, and for shared capacities a maximum of eight refresh requests per day can be initiated, including scheduled refresh.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Dataset refresh history is available through GET /v1.0/myorg/datasets/{datasetId}/refreshes.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-history",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "automation_sequence": [
+    "Identify or create the target workspace through the Groups API.",
+    "Import a PBIX, JSON, XLSX, or RDL artifact into the workspace using the Imports API.",
+    "Capture the resulting dataset and report identifiers.",
+    "Configure connections or gateway bindings if the imported semantic model requires them.",
+    "Trigger refresh and monitor refresh history through the Datasets API.",
+    "Optionally create or manage dashboards and tiles through the Dashboards API.",
+    "Optionally clone reports to new workspaces or bind them to target semantic models when report reuse is needed."
+  ],
+  "implementation_notes": [
+    "This is the missing bridge between knowledge of Power BI as a reporting product and actual programmatic artifact management.",
+    "For a Microsoft security to Power BI pipeline, the minimum useful automation set is workspace discovery or creation, import or deployment of a report artifact, and dataset refresh plus refresh monitoring.",
+    "Use workspace-scoped 'In Group' APIs for automation that targets shared workspaces rather than My workspace.",
+    "Refresh quotas and capacity type matter operationally; treat refresh design as part of deployment automation, not as a separate concern."
+  ],
+  "caveats": [
+    "A fully automated Power BI solution still needs an artifact strategy such as importing PBIX files or creating datasets by another supported path.",
+    "Shared-capacity refresh limits can constrain frequent dashboard updates.",
+    "API pages are broad operation catalogs; deeper per-endpoint extraction may still be needed when a project targets a specific lifecycle step."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/groups",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/groups/get-groups",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/imports",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/imports/post-import",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/reports",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/dashboards",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-history"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-data-sources-and-refresh",
+    "power-bi-embedding-and-apis"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

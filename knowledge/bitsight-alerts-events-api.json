@@ -1,0 +1,67 @@
+{
+  "id": "bitsight-alerts-events-api",
+  "title": "BitSight Alerts And Events API - Rating Change Notifications And Threshold Alerting",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Real-time alerting when a monitored company's BitSight rating drops below a threshold",
+    "Retrieving BitSight alert history for audit and reporting",
+    "Integrating BitSight rating change events with Teams, email, or Logic Apps workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "BitSight alerts are configured in the portal under Alerts > Manage Alerts. Alert types include: Rating Alert (trigger when rating crosses a threshold), Breach Alert (news of a security incident), Finding Alert (new critical finding detected), and Grade Change Alert. Each alert type generates an event accessible via the Alerts API.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/categories/360004003013",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List alert events: `GET https://api.bitsighttech.com/v1/alerts/triggered`. Returns a `results` array of triggered alert events. Each event includes `alert_type`, `company_guid`, `company_name`, `triggered_at`, `details` (threshold, current rating, previous rating), and `severity`. Paginate via `links.next`.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/categories/360004003013",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Filter alerts by date range: `GET /v1/alerts/triggered?triggered_after=2026-03-01&triggered_before=2026-03-28`. Use this in the daily pipeline to retrieve only new alerts since the last run. The `triggered_at` field format is ISO 8601.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/categories/360004003013",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Polling-based alert integration pattern (no webhook): in the daily PowerShell pipeline, query `GET /v1/alerts/triggered?triggered_after={lastRunTimestamp}` to retrieve alerts fired since the last run. For each alert where `alert_type` is 'rating_threshold' and the company is tagged 'Critical Vendor', trigger an immediate Teams notification and create an incident ticket.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/categories/360004003013",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Detect rating drops proactively without portal-configured alerts: compare today's rating (from `GET /ratings/v1/companies`) with yesterday's rating (from SharePoint staging list) in the PowerShell pipeline. Flag companies where `todayRating < yesterdayRating - threshold` (e.g., threshold = 20 points) for immediate escalation.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "The proactive rating-drop comparison (fact 5) is more reliable than the portal alerts API because it does not depend on alert configuration in the BitSight portal, which may not be set up for all companies or thresholds.",
+    "For Teams alerting on rating drops: after each daily pipeline run, check for companies where todayRating < threshold. If any found, post an Adaptive Card to the Security Alerts Teams channel with company name, current rating, yesterday's rating, and a link to the BitSight report.",
+    "Store triggered alerts in a SharePoint `BitSightAlerts` list for audit trail: AlertId (SourceKey), CompanyGuid, CompanyName, AlertType, TriggeredAt, CurrentRating, PreviousRating, Threshold, Acknowledged (bool). This creates a permanent record even if alerts are purged from BitSight."
+  ],
+  "caveats": [
+    "BitSight's alert event API (`/v1/alerts/triggered`) may require specific subscription entitlements. Verify the endpoint returns data for your subscription before building automation that depends on it.",
+    "Portal-configured alerts have a delivery delay — they may not fire immediately when a rating changes. The polling comparison pattern in the pipeline provides sub-24-hour detection without waiting for portal alert delivery.",
+    "Alert history in the BitSight portal is not indefinite. Store alerts to SharePoint as they are retrieved to maintain a permanent audit record."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/categories/360004003013",
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-current-ratings-api",
+    "bitsight-historical-ratings-trend-analysis",
+    "powershell-bitsight-http-client-patterns",
+    "ms-graph-teams-api"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,72 @@
+{
+  "id": "power-bi-modeling-dax-and-relationships",
+  "title": "Power BI - Semantic Modeling, Relationships, And DAX Conventions",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI semantic model design",
+    "Power BI relationships, measures, and DAX-based analytics"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Relationships between tables are necessary to accurately calculate results and display the correct information in Power BI reports, and Power BI Desktop can autodetect relationships during load.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-create-and-manage-relationships",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Relationship options include cardinality, cross-filter direction, and whether a relationship is active.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-create-and-manage-relationships",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI Desktop supports many-to-many relationship scenarios and commonly models them with a bridging table.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/desktop-many-to-many-relationships",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Measures are DAX-based calculations whose results change as users interact with reports, making them central to dynamic analysis in Power BI.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-measures",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI Desktop supports model measures, report-level measures, quick measures, display folders, and dynamic format strings for measures.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-measures",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "DAX is the formula language used to create calculations, logic, and analysis in Power BI semantic models.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-quickstart-learn-dax-basics",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Treat semantic modeling as the foundation for reliable report design. Visual quality cannot compensate for a weak relationship model.",
+    "Default to star-schema thinking where practical: facts for measurable events, dimensions for slicing and filtering.",
+    "Use measures rather than calculated columns for dynamic aggregations and KPI logic whenever the calculation should respond to filter context.",
+    "Document relationship direction, cardinality, and active or inactive status explicitly when handing off a Power BI design to another engineer or analyst.",
+    "Use bridging tables deliberately for many-to-many scenarios instead of hoping visuals infer the intended business logic."
+  ],
+  "caveats": [
+    "Autodetect helps, but it is not a substitute for deliberate model review.",
+    "Many-to-many relationships solve real problems but can also make model behavior harder to reason about if used casually.",
+    "DAX and report-level measures add flexibility, but they also increase maintenance burden if naming and organization are weak."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-create-and-manage-relationships",
+    "https://learn.microsoft.com/en-us/power-bi/desktop-many-to-many-relationships",
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-measures",
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-quickstart-learn-dax-basics"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-row-level-security-and-governance"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

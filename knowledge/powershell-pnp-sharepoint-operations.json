@@ -1,0 +1,117 @@
+{
+  "id": "powershell-pnp-sharepoint-operations",
+  "title": "PowerShell PnP.PowerShell - SharePoint CRUD, Authentication, And Batching",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "SharePoint list item create, read, update, delete from PowerShell",
+    "File uploads to SharePoint document libraries",
+    "Bulk data staging with batch operations",
+    "App-only or Managed Identity SharePoint automation"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "PnP.PowerShell is the community-maintained cross-platform PowerShell module for SharePoint Online built on PnP Core SDK. Install: `Install-Module PnP.PowerShell -Scope CurrentUser`. Version 2.x requires PowerShell 7.2 or later. Version 1.x supports both Windows PowerShell 5.1 and PowerShell 7.",
+      "source_url": "https://pnp.github.io/powershell/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Certificate-based app-only connection (production recommended): `Connect-PnPOnline -Url \"https://tenant.sharepoint.com/sites/sitename\" -ClientId $appId -Tenant $tenantId -CertificatePath $certPath -CertificatePassword (ConvertTo-SecureString $certPass -AsPlainText -Force)`. The app registration requires Sites.Selected or Sites.FullControl.All Graph permission.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Connect-PnPOnline.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Client secret app-only connection (legacy, being deprecated by Microsoft): `Connect-PnPOnline -Url $siteUrl -ClientId $appId -ClientSecret $secret`. This uses the Azure ACS (Access Control Service) model. Microsoft recommends migrating to certificate or Managed Identity auth.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Connect-PnPOnline.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Managed Identity connection (Azure Automation, Azure Functions): `Connect-PnPOnline -Url $siteUrl -ManagedIdentity`. The Managed Identity must be granted SharePoint site permissions via `Set-PnPTenantSite` or via Microsoft Graph. No credential management required.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Connect-PnPOnline.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Add a list item: `Add-PnPListItem -List \"ListName\" -Values @{ \"Title\" = \"value\"; \"InternalFieldName\" = \"value\" }`. Returns a Microsoft.SharePoint.Client.ListItem object containing the new item's `Id` property. Values hashtable uses internal column names.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Add-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Update a list item: `Set-PnPListItem -List \"ListName\" -Identity $itemId -Values @{ \"InternalFieldName\" = \"newvalue\" }`. The -Identity parameter accepts an integer item ID or a ListItem object returned from Get-PnPListItem or Add-PnPListItem.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Set-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Retrieve list items with CAML filtering (efficient for large lists): `Get-PnPListItem -List \"ListName\" -Query \"<View><Query><Where><Eq><FieldRef Name='SourceKey'/><Value Type='Text'>$key</Value></Eq></Where></Query></View>\"`. CAML filtering happens server-side and is much faster than client-side filtering for upsert lookups.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Retrieve all items from a list: `Get-PnPListItem -List \"ListName\" -PageSize 500`. Use -PageSize to control server-side pagination batch size. Default is 100. PnP automatically follows pages until all items are returned.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Batch operations for bulk writes: `$batch = New-PnPBatch; foreach ($row in $data) { Add-PnPListItem -List \"ListName\" -Values $row -Batch $batch }; Invoke-PnPBatch -Batch $batch`. Batches up to 100 operations per Invoke-PnPBatch call for optimal performance. Always split large datasets into chunks of 100.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/New-PnPBatch.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Discover column internal names: `Get-PnPField -List \"ListName\" | Select-Object Title, InternalName, TypeAsString`. The InternalName is required for all Values hashtables. Display names are not accepted. Columns with spaces in display names often have underscores in internal names.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Get-PnPField.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Upload a file to a document library: `Add-PnPFile -Path $localFilePath -Folder \"Shared Documents/Reports\"`. Returns a Microsoft.SharePoint.Client.File object. For files larger than 10MB, use chunked upload: `Add-PnPFile -Path $localFilePath -Folder $folder -Chunked -ChunkSize 10` (ChunkSize in MB).",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Add-PnPFile.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Delete a list item: `Remove-PnPListItem -List \"ListName\" -Identity $itemId -Force`. The -Force flag suppresses the confirmation prompt, required for unattended scripts.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Remove-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "PnP.PowerShell is generally preferred over Microsoft.Graph SDK for SharePoint-heavy workloads due to simpler CAML-based filtering, built-in batching, and higher-level abstraction over Graph REST calls.",
+    "Run a one-time discovery of list internal names using Get-PnPField and cache results. Internal names never change even if display names are renamed.",
+    "For upsert logic: query by source key with CAML, check result count, then call Add-PnPListItem or Set-PnPListItem accordingly. This avoids duplicates on repeated script runs.",
+    "Split bulk inserts into batches of 100: `$chunks = [System.Linq.Enumerable]::Chunk($data, 100)`. This avoids throttling and ensures each batch completes within SharePoint's request timeout.",
+    "Always call `Disconnect-PnPOnline` at the end of scripts to release the connection context and avoid token leakage in long-running processes."
+  ],
+  "caveats": [
+    "PnP.PowerShell 2.x requires PowerShell 7.2+. Scripts running on Windows PowerShell 5.1 must use PnP.PowerShell 1.x, which has a slightly different API surface.",
+    "Client secret (ACS) auth is being phased out by Microsoft. New implementations should use certificate-based or Managed Identity auth.",
+    "Managed Identity must be explicitly granted site-level permissions; granting SharePoint admin rights does not automatically flow to specific sites.",
+    "CAML queries are case-sensitive on field reference names. Use the exact InternalName value from Get-PnPField.",
+    "Batch operations with Set-PnPListItem (update) in a batch context may not be supported in all PnP versions; verify batch support for updates vs. adds.",
+    "SharePoint Online enforces resource throttling. On 429 responses, PnP.PowerShell automatically retries. For custom HTTP calls outside PnP, implement explicit retry logic."
+  ],
+  "authoritative_sources": [
+    "https://pnp.github.io/powershell/",
+    "https://pnp.github.io/powershell/cmdlets/Connect-PnPOnline.html",
+    "https://pnp.github.io/powershell/cmdlets/Add-PnPListItem.html",
+    "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html",
+    "https://pnp.github.io/powershell/cmdlets/New-PnPBatch.html"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "powershell-microsoftgraph-sdk-auth-sharepoint",
+    "powershell-sharepoint-data-staging-upsert",
+    "ms-graph-sharepoint-list-item-crud-playbook"
+  ],
+  "source_projects": ["shared-seed"]
+}

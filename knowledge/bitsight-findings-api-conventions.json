@@ -1,0 +1,51 @@
+{
+  "id": "bitsight-findings-api-conventions",
+  "title": "BitSight Findings API - Entity And Risk Vector Conventions",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": ["BitSight findings retrieval by company and risk vector"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-19T18:10:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "BitSight exposes findings by company entity under endpoints shaped like GET /v1/companies/{entity_guid}/findings with filters such as risk_vector.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360007940393-Potentially-Exploited-Findings",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "The findings surface is organized around risk vectors, and documentation for specific finding classes maps directly to concrete API request patterns.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360007940393-Potentially-Exploited-Findings",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "BitSight error handling uses standard HTTP status codes, including 401 when no valid API token is provided and 403 when the caller lacks permission to the resource.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360036941374-Errors-and-Status-Codes",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Current ratings retrieval is exposed under a versioned ratings API path such as /ratings/v1/current-ratings, which indicates BitSight uses separate endpoint families for different data domains.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/18061051106455-Current-Ratings-API-Endpoint",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/360007940393-Potentially-Exploited-Findings",
+    "https://help.bitsighttech.com/hc/en-us/articles/360036941374-Errors-and-Status-Codes",
+    "https://help.bitsighttech.com/hc/en-us/articles/18061051106455-Current-Ratings-API-Endpoint",
+    "https://help.bitsighttech.com/hc/en-us/articles/231872628-API-Documentation-Overview"
+  ],
+  "implementation_notes": [
+    "Model findings ingestion around entity GUID plus risk vector filters, then normalize different findings classes in your own schema.",
+    "Handle permissions errors distinctly from missing-token errors because they signal different operational fixes.",
+    "Do not assume findings and ratings share identical paths or response shapes just because they are both in BitSight."
+  ],
+  "caveats": [
+    "BitSight documents many finding types separately, so additional risk-vector-specific entries may still be worth adding later.",
+    "Access to some findings views is product- and role-dependent."
+  ],
+  "last_verified": "2026-03-20T18:10:00Z",
+  "related_entries": [
+    "bitsight-api-auth-conventions"
+  ],
+  "source_projects": ["shared-seed"]
+}

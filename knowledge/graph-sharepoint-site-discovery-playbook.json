@@ -1,0 +1,83 @@
+{
+  "id": "graph-sharepoint-site-discovery-playbook",
+  "title": "Playbook - Microsoft Graph SharePoint Site Discovery And Resolution",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Finding and resolving SharePoint sites before list or file operations"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Working Graph token with site-read capability",
+    "One of: known hostname and path, known group ID, known site IDs, or free-text search keywords"
+  ],
+  "required_permissions": [
+    "Site discovery APIs generally require Sites.Read.All or stronger permissions for app-only access",
+    "Use higher scopes only when later CRUD operations require them"
+  ],
+  "request_sequence": [
+    "If the exact site path is known, resolve it directly: GET /sites/{hostname}:/{relative-path}.",
+    "If only a group or Team is known, resolve the group site: GET /groups/{group-id}/sites/root.",
+    "If a site ID is already known, get it directly: GET /sites/{site-id}.",
+    "If only keywords are known, search sites across the tenant: GET /sites?search={query}.",
+    "If broad inventory is required, enumerate sites: GET /sites/getAllSites.",
+    "If the target may be a subsite, enumerate children: GET /sites/{site-id}/sites.",
+    "After discovery, cache the canonical site ID and use it for downstream drive and list operations."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The SharePoint API root resources include /sites/root, /sites/{site-id}, /sites/{site-id}/drive, /sites/{site-id}/drives, /sites/{site-id}/sites, /sites/{site-id}/lists, and /groups/{group-id}/sites/root.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Sites can be resolved by path using /sites/{hostname}:/{relative-path}.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Site search supports free-text search across a SharePoint tenant with GET /sites?search={query}, and the only sortable property is createdDateTime.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/site-search?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Tenant-wide site enumeration is available through getAllSites.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/site-getallsites?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Subsites can be enumerated with GET /sites/{site-id}/sites.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/site-list-subsites?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Prefer path-based resolution when the exact URL is known because it avoids ambiguous search results.",
+    "Use search for interactive discovery by name or keyword, and getAllSites only for inventory-style synchronization or full-tenant exploration.",
+    "Resolve once, then cache the site ID and related drive or list IDs for later CRUD operations.",
+    "When mapping old SharePoint REST or CSOM patterns, remember that Graph site IDs encode both site collection and web identifiers."
+  ],
+  "common_failures": [
+    "Search returning multiple similarly named sites and the caller choosing the wrong one.",
+    "404 because the relative path omits a subsite segment.",
+    "Overusing getAllSites for interactive lookups when path resolution or search is cheaper and more precise."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/resources/sharepoint?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-get?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-search?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-getallsites?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/site-list-subsites?view=graph-rest-1.0"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-sharepoint-data-conventions",
+    "graph-sharepoint-list-crud-playbook",
+    "graph-sharepoint-file-transfer-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "sharepoint-graph-research"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "project_id": "",
+  "project_name": "",
+  "project_root": "",
+  "runtime_dir": "",
+  "default_constraints": [],
+  "agent_models": {
+    "default": "gpt-4.1"
+  },
+  "coding_backend": {
+    "type": "recipe",
+    "command": [],
+    "plan_file": "",
+    "timeout_seconds": 30,
+    "model": ""
+  },
+  "coding_autonomous_commands": [],
+  "coding_autonomous_checks": [],
+  "coding_expected_changed_files": [],
+  "platform_builder_backend": {
+    "type": "recipe",
+    "command": [],
+    "plan_file": "",
+    "timeout_seconds": 30,
+    "model": ""
+  },
+  "platform_builder_allowed_command_prefixes": [],
+  "platform_builder_default_targets": [],
+  "qa_backend": {
+    "type": "recipe",
+    "command": [],
+    "plan_file": "",
+    "timeout_seconds": 30,
+    "model": ""
+  },
+  "qa_default_checks": [],
+  "qa_allowed_command_prefixes": [],
+  "security_default_scan_files": [],
+  "allowed_tools": [],
+  "notes": [],
+  "deliverables_dir": "",
+  "security_policy": {
+    "hardcoded_credentials": "warn",
+    "notes": "warn = flag but do not block; block = treat as release-blocking"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "repos": [
+    {
+      "id": "anthropic",
+      "url": "https://github.com/anthropics/skills",
+      "skills_path": "skills"
+    },
+    {
+      "id": "openai",
+      "url": "https://github.com/openai/skills",
+      "skills_path": "skills/.curated"
+    },
+    {
+      "id": "google-gemini-skills",
+      "url": "https://github.com/google-gemini/gemini-skills",
+      "skills_path": "skills"
+    },
+    {
+      "id": "google-gemini-cli",
+      "url": "https://github.com/google-gemini/gemini-cli",
+      "skills_path": ".gemini/skills"
+    },
+    {
+      "id": "microsoft",
+      "url": "https://github.com/microsoft/skills",
+      "skills_path": ".github/skills"
+    }
+  ]
+}

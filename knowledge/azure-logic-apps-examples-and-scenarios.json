@@ -1,0 +1,103 @@
+{
+  "id": "azure-logic-apps-examples-and-scenarios",
+  "title": "Azure Logic Apps - Common Scenarios, Patterns, And Operational Branches",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Routing Logic Apps requests by scenario and solution pattern",
+    "Choosing the right Logic Apps branch for triggers, control flow, deployment, monitoring, and enterprise integration"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The examples and scenarios guide positions Azure Logic Apps as a serverless integration platform for orchestrating actions across multiple systems and services by using more than 1,400 prebuilt connectors.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The guide organizes Logic Apps work into common starting points, migrations, control flow, code execution, security, reliability, Foundry integration, content transformation, custom APIs and connectors, B2B, virtual-network access, deployment, management, monitoring, and end-to-end scenarios.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The page distinguishes polling triggers, which check an endpoint on a schedule, from push triggers, which wait for an external event and fire when the event happens.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Common polling trigger examples on the page include Recurrence, email-received triggers, and HTTP-based checks of a service endpoint, while common push trigger examples include Request and HTTP Webhook.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The guide explicitly includes migration paths from BizTalk Server and from Power Automate to Azure Logic Apps Standard.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The page groups advanced workflow logic under control-flow and error-handling capabilities such as conditions, switches, loops, scopes, and exception handling.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps code-execution examples on the page include JavaScript snippets, Azure Functions, and in Standard workflows .NET code, C# scripts, and PowerShell scripts.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The guide includes dedicated branches for securing workflows, reliability, Foundry tools and AI capabilities, content-type handling and transformations, custom APIs or connectors, B2B integration accounts, virtual-network access, deployment, management, and monitoring.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For direct access to secured resources in an Azure virtual network, the page points to creating a Standard logic app workflow in single-tenant Azure Logic Apps.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The deployment branch on the page includes DevOps and ARM-template automation, and the monitoring branch includes workflow monitoring, run-status review, alerts, diagnostic collection, Defender for Cloud monitoring, and Application Insights for Standard workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "scenario_selection_rules": [
+    "Use the common-starting-points branch first when the question is mainly about trigger style, workflow bootstrap, or whether the workflow starts on a schedule or on an event.",
+    "Use the control-flow branch when the problem is conditional logic, loops, scopes, or exception handling rather than connector choice.",
+    "Use the code-execution branch when the workflow needs inline code, Azure Functions, or Standard-only script execution instead of only designer actions.",
+    "Use the custom-API-or-connector branch when the target system is not covered by a connector and the solution needs HTTP plus Swagger, API Management, App Service, or custom connector design decisions.",
+    "Use the security and reliability branches when the request is about identity, tenant restrictions, resilience, zone redundancy, or disaster recovery.",
+    "Use the Foundry and AI branch when the request involves document parsing, LLMs, chunking, or AI-enriched workflows.",
+    "Use the B2B branch when the request is about AS2, X12, EDIFACT, RosettaNet, trading partners, or integration accounts.",
+    "Use the VNet-access branch when the workflow must reach private Azure resources directly; this is a Standard-oriented design question.",
+    "Use the deploy-manage-monitor branches when the user asks for productionization, CI/CD, cost management, logging, telemetry, or operational ownership."
+  ],
+  "implementation_notes": [
+    "Treat this page as a scenario router for Logic Apps, not just an examples page. It maps user requests to the correct capability family quickly.",
+    "When planning a Logic Apps solution, first classify the request into one of these branches: trigger pattern, control flow, code execution, security, reliability, AI, B2B, private networking, deployment, or monitoring.",
+    "If a request spans several branches, keep the design modular. For example, an enterprise workflow can require trigger design, managed identity, private networking, error handling, and monitoring all at once.",
+    "Use this entry to decide which more-specific KB entries to load before building or documenting a Logic Apps solution."
+  ],
+  "caveats": [
+    "This page is a hub of scenario links, not a substitute for the deeper how-to pages it references.",
+    "Many branches differ materially between Consumption and Standard, so scenario selection must still be paired with hosting-model selection.",
+    "Some scenario links point to tutorials, samples, blogs, GitHub assets, or whitepapers; use official Microsoft Learn pages as the primary authority for reusable implementation facts."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-examples-and-scenarios"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-solution-playbook",
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-custom-api-patterns",
+    "azure-logic-apps-reliability-and-error-handling",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-limits-and-networking"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

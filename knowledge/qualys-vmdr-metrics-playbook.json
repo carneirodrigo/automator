@@ -1,0 +1,90 @@
+{
+  "id": "qualys-vmdr-metrics-playbook",
+  "title": "Playbook - Qualys VMDR Reporting And Metrics Extraction",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Building engine workflows that generate VMDR reports by asset, asset group, tag, month, and quarter"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "User identifies the tenant platform from https://www.qualys.com/platform-identification",
+    "Project config stores both the classic Qualys API server URL and the API gateway URL for the tenant",
+    "Credentials or tokens are available for both the classic VM API family and gateway asset inventory APIs as needed",
+    "Report request states the asset scope and whether the output is snapshot, period activity, or trend"
+  ],
+  "required_permissions": [
+    "Classic VM visibility to target hosts and detections",
+    "KnowledgeBase download permission when KB enrichment is required",
+    "GAV or CSAM module plus App API Enabled and view access permissions for Asset Inventory routes"
+  ],
+  "request_sequence": [
+    "Resolve tenant platform and derive the classic API server URL and gateway URL from the official Qualys platform-identification reference.",
+    "Resolve the reporting scope. For a single asset, resolve by assetId, hostId, IP, or hostname. For a group or tag report, resolve the asset set first, preferably through Asset Inventory search filters and tag metadata.",
+    "Pull or refresh the asset inventory dimension from POST /rest/2.0/search/am/asset using includeFields to retain only the fields needed for reporting and grouping.",
+    "Pull host detections from /api/2.0/fo/asset/host/vm/detection/?action=list for the scoped assets. Use show_asset_id=1 and show_qds=1. Add tag parameters when the tenant scoping model supports them.",
+    "For change-window reports, use detection_updated_since/before or vm_processed_after/before. For current-state reports, use the current detection set without a date window unless the user asks otherwise.",
+    "Collect the distinct QIDs from the detection result and enrich them through /api/2.0/fo/knowledge_base/vuln/ with details=All, scoped to the referenced ids when possible.",
+    "Normalize to one detection-instance row per asset with KB title, severity metadata, CVEs, asset name, network identifiers, and tag context.",
+    "Aggregate into the requested output shape: by asset, by tag, by severity, by title, by month, or by quarter.",
+    "State the timestamp basis explicitly for any previous month or previous quarter report."
+  ],
+  "common_report_recipes": [
+    "Current vulnerabilities for one asset: scope to one asset, current detection rows only, group by status or severity as requested.",
+    "Current vulnerabilities for a tag: resolve tag membership in Asset Inventory, fetch detections for the resulting asset set, group by severity, title, or asset.",
+    "Previous month activity: choose one timestamp basis such as FIRST_FOUND_DATETIME for newly found or LAST_FIXED_DATETIME for remediated items, then aggregate within the previous calendar month.",
+    "Previous quarter summary: bucket rows by calendar quarter using the chosen timestamp basis, then produce counts by severity, status transition, or title.",
+    "Top vulnerabilities for a scoped population: aggregate current or period rows by QID and KB TITLE, then sort by count descending."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The Sumo Logic Qualys VMDR integration documents the same three-source model used here: vulnerability detections from /api/2.0/fo/asset/host/vm/detection/, KnowledgeBase data from /api/2.0/fo/knowledge_base/vuln/, and asset data from /rest/2.0/search/am/asset/.",
+      "source_url": "https://www.sumologic.com/help/docs/send-data/hosted-collectors/cloud-to-cloud-integration-framework/qualys-vmdr-source/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Host Detection List API returns latest vulnerability data for hosts and supports QDS plus filterable date windows for changed or processed detections.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Asset Inventory API documents includeFields or excludeFields for payload reduction and exposes hostId, assetId, names, addresses, OS, and tags in asset payloads.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "When the user asks for 'all vulnerabilities as a point in time', interpret that as a current-state snapshot unless stored historical snapshots exist. For a past point in time, use persisted extracts rather than assuming live APIs can recreate old dashboard state exactly.",
+    "When the user asks for 'previous month' or 'previous quarter' without clarifying the timestamp basis, default to a clearly labeled basis such as LAST_UPDATE_DATETIME for activity or FIRST_FOUND_DATETIME for newly discovered findings, and surface that choice in the report header.",
+    "Prefer deriving asset groups from asset inventory filters and tags instead of trying to reconstruct groups only from classic VM host fields.",
+    "Use KB TITLE as the stable display name for vulnerability-name reports and keep QID alongside it to avoid collisions or renamed titles.",
+    "Keep the normalized output durable enough to support repeated monthly or quarterly rollups without reinterpreting raw XML every time."
+  ],
+  "common_failures": [
+    "Wrong pod or wrong URL family, causing classic VM calls and gateway calls to fail in different ways.",
+    "Missing KB permission, which leaves QIDs without titles, CVEs, or patchability metadata.",
+    "Omitting show_asset_id=1, which makes classic-to-gateway joins harder than necessary.",
+    "Building a previous-month report without stating which timestamp defines inclusion.",
+    "Treating current live detections as if they were a historical snapshot for a past date."
+  ],
+  "authoritative_sources": [
+    "https://www.qualys.com/platform-identification",
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+    "https://www.sumologic.com/help/docs/send-data/hosted-collectors/cloud-to-cloud-integration-framework/qualys-vmdr-source/"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-api-conventions",
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-global-asset-inventory-join-conventions",
+    "qualys-vmdr-reporting-model"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "id": "powershell-sharepoint-data-staging-upsert",
+  "title": "PowerShell SharePoint Data Staging - Upsert Logic, Field Mapping, And Deduplication",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Staging Qualys, BitSight, or Defender data to SharePoint lists without duplicates",
+    "Implementing upsert (insert-or-update) logic for PowerShell to SharePoint pipelines",
+    "Field name mapping and type conversion for SharePoint list writes"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Upsert pattern via PnP.PowerShell: query for existing item by source key using CAML, then branch on result count. Pattern: `$existing = Get-PnPListItem -List $listName -Query \"<View><Query><Where><Eq><FieldRef Name='SourceKey'/><Value Type='Text'>$key</Value></Eq></Where></Query></View>\"; if ($existing) { Set-PnPListItem -List $listName -Identity $existing.Id -Values $updateValues } else { Add-PnPListItem -List $listName -Values $insertValues }`.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Upsert pattern via Microsoft.Graph SDK: `$items = Get-MgSiteListItem -SiteId $siteId -ListId $listId -Filter \"fields/SourceKey eq '$key'\" -ExpandProperty fields; if ($items) { Update-MgSiteListItem -SiteId $siteId -ListId $listId -ListItemId $items[0].Id -Fields $updateFields } else { New-MgSiteListItem -SiteId $siteId -ListId $listId -Fields $insertFields }`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/listitem-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Discover SharePoint list internal column names for field mapping: `Get-PnPField -List $listName | Select-Object Title, InternalName, TypeAsString | Sort-Object Title`. Always use InternalName in Values hashtables; display names are not accepted by SharePoint write APIs.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Get-PnPField.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "SharePoint column type requirements for write operations: Text columns accept plain strings; Number columns accept numeric values (not strings); DateTime columns require ISO 8601 format strings (`\"2026-03-28T00:00:00Z\"`); Choice columns accept the choice option string (must exactly match a defined choice); Boolean columns accept `$true` or `$false`; Lookup columns require the integer lookup item ID.",
+      "source_url": "https://learn.microsoft.com/en-us/sharepoint/dev/sp-add-ins/working-with-lists-and-list-items-with-rest",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "For bulk upsert operations, combine CAML lookups and PnP batching. Build a hashtable of existing items keyed by SourceKey before processing: `$existingMap = @{}; Get-PnPListItem -List $listName -PageSize 500 | ForEach-Object { $existingMap[$_.FieldValues['SourceKey']] = $_.Id }`. Then use the map for O(1) lookup instead of per-row CAML queries.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Chunk bulk inserts into batches of 100 for PnP batch operations to avoid SharePoint throttling: `$chunks = [System.Linq.Enumerable]::Chunk($insertRows, 100); foreach ($chunk in $chunks) { $batch = New-PnPBatch; $chunk | ForEach-Object { Add-PnPListItem -List $listName -Values $_ -Batch $batch }; Invoke-PnPBatch -Batch $batch }`.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/New-PnPBatch.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "For CSV or Excel report staging, upload the file directly to a SharePoint document library: `Add-PnPFile -Path $reportPath -Folder \"Shared Documents/Reports\"`. Power BI can connect to this file as a data source and trigger automatic dataset refresh after the file is updated.",
+      "source_url": "https://pnp.github.io/powershell/cmdlets/Add-PnPFile.html",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "SharePoint list view threshold: lists with more than 5,000 items require indexed columns for CAML filtering. Add an index to the SourceKey column if the list will grow beyond 5,000 rows: `Set-PnPField -List $listName -Identity 'SourceKey' -Values @{ Indexed = $true }`.",
+      "source_url": "https://learn.microsoft.com/en-us/sharepoint/manage-lists-and-libraries-exceeding-the-view-threshold",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "SharePoint Online resource throttling: when a 429 or 503 response is returned, PnP.PowerShell automatically retries with the Retry-After delay for most built-in cmdlets. For custom Invoke-RestMethod calls to SharePoint REST endpoints, implement explicit retry: check `$_.Exception.Response.StatusCode.Value__` for 429/503 and sleep for the Retry-After duration.",
+      "source_url": "https://learn.microsoft.com/en-us/sharepoint/dev/general-development/how-to-avoid-getting-throttled-or-blocked-in-sharepoint-online",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Define a SourceKey column (single-line text, indexed) in every staging list to enable idempotent upsert. For Qualys hosts, use IP or asset ID. For BitSight companies, use the BitSight GUID. For Defender devices, use the device ID.",
+    "Pre-load the full existing item map into a PowerShell hashtable at script start (pattern in fact 5), then execute all inserts and updates using that map. This avoids per-row CAML queries which generate heavy server load on large lists.",
+    "Add a LastUpdated column (DateTime) to all staging lists and set it to the current UTC time on every insert and update. This enables downstream queries to filter for records changed since the last Power BI refresh.",
+    "For Defender data, include the DeviceId as SourceKey, DeviceName as Title, and separate columns for RiskScore, ExposureLevel, and LastSeen. This maps cleanly to Power BI reports showing device risk distribution.",
+    "For Qualys VMDR data, recommended column set: HostId (number, SourceKey), IPAddress (text), HostName (text), LastScanDate (DateTime), CriticalCount (number), HighCount (number), MediumCount (number), LastUpdated (DateTime)."
+  ],
+  "caveats": [
+    "The 5,000-item list view threshold applies to CAML filtering. Without an index on the filtered column, queries against lists exceeding 5,000 items will fail with a threshold error.",
+    "DateTime values must be in ISO 8601 UTC format. Local time strings without timezone suffix may be stored with incorrect UTC offsets.",
+    "SharePoint Choice column values must exactly match one of the defined choices (case-sensitive in some tenants). Pre-validate incoming data against the defined choice values before writing.",
+    "Lookup column writes require the integer ID of the referenced item in the source list, not the display value. Maintain a lookup map if source IDs are not already available."
+  ],
+  "authoritative_sources": [
+    "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html",
+    "https://pnp.github.io/powershell/cmdlets/Add-PnPListItem.html",
+    "https://learn.microsoft.com/en-us/graph/api/listitem-create",
+    "https://learn.microsoft.com/en-us/sharepoint/manage-lists-and-libraries-exceeding-the-view-threshold",
+    "https://learn.microsoft.com/en-us/sharepoint/dev/general-development/how-to-avoid-getting-throttled-or-blocked-in-sharepoint-online"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "powershell-pnp-sharepoint-operations",
+    "powershell-microsoftgraph-sdk-auth-sharepoint",
+    "ms-graph-sharepoint-list-item-crud-playbook",
+    "powershell-http-retry-rate-limit-patterns"
+  ],
+  "source_projects": ["shared-seed"]
+}

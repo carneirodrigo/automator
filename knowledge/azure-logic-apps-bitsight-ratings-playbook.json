@@ -1,0 +1,63 @@
+{
+  "id": "azure-logic-apps-bitsight-ratings-playbook",
+  "title": "Playbook - Azure Logic Apps To BitSight Ratings APIs",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps workflows that retrieve BitSight current ratings and rating history for reporting",
+    "BitSight rating ingestion pipelines that feed SharePoint or Power BI"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Valid BitSight API token stored as a secret",
+    "Decision on whether the workflow needs portfolio snapshots, single-company history, or both",
+    "Decision on whether the destination is SharePoint, Power BI, or another persisted store"
+  ],
+  "required_permissions": [
+    "BitSight token access to the ratings data in scope",
+    "SharePoint or Power BI permissions appropriate to the chosen downstream path"
+  ],
+  "request_sequence": [
+    "Start with a Recurrence trigger for scheduled snapshots or a Request trigger for programmatic execution.",
+    "Call GET /ratings/v1/current-ratings through the Logic Apps HTTP action to retrieve the current portfolio snapshot.",
+    "If the report needs over-time data for one company, call GET /ratings/v1/companies/{company_guid} and flatten the ratings array into daily rows.",
+    "Handle pagination on current-ratings until the response indicates there are no more pages.",
+    "Normalize the response into stable columns such as guid, name, rating, rating_category, rating_as_of, and for historical rows rating_date and rating range.",
+    "Persist the normalized rows to SharePoint lists or files when the workflow needs durable history, or hand the normalized payload to a direct Power BI ingestion path if the project deliberately avoids staging."
+  ],
+  "implementation_notes": [
+    "Use current-ratings for portfolio-wide current-state extracts and Company Details for one-year daily history per company.",
+    "For trend dashboards, schedule recurring extracts and store them; current-ratings alone is only a 24-hour snapshot.",
+    "SharePoint lists are the easiest durable store for normalized rating rows and scheduled snapshots. Files in a document library are useful for raw JSON or CSV archives.",
+    "Use BitSight GUID as the stable business key. Treat name as a display label only.",
+    "Because BitSight uses Basic Auth with the token as the username, the generic Logic Apps HTTP action is usually sufficient and no dedicated connector is required."
+  ],
+  "caveats": [
+    "Portfolio-wide historical trends require repeated extractions over time or iterating company-by-company where the API exposes history.",
+    "The native Power BI BitSight connector is convenient for quick exploration, but its one-company limitation makes Logic Apps plus persisted storage more flexible for portfolio reporting.",
+    "Rating history beyond the one-year company-details window must come from stored extracts or separately saved report artifacts."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management",
+    "https://help.bitsighttech.com/hc/en-us/articles/25748078243735-API-Token-Types",
+    "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+    "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+    "https://help.bitsighttech.com/hc/en-us/articles/360050111794-Pagination",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "bitsight-api-auth-conventions",
+    "bitsight-current-ratings-api",
+    "bitsight-company-details-ratings-history",
+    "bitsight-ratings-powerbi-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "bitsight-ratings-research"
+  ]
+}

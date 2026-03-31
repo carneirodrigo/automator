@@ -1,0 +1,82 @@
+{
+  "id": "bitsight-current-ratings-api",
+  "title": "BitSight Current Ratings API - Security Rating Retrieval Conventions",
+  "source_family": "bitsight",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "BitSight security rating retrieval",
+    "Portfolio current rating extraction for downstream reporting"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Current Ratings endpoint is GET https://api.bitsighttech.com/ratings/v1/current-ratings.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Current Ratings provides a 24-hour snapshot of a company's rating.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Current Ratings response includes pagination links, a count, a summaries.rating_as_of date, and result objects that include guid, name, rating, and rating_category.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "BitSight recommends using pagination parameters such as limit and offset where available, and paginated responses can include next, next_url, previous, and count.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360050111794-Pagination",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "BitSight query parameters include limit, offset, fields, format, q, sort, start_date, end_date, and cursor, although parameter availability varies by endpoint.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360036566794-Parameters",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The response codes for Current Ratings include 200, 401 for invalid token, 403 for permission denied, and 404 for not found.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "rating_fields": [
+    "guid",
+    "name",
+    "rating",
+    "rating_category",
+    "summaries.rating_as_of",
+    "count",
+    "links.next",
+    "links.previous"
+  ],
+  "implementation_notes": [
+    "Treat current-ratings as the primary BitSight portfolio ratings feed for security-rating reporting.",
+    "Persist rating_as_of alongside every extracted rating row so reports can distinguish observation date from extraction date.",
+    "Use guid as the stable entity key and name only as a display label.",
+    "If the endpoint supports fields selection in your tenant, limit the response to the columns required by the downstream report.",
+    "Handle pagination until links.next or next_url is empty rather than assuming a single response page."
+  ],
+  "caveats": [
+    "Current Ratings is a current-state snapshot and not a full historical ratings series.",
+    "Parameter availability can vary by endpoint, so not every generic BitSight query parameter should be assumed to work here without verification.",
+    "Access to ratings data is tied to BitSight product entitlements and portfolio visibility."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+    "https://help.bitsighttech.com/hc/en-us/articles/360050111794-Pagination",
+    "https://help.bitsighttech.com/hc/en-us/articles/360036566794-Parameters",
+    "https://help.bitsighttech.com/hc/en-us/articles/231872628-API-Documentation-Overview"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-api-auth-conventions",
+    "bitsight-company-details-ratings-history",
+    "bitsight-ratings-powerbi-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "bitsight-ratings-research"
+  ]
+}

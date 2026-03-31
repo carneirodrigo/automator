@@ -1,0 +1,100 @@
+{
+  "id": "powershell-report-generation-excel-html-csv",
+  "title": "PowerShell Report Generation - ImportExcel, PSWriteHTML, CSV Export, And Power BI Refresh",
+  "source_family": "powershell-automation",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Generating formatted Excel reports from Qualys, BitSight, or Defender data in PowerShell",
+    "Creating HTML reports with interactive tables for email or web distribution",
+    "Triggering Power BI dataset refresh after data pipeline completion",
+    "Exporting structured CSV data for downstream consumption"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The `ImportExcel` module (by Doug Finke) creates and modifies Excel .xlsx files without Excel installed. Install: `Install-Module ImportExcel -Scope CurrentUser`. Core export cmdlet: `$data | Export-Excel -Path $xlsxPath -WorksheetName 'Sheet1' -AutoSize -FreezeTopRow -BoldTopRow -TableName 'DataTable' -ClearSheet`. The `-ClearSheet` flag overwrites existing worksheet content on repeated runs.",
+      "source_url": "https://github.com/dfinke/ImportExcel",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Multiple worksheets in one workbook using ImportExcel: call `Export-Excel` multiple times with different `-WorksheetName` values and add `-Append` on the second and subsequent calls to write to the same file without overwriting earlier sheets. Example: `$qualysData | Export-Excel -Path $path -WorksheetName 'Qualys' -AutoSize; $bitsightData | Export-Excel -Path $path -WorksheetName 'BitSight' -Append -AutoSize`.",
+      "source_url": "https://github.com/dfinke/ImportExcel",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Conditional formatting with ImportExcel: `$ws = (Open-ExcelPackage -Path $path).Sheet1; Add-ConditionalFormatting -WorkSheet $ws -Address 'D2:D500' -RuleType LessThan -ConditionValue 700 -ForeGroundColor Red -BackgroundColor LightPink`. Useful for highlighting BitSight ratings below threshold or Qualys critical counts above zero.",
+      "source_url": "https://github.com/dfinke/ImportExcel",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Chart generation with ImportExcel: `Add-ExcelChart -WorkSheet $ws -ChartType ColumnClustered -XRange 'A2:A20' -YRange 'D2:D20' -Title 'Security Ratings' -Column 7 -Row 1`. Charts are embedded in the worksheet and visible when the file is opened in Excel.",
+      "source_url": "https://github.com/dfinke/ImportExcel",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "CSV export: `$data | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8`. The `-NoTypeInformation` flag removes the `#TYPE` header comment from the first line. `-Encoding UTF8` is required to correctly handle special characters; omitting it uses the system default encoding which may corrupt non-ASCII content.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-csv",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "HTML report generation with `PSWriteHTML` module (by Przemyslaw Klys): `Install-Module PSWriteHTML -Scope CurrentUser`. Create self-contained interactive HTML: `New-HTML -FilePath $htmlPath -TitleText 'Security Report' { New-HTMLSection -HeaderText 'BitSight Ratings' { New-HTMLTable -DataTable $bitsightData -HideFooter -SearchBuilder -PagingOptions @(25,50,100) } }`. Produces a self-contained HTML file with embedded DataTables.js.",
+      "source_url": "https://github.com/EvotecIT/PSWriteHTML",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Send report as email attachment via Microsoft Graph (no SMTP relay required): acquire a token for scope `https://graph.microsoft.com/.default` with Mail.Send permission, then call `Send-MgUserMail -UserId $senderUpn`. Attach files by converting to Base64: `[Convert]::ToBase64String([IO.File]::ReadAllBytes($filePath))` and including in the message body's `attachments` array.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/user-sendmail",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Trigger a Power BI dataset refresh via REST API from PowerShell: acquire a Power BI service token with scope `https://analysis.windows.net/powerbi/api/.default`, then: `Invoke-RestMethod -Uri \"https://api.powerbi.com/v1.0/myorg/datasets/$datasetId/refreshes\" -Method POST -Headers @{ Authorization = \"Bearer $pbiToken\" }`. A 202 Accepted response means the refresh was queued.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Check Power BI refresh status: `Invoke-RestMethod -Uri \"https://api.powerbi.com/v1.0/myorg/datasets/$datasetId/refreshes\" -Method GET -Headers @{ Authorization = \"Bearer $pbiToken\" }`. Returns a `value` array of refresh history entries. Most recent entry status: `Completed`, `Failed`, or `Unknown` (in progress).",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-history",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For security reporting dashboards, use ImportExcel with separate worksheets per data source (Qualys, BitSight, Defender) plus an Executive Summary sheet with KPI values. This lets business users navigate per-source data while seeing top-line metrics on one sheet.",
+    "Apply conditional formatting after the main Export-Excel call using Open-ExcelPackage / Add-ConditionalFormatting / Close-ExcelPackage. This keeps the main export clean and makes formatting changes easy to update independently.",
+    "For Power BI integration, the simplest pattern is to upload the CSV or Excel file to a SharePoint document library and configure Power BI to connect to that file as a data source with scheduled refresh. Avoid the REST refresh trigger unless you need real-time refresh coordination.",
+    "PSWriteHTML is best for email distribution or intranet publishing where recipients may not have Excel. Use it for weekly summary reports; use ImportExcel for analyst-facing workbooks that will be manipulated after delivery.",
+    "When emailing via Graph, note that Mail.Send is a broad permission. For automation, use a dedicated service mailbox rather than a real user's mailbox to contain the permission scope and preserve audit trails."
+  ],
+  "caveats": [
+    "ImportExcel requires the EPPlus library and does not support all Excel features (e.g., complex macros, pivot table refresh). It is sufficient for formatted tables, charts, and conditional formatting.",
+    "The PSWriteHTML `-ShowHTML` parameter opens the file in the default browser. Omit it in automated scripts.",
+    "Power BI dataset refresh via REST is subject to the plan's refresh-per-day limit (8/day for Pro, 48/day for Premium). Exceeding this returns 429.",
+    "Export-Csv in PowerShell 5.1 with `-Encoding UTF8` writes a UTF-8 file with BOM. In PowerShell 7+, use `-Encoding utf8NoBOM` to produce a BOM-free file, which is better for cross-platform consumption.",
+    "The Power BI REST token uses a different resource scope than Microsoft Graph. Acquire it separately from your Graph token even if using the same app registration."
+  ],
+  "authoritative_sources": [
+    "https://github.com/dfinke/ImportExcel",
+    "https://github.com/EvotecIT/PSWriteHTML",
+    "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-csv",
+    "https://learn.microsoft.com/en-us/graph/api/user-sendmail",
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-rest-api-automation",
+    "powershell-sharepoint-data-staging-upsert",
+    "powershell-microsoftgraph-sdk-auth-sharepoint",
+    "powershell-scheduling-task-scheduler-azure-automation"
+  ],
+  "source_projects": ["shared-seed"]
+}

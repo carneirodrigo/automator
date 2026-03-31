@@ -1,0 +1,96 @@
+{
+  "id": "qualys-api-auth-conventions",
+  "title": "Qualys API - Authentication And Platform Resolution Conventions",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Qualys platform and product APIs",
+    "Qualys VMDR reporting projects that mix classic VM APIs and gateway APIs"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Qualys API URL depends on the customer's Qualys platform, so each project must identify the tenant platform and use the matching API URLs instead of assuming a global hostname.",
+      "source_url": "https://www.qualys.com/platform-identification",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys documents two URL families on the platform-identification page: API Server URLs for most apps and API Gateway URLs for Asset Inventory, Endpoint Detection and Response, File Integrity Monitoring, and Container Security.",
+      "source_url": "https://www.qualys.com/platform-identification",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The general Qualys request URL pattern is https://<baseurl>/<module>/<object>/<object_id>/<operation>.",
+      "source_url": "https://docs.qualys.com/en/admin/api/administration_api/api_conventions.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Classic Qualys APIs can authenticate with Qualys username and password using HTTP Basic Authentication over HTTPS.",
+      "source_url": "https://docs.qualys.com/en/cm/api/get_started/user_account.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys documents that API v2 calls using Basic authentication must include the X-Requested-With header.",
+      "source_url": "https://docs.qualys.com/en/vm/api/pc/get_started/authentication.htm",
+      "verified_date": "2026-03-30"
+    },
+    {
+      "fact": "Qualys documents session-based authentication for request URLs containing /2.0/: clients can POST to /api/2.0/fo/session/ with action=login to obtain a QualysSession cookie, use that cookie on subsequent /2.0/ requests, and then POST action=logout to close the session.",
+      "source_url": "https://docs.qualys.com/en/vm/api/pc/get_started/authentication.htm",
+      "verified_date": "2026-03-30"
+    },
+    {
+      "fact": "Administration and Global IT Asset Inventory examples use the gateway auth endpoint with an application/x-www-form-urlencoded POST that includes username, password, and token=true to obtain a JWT.",
+      "source_url": "https://docs.qualys.com/en/admin/api/administration_api/api_conventions.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Global IT Asset Inventory API requires a JWT from the Qualys Authentication API and states that the token expires in 4 hours.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys also documents client-based token generation endpoints /auth/oauth and /auth/oidc, and the generated token is valid for the next four hours.",
+      "source_url": "https://docs.qualys.com/en/oauth/oauth-phase2/oauth_ui/generate_authentication_token.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "authoritative_sources": [
+    "https://www.qualys.com/platform-identification",
+    "https://docs.qualys.com/en/admin/api/administration_api/api_conventions.htm",
+    "https://docs.qualys.com/en/cm/api/get_started/user_account.htm",
+    "https://docs.qualys.com/en/vm/api/pc/get_started/authentication.htm",
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+    "https://docs.qualys.com/en/oauth/oauth-phase2/oauth_ui/generate_authentication_token.htm"
+  ],
+  "implementation_notes": [
+    "Require the user or project config to provide the tenant platform before any API call. Resolve both the classic API server URL and the API gateway URL from the official platform-identification page.",
+    "Use the classic API server URL for VM/VMDR host detection and KnowledgeBase APIs. Use the gateway URL for Global IT Asset Inventory APIs and gateway-based JWT auth flows.",
+    "For classic /api/2.0/fo/ APIs, research must explicitly assess both documented username/password approaches: Basic auth with X-Requested-With and session-based auth via /api/2.0/fo/session/. Do not hand only one of them to coding without explaining why it is the correct path for the target endpoint.",
+    "For classic VM Host Detection probes, do not treat a Basic-auth 401/2000 response as conclusive proof that the credentials are bad. First test the documented /api/2.0/fo/session/ login flow with the same credentials and retry the target API call with the returned QualysSession cookie.",
+    "Project evidence from qualys-severity-5-external-ips-guide showed this exact pattern on AU1: direct Basic auth to /api/2.0/fo/asset/host/vm/detection/ returned 401/2000, while session login to /api/2.0/fo/session/ succeeded and the same detection request succeeded when replayed with the session cookie. Future probes should prefer this fallback before escalating to a credential failure claim.",
+    "Do not hardcode AU1. If a tenant happens to be AU1, the current mapping is qualysguard.qg1.apps.qualys.com.au -> qualysapi.qg1.apps.qualys.com.au and gateway.qg1.apps.qualys.com.au, but this should remain an example only.",
+    "Cache gateway-issued JWTs with an expiry shorter than four hours to avoid avoidable auth churn during asset inventory syncs.",
+    "Expect older Qualys APIs to default to XML, while gateway APIs such as Asset Inventory use JSON and bearer auth more naturally.",
+    "If the integration must support both legacy user/password auth and newer client-based token flows, keep the auth method configurable per API family and tenant entitlement."
+  ],
+  "caveats": [
+    "Qualys API behavior varies by product family and version; platform resolution alone does not tell you which auth style a specific API family expects.",
+    "The presence of valid username/password credentials does not prove that Basic auth is the only or best supported flow for a given classic VM endpoint; the research stage still needs to check documented session-based alternatives for /2.0/ APIs.",
+    "Classic /api/2.0/fo/ documentation says Basic auth is supported, but tenant-specific behavior may still require or effectively favor session-based authentication for successful execution of a specific workflow. Probe guidance should reflect that possibility explicitly.",
+    "Some subscriptions may expose newer OIDC or OAuth client flows while existing implementations still rely on Basic authentication for classic VM endpoints.",
+    "Platform-identification guidance is authoritative for URL mapping, but app-level permissions and entitlements still need to be validated per user and module."
+  ],
+  "last_verified": "2026-03-30T00:00:00Z",
+  "related_entries": [
+    "qualys-vmdr-api-conventions",
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-global-asset-inventory-join-conventions"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research",
+    "qualys-severity-5-external-ips-guide"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "id": "azure-logic-apps-reliability-and-error-handling",
+  "title": "Azure Logic Apps - Retries, Run-After, And Error-Handling Patterns",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Reliable Logic Apps workflows that call APIs and persist data",
+    "Logic Apps error handling, retries, and control-flow design"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Logic Apps supports configuring an action's run-after behavior so downstream actions can run after success, failure, skipped, or timed-out states from previous actions.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/error-exception-handling",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Scopes can group actions and are commonly used with run-after behavior to implement try/catch/finally-style workflow patterns.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/error-exception-handling",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps supports retry policies for actions such as HTTP calls, including default exponential retry behavior and configurable retry settings.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/error-exception-handling",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Trigger and action settings can be changed in the workflow definition language, including runtime configuration that affects execution behavior.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "For API ingestion workflows, place the source API call and parsing steps inside a scope, then use separate scopes for success handling, failure capture, and cleanup or notification paths.",
+    "Use explicit retry policies for external API calls instead of relying blindly on defaults, especially when the source API documents its own rate limits or retry-after behavior.",
+    "When writing to SharePoint, separate retrieval and persistence scopes so failed writes can be handled independently of retrieval failures.",
+    "Use run-after conditions to prevent one bad row or one downstream write failure from obscuring where the real fault occurred."
+  ],
+  "caveats": [
+    "Retries can create duplicates if the target write operation is not idempotent.",
+    "A workflow that retries source reads and target writes without a source key or deduplication strategy can corrupt SharePoint data over time.",
+    "Error handling in the designer is easy to misread unless the intended run-after graph is documented clearly."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/error-exception-handling",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "azure-logic-apps-limits-and-networking"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

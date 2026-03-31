@@ -1,0 +1,150 @@
+{
+  "id": "ms-graph-security-overview",
+  "title": "Microsoft Graph Security API - Overview, Namespaces, And Permissions",
+  "source_family": "microsoft-graph",
+  "coverage_type": "endpoint",
+  "tags": ["microsoft-graph", "security", "permissions", "namespaces", "overview", "alerts", "incidents", "secure-score", "attack-simulation", "threat-intelligence", "advanced-hunting"],
+  "version": "graph-rest-1.0",
+  "last_verified": "2026-03-28T00:00:00Z",
+  "summary": "Security API surface overview under /security, available namespaces, permission scopes per area, cloud availability, and migration notes from legacy APIs.",
+  "content": {
+    "base_url": "https://graph.microsoft.com/v1.0/security",
+    "namespace_notes": {
+      "modern_alerts_incidents": "microsoft.graph.security namespace — use /security/alerts_v2 and /security/incidents",
+      "legacy_alerts": "microsoft.graph namespace — /security/alerts is DEPRECATED, removal April 2026",
+      "secure_score": "microsoft.graph namespace — /security/secureScores and /security/secureScoreControlProfiles",
+      "attack_simulation": "microsoft.graph namespace — /security/attackSimulation/...",
+      "threat_intelligence": "microsoft.graph.security namespace — /security/threatIntelligence/...",
+      "identities": "microsoft.graph.security namespace — /security/identities/...",
+      "advanced_hunting": "microsoft.graph.security namespace — POST /security/runHuntingQuery"
+    },
+    "top_level_endpoints": [
+      { "path": "/security/alerts_v2", "description": "Modern alerts (microsoft.graph.security.alert)", "version": "v1.0 GA" },
+      { "path": "/security/incidents", "description": "Incidents with correlated alerts", "version": "v1.0 GA" },
+      { "path": "/security/secureScores", "description": "Tenant secure score history (90 days)", "version": "v1.0 GA" },
+      { "path": "/security/secureScoreControlProfiles", "description": "Per-control secure score data, supports PATCH", "version": "v1.0 GA" },
+      { "path": "/security/attackSimulation/simulations", "description": "Attack simulation campaigns", "version": "v1.0 GA" },
+      { "path": "/security/attackSimulation/simulationAutomations", "description": "Simulation automations", "version": "v1.0 GA" },
+      { "path": "/security/threatIntelligence/vulnerabilities/{cveId}", "description": "Defender Threat Intelligence vulnerability articles", "version": "v1.0 GA" },
+      { "path": "/security/identities/healthIssues", "description": "Defender for Identity sensor health issues", "version": "v1.0 GA" },
+      { "path": "/security/identities/sensors", "description": "Defender for Identity sensors", "version": "v1.0 GA" },
+      { "path": "/security/runHuntingQuery", "description": "Advanced hunting (KQL query, POST)", "version": "v1.0 GA" },
+      { "path": "/security/cases/eDiscoveryCases", "description": "Purview eDiscovery cases", "version": "v1.0 GA" },
+      { "path": "/auditLogs/directoryAudits", "description": "Directory audit log (note: NOT under /security)", "version": "v1.0 GA" },
+      { "path": "/auditLogs/signIns", "description": "Sign-in logs (note: NOT under /security)", "version": "v1.0 GA" }
+    ],
+    "permissions_by_area": {
+      "alerts_v2": {
+        "delegated_read": "SecurityAlert.Read.All",
+        "delegated_write": "SecurityAlert.ReadWrite.All",
+        "application_read": "SecurityAlert.Read.All",
+        "application_write": "SecurityAlert.ReadWrite.All",
+        "required_entra_roles": ["Security Reader", "Global Reader", "Security Operator", "Security Administrator"]
+      },
+      "incidents": {
+        "delegated_read": "SecurityIncident.Read.All",
+        "delegated_write": "SecurityIncident.ReadWrite.All",
+        "application_read": "SecurityIncident.Read.All",
+        "application_write": "SecurityIncident.ReadWrite.All",
+        "required_entra_roles": ["Security Reader", "Global Reader", "Security Operator", "Security Administrator"]
+      },
+      "secure_scores": {
+        "delegated_read": "SecurityEvents.Read.All",
+        "delegated_write": "SecurityEvents.ReadWrite.All",
+        "application_read": "SecurityEvents.Read.All",
+        "application_write": "SecurityEvents.ReadWrite.All"
+      },
+      "attack_simulation": {
+        "delegated_read": "AttackSimulation.Read.All",
+        "application_read": "AttackSimulation.Read.All",
+        "note": "Admin consent required for both delegated and application modes"
+      },
+      "threat_intelligence_vulnerabilities": {
+        "delegated_read": "ThreatIntelligence.Read.All",
+        "application_read": "ThreatIntelligence.Read.All",
+        "license_required": "Active Defender Threat Intelligence Portal license AND API add-on license"
+      },
+      "advanced_hunting": {
+        "delegated_read": "ThreatHunting.Read.All",
+        "application_read": "ThreatHunting.Read.All"
+      },
+      "identity_health_sensors": {
+        "note": "Requires Microsoft Defender for Identity plan or Microsoft 365 E5/A5/G5/F5 Security"
+      },
+      "threat_submission": {
+        "note": "emailThreatSubmission/urlThreatSubmission/fileThreatSubmission — beta only as of v1.0 check date"
+      },
+      "information_protection": {
+        "note": "security/informationProtection (sensitivityLabels, labelPolicySettings) — beta only"
+      }
+    },
+    "cloud_availability": {
+      "alerts_v2_incidents": { "Global": true, "GCC_L4": true, "GCC_L5_DOD": true, "China_21Vianet": false },
+      "secure_scores": { "Global": true, "GCC_L4": true, "GCC_L5_DOD": true, "China_21Vianet": false },
+      "threat_intelligence_vulnerabilities": { "Global": true, "GCC_L4": false, "GCC_L5_DOD": false, "China_21Vianet": false },
+      "advanced_hunting": { "Global": true, "GCC_L4": true, "GCC_L5_DOD": true, "China_21Vianet": false }
+    },
+    "alert_types": {
+      "modern": {
+        "resource": "microsoft.graph.security.alert",
+        "endpoint": "/security/alerts_v2",
+        "description": "Current generation — correlated, rich evidence, from Defender XDR integrated providers",
+        "providers": [
+          "Microsoft Entra ID Protection",
+          "Microsoft 365 Defender",
+          "Microsoft Defender for Cloud Apps",
+          "Microsoft Defender for Endpoint",
+          "Microsoft Defender for Identity",
+          "Microsoft Defender for Office 365",
+          "Microsoft Purview Data Loss Prevention",
+          "Microsoft Purview Insider Risk Management"
+        ]
+      },
+      "legacy": {
+        "resource": "microsoft.graph.alert",
+        "endpoint": "/security/alerts",
+        "description": "DEPRECATED — removal April 2026. Migrate to alerts_v2",
+        "providers": ["Microsoft Entra ID Protection", "Microsoft 365 Defender", "Microsoft Defender for Cloud Apps", "Microsoft Defender for Endpoint", "Microsoft Defender for Identity", "Microsoft Sentinel"]
+      }
+    },
+    "advanced_hunting_quotas": {
+      "data_range": "up to 30 days of raw data",
+      "max_rows": 100000,
+      "calls_per_minute": "at least 45 per tenant (varies by tenant size)",
+      "cpu_quota": "blocked if tenant reaches 100% of allocated CPU until next 15-minute cycle",
+      "timeout": "3 minutes per request",
+      "rate_limit_code": 429,
+      "max_result_size_mb": 50
+    },
+    "legacy_api_migration": {
+      "old_endpoints": [
+        "https://api.securitycenter.microsoft.com/api/advancedqueries/run",
+        "https://api.security.microsoft.com/api/advancedhunting/run"
+      ],
+      "new_endpoint": "POST https://graph.microsoft.com/v1.0/security/runHuntingQuery",
+      "old_permission_mde": "AdvancedQuery.Read / AdvancedQuery.Read.All (under Windows Defender ATP)",
+      "old_permission_m365": "AdvancedHunting.Read / AdvancedHunting.Read.All (under Microsoft Threat Protection)",
+      "new_permission": "ThreatHunting.Read.All",
+      "retirement_date": "February 1, 2027"
+    },
+    "authentication": {
+      "pattern": "OAuth2 client credentials (app-only) preferred for automation; delegated supported",
+      "token_endpoint": "https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token",
+      "scope": "https://graph.microsoft.com/.default",
+      "header": "Authorization: Bearer {access_token}"
+    }
+  },
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0"
+  ],
+  "caveats": [
+    "Legacy alerts API (/security/alerts) is deprecated and will be removed April 2026",
+    "informationProtection (sensitivityLabels) under /security is beta-only",
+    "emailThreatSubmission, urlThreatSubmission, fileThreatSubmission are beta-only",
+    "Defender Threat Intelligence vulnerabilities are not available in GCC L4/L5 or China",
+    "Attack simulation Graph APIs are unavailable in GCC High and DoD",
+    "auditLogs (directoryAudits, signIns) is at /auditLogs/..., NOT /security/..."
+  ],
+  "related_entries": ["ms-graph-oauth2-client-credentials", "ms-graph-attack-simulation-api", "ms-graph-security-alerts-incidents"],
+  "source_projects": ["shared-seed"]
+}

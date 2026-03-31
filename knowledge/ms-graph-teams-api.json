@@ -1,0 +1,74 @@
+{
+  "id": "ms-graph-teams-api",
+  "title": "Microsoft Graph - Teams API: Channel Messages, Adaptive Cards, And Security Alerting",
+  "source_family": "microsoft-graph",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Posting security alerts and pipeline status updates to Teams channels",
+    "Sending Adaptive Card formatted notifications to Teams from automation scripts",
+    "Teams team and channel provisioning via Graph API"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Post a message to a Teams channel: `POST /teams/{teamId}/channels/{channelId}/messages` with body `{ \"body\": { \"contentType\": \"html\", \"content\": \"<b>Security Alert</b>: Critical finding detected.\" } }`. Requires `ChannelMessage.Send` delegated permission or `Teamwork.Migrate.All` for app-only (migration scenario). For standard app-only posting, use a channel webhook or incoming webhook connector instead.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/channel-post-messages",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Incoming webhooks (Teams connector): create an Incoming Webhook in Teams channel settings > Connectors > Incoming Webhook. Post to the webhook URL via HTTP POST with a JSON body. Supports legacy Office 365 connectors format and Adaptive Cards via `type: 'message'` payload. Incoming webhooks do not require any Entra ID permissions — the URL is the authentication token.",
+      "source_url": "https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Post an Adaptive Card to Teams via incoming webhook: POST to the webhook URL with `{ \"type\": \"message\", \"attachments\": [{ \"contentType\": \"application/vnd.microsoft.card.adaptive\", \"content\": { \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\", \"type\": \"AdaptiveCard\", \"version\": \"1.4\", \"body\": [...] } }] }`. Adaptive Cards support rich formatting: ColumnSets, FactSets, Images, and Action buttons.",
+      "source_url": "https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "PowerShell post to Teams webhook: `$body = @{ type='message'; attachments=@(@{ contentType='application/vnd.microsoft.card.adaptive'; content=$adaptiveCard }) } | ConvertTo-Json -Depth 10; Invoke-RestMethod -Uri $webhookUrl -Method POST -Body $body -ContentType 'application/json'`. No authentication header required — the webhook URL is self-authenticating.",
+      "source_url": "https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List teams and channels via Graph: `GET /teams` (requires Team.ReadBasic.All), `GET /teams/{teamId}/channels` (returns all channels). Filter standard channels: `$filter=membershipType eq 'standard'`. Get a specific channel by name: `GET /teams/{teamId}/channels?$filter=displayName eq 'Security Alerts'`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/team-list-channels",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Create a new team: `POST /teams` with body including `displayName`, `description`, `template@odata.bind` (e.g., `https://graph.microsoft.com/v1.0/teamsTemplates('standard')`), and `members` array. Team creation is asynchronous — the response is a 202 Accepted with an operation location header. Poll `GET /teamsAsyncOperations/{operationId}` until status is `succeeded`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/team-post",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For the security reporting pipeline, use an incoming webhook to post a summary card to a 'Security Reports' Teams channel at the end of each pipeline run. Include: run status (success/failure), record counts per source, and a link to the Power BI report. This provides instant visibility without requiring report consumers to check Power BI directly.",
+    "Store the webhook URL in Key Vault or an Automation encrypted variable — while it does not require Entra auth, it is a sensitive credential that grants anyone with the URL the ability to post to the channel.",
+    "For alert-based notifications (e.g., BitSight rating drops below threshold), use a Logic App webhook trigger or Azure Function that fires on the alert and posts an Adaptive Card with the company name, old/new rating, and a link to the BitSight portal.",
+    "Use FactSet in Adaptive Cards to display key-value pairs neatly: `{ \"type\": \"FactSet\", \"facts\": [{ \"title\": \"Qualys Critical\", \"value\": \"14\" }, { \"title\": \"BitSight Avg\", \"value\": \"720\" }] }`."
+  ],
+  "caveats": [
+    "Graph API app-only channel message posting (`ChannelMessage.Send` as application permission) requires the app to be installed in the team. For simple automation notifications, incoming webhooks are simpler and do not require app installation.",
+    "Incoming webhooks are being transitioned by Microsoft to Workflows (Power Automate) in newer Teams tenants. Verify that legacy incoming webhook connectors are still enabled in your tenant's Teams admin settings.",
+    "Teams webhook URL rotation: if a webhook URL is compromised, delete and recreate the connector in Teams. Update the stored URL in Key Vault immediately."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/channel-post-messages",
+    "https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using",
+    "https://learn.microsoft.com/en-us/graph/api/team-post"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-mail-calendar-api",
+    "powershell-report-generation-excel-html-csv",
+    "powershell-security-reporting-pipeline-playbook"
+  ],
+  "source_projects": ["shared-seed"]
+}

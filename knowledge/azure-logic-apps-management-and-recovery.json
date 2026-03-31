@@ -1,0 +1,93 @@
+{
+  "id": "azure-logic-apps-management-and-recovery",
+  "title": "Azure Logic Apps - Portal Management, Lifecycle Control, And Recovery",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Managing deployed Logic Apps resources and workflows",
+    "Enable, disable, restart, delete, and recover Logic Apps",
+    "Operational ownership for Standard and Consumption workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Azure portal management guide covers editing, disabling, enabling, and deleting both Consumption and Standard logic app workflows.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "A Standard logic app resource can contain multiple workflows, while a Consumption logic app resource contains only one workflow.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For managed connectors, connections are separate Azure resources with their own resource definitions, while Standard workflows can also use built-in service provider connectors that run natively in the single-tenant runtime.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Disabling a Consumption logic app allows in-progress and pending workflow instances to continue until they finish, while disabling a Standard logic app immediately cancels in-progress and pending workflow runs.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Disabling an individual Standard workflow allows in-progress and pending workflow runs to continue until they finish, unlike disabling the entire Standard logic app resource.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "When a logic app or workflow is re-enabled after stoppage, the trigger state remembers the previous point and can fire for unprocessed items since the last workflow run unless the trigger state is reset first.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Deleting and recreating a Consumption or Standard logic app or workflow doesn't preserve the same metadata, so other workflows that call the recreated resource must be resaved or calls can fail with Unauthorized errors.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For a deleted Standard logic app, the run history isn't available in the recovered logic app, and if the workflow starts with the Request trigger, the callback URL for the recovered app differs from the deleted app's URL.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft recommends source control for Standard logic app recovery and notes that without source control you may need storage metadata, app settings, configuration, and environment-variable values to recover the app.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "management_rules": [
+    "Use workflow-level enable or disable controls in Standard when you want to pause one workflow without stopping the entire logic app resource.",
+    "Use app-level stop or start in Standard only when you intend to affect every workflow in the resource.",
+    "Before restarting or re-enabling a workflow after a pause, decide whether trigger state should be preserved or reset to avoid replaying unprocessed items.",
+    "Treat connection resources as first-class operational dependencies, especially for managed connectors.",
+    "Use source control as the default recovery strategy for Standard logic apps rather than relying on portal-only reconstruction."
+  ],
+  "implementation_notes": [
+    "For production operations, distinguish clearly between stopping a Standard logic app resource and disabling one Standard child workflow. The runtime impact is different.",
+    "If your Logic App exposes a Request trigger URL, treat delete and recovery as an external contract change because callback URLs can change after recreation.",
+    "When documenting or automating recovery, capture environment variables, custom app settings, configuration tabs, storage-account references, and connection definitions as part of the deployment artifact set.",
+    "For nonproduction Standard workflows, the host-setting approach to suspend workflow jobs can reduce costs during load or performance testing, but it should not be treated as a generic production pause mechanism."
+  ],
+  "caveats": [
+    "Disable, enable, stop, restart, delete, and recover operations behave differently across Consumption, Standard app scope, and Standard workflow scope.",
+    "Portal recovery without source control is fragile and can miss hidden operational dependencies such as callback URLs, connection resources, environment variables, and storage metadata.",
+    "Deleting and recreating a workflow can break callers even if the name looks unchanged."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/manage-logic-apps-with-azure-portal?tabs=consumption"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-examples-and-scenarios",
+    "azure-logic-apps-security-and-identity",
+    "azure-logic-apps-limits-and-networking",
+    "azure-logic-apps-solution-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

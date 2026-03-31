@@ -1,0 +1,61 @@
+{
+  "id": "azure-logic-apps-qualys-playbook",
+  "title": "Playbook - Azure Logic Apps To Qualys VMDR APIs",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps workflows that retrieve Qualys VMDR vulnerability data for reporting or downstream storage"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Tenant platform identified from the Qualys platform-identification reference",
+    "Qualys API authentication working for both classic VM APIs and any gateway APIs needed",
+    "Decision on whether the output should come from raw detections, generated report artifacts, or both"
+  ],
+  "required_permissions": [
+    "Qualys account access to host detections, KnowledgeBase, and asset inventory as needed",
+    "Any report-generation permissions required by the selected report template path"
+  ],
+  "request_sequence": [
+    "Resolve the tenant's Qualys API server URL and gateway URL before building any Logic Apps call.",
+    "Call classic VM detection and KnowledgeBase APIs through the Logic Apps HTTP action for row-level vulnerability data.",
+    "If asset or tag scoping requires richer asset metadata, call the Global IT Asset Inventory gateway APIs separately.",
+    "If the user explicitly wants Qualys-generated report files, launch and fetch reports through the report APIs, optionally using asset tags.",
+    "Parse XML or JSON responses, normalize the fields required by downstream reporting, and persist the results to SharePoint or another store.",
+    "Handle paging, truncation, and repeated-run deduplication explicitly."
+  ],
+  "implementation_notes": [
+    "Use raw detections plus KnowledgeBase plus asset inventory when the goal is Power BI-friendly tabular reporting. This is the preferred path for severity trends, tag slices, and month-over-month metrics.",
+    "Use classic report APIs only when the project specifically needs a Qualys-produced CSV, PDF, or other report artifact.",
+    "Treat the Qualys platform URL as a required input in the Logic Apps solution because pod selection changes all downstream URLs.",
+    "The Logic Apps HTTP action is sufficient here because Qualys classic APIs are HTTP-based and the main complexity is data normalization, not connector selection."
+  ],
+  "caveats": [
+    "Qualys dashboard widgets are not documented as a direct API surface, so Logic Apps should derive dashboard-equivalent metrics from detections rather than expect a 'get dashboard by name' endpoint.",
+    "Classic VM APIs are XML-heavy and require explicit parsing strategy in Logic Apps or in a downstream processor.",
+    "Generated report APIs are useful, but they are less flexible than raw detections for Power BI model design."
+  ],
+  "authoritative_sources": [
+    "https://www.qualys.com/platform-identification",
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/api/scans/kbase/knowledgebase.htm",
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+    "https://docs.qualys.com/en/vm/api/reports/reports/Reports.htm",
+    "https://docs.qualys.com/en/vm/api/reports/reports/launch_report_tags.htm",
+    "https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-api-to-sharepoint-playbook",
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-global-asset-inventory-join-conventions",
+    "qualys-vmdr-metrics-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

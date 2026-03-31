@@ -1,0 +1,63 @@
+{
+  "id": "qualys-vmdr-host-detections-playbook",
+  "title": "Playbook - Qualys VMDR Host Detections Export",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": ["Export host vulnerability detections from Qualys VMDR"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-19T18:40:00Z",
+  "prerequisites": [
+    "Correct Qualys platform base URL for the subscription",
+    "Working authentication using the subscription's enabled auth mode",
+    "Decision on XML parsing strategy before ingestion"
+  ],
+  "required_permissions": [
+    "Qualys account access sufficient to view target hosts and detections",
+    "Product-specific permissions for VM/VMDR reporting as applicable"
+  ],
+  "request_sequence": [
+    "Confirm the correct Qualys API server URL for the tenant",
+    "Authenticate using Basic Auth or an enabled JWT/OIDC flow for the subscription",
+    "Call the Host Detection List API for the target host scope",
+    "Parse the XML response and normalize hosts, QIDs, severity, and status fields",
+    "Layer dashboard or report workflows separately if the consumer needs presentation-friendly output"
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "Host detection retrieval is part of the classic VM API host list family.",
+      "source_url": "https://docs.qualys.com/en/vm/api/assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Qualys API server URLs are subscription-specific and must match the account's platform.",
+      "source_url": "https://docs.qualys.com/en/admin/api/administration_api/api_conventions.htm",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Classic VM reporting and detection APIs are XML-oriented.",
+      "source_url": "https://docs.qualys.com/en/vm/api/reports/get_started/get_started.htm",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "implementation_notes": [
+    "Do not assume modern JSON conventions for classic VMDR exports.",
+    "Design an explicit XML-to-tabular normalization pass; do not mix transport parsing with business logic.",
+    "Treat dashboards as a secondary derivation from raw detection data unless a specific report API is required."
+  ],
+  "common_failures": [
+    "Authentication succeeds against the wrong Qualys pod but returns misleading errors for downstream APIs",
+    "XML parsing breaks when optional nodes are missing",
+    "Large exports become slow if host scope is not constrained"
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/admin/api/administration_api/api_conventions.htm",
+    "https://docs.qualys.com/en/vm/api/reports/get_started/get_started.htm"
+  ],
+  "last_verified": "2026-03-20T18:40:00Z",
+  "related_entries": [
+    "qualys-vmdr-api-conventions",
+    "qualys-api-auth-conventions"
+  ],
+  "source_projects": ["shared-seed"]
+}

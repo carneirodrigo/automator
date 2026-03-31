@@ -1,0 +1,84 @@
+{
+  "id": "qualys-was-reports-playbook",
+  "title": "Playbook - Qualys WAS Findings, Scans, And Report Retrieval",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Retrieve Qualys WAS findings, scans, reports, or API-asset views for application security workflows"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Correct tenant-specific Qualys API server URL",
+    "Working Qualys authentication",
+    "Clear decision on whether the workflow needs findings, scans, generated reports, or API-asset inventory"
+  ],
+  "required_permissions": [
+    "WAS product access for the target subscription",
+    "Visibility into the target web applications or API assets",
+    "Any report-download visibility permissions required by the account"
+  ],
+  "request_sequence": [
+    "Resolve the tenant platform and use the tenant-specific Qualys API server URL.",
+    "Authenticate using the Qualys auth mode available for the tenant.",
+    "If the need is current or trendable security data, search findings using POST /qps/rest/3.0/search/was/finding with criteria for webApp, tags, status, severity, or dates.",
+    "If the need is application inventory or API-asset scoping, search web applications using POST /qps/rest/3.0/search/was/webapp and include tag or TruRisk fields as needed.",
+    "If the need is scan execution history or scan-centric evidence, search scans using POST /qps/rest/3.0/search/was/wasscan and download scan results for specific scan IDs when needed.",
+    "If the need is a report artifact, search or locate reports with POST /qps/rest/3.0/search/was/report and download the chosen report via GET /qps/rest/3.0/download/was/report/<id>.",
+    "Normalize WAS findings separately from VMDR data; preserve webApp or API asset identifiers, finding status, severity, QDS, and detection dates."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "WAS findings are searchable at POST /qps/rest/3.0/search/was/finding.",
+      "source_url": "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS scans are searchable at POST /qps/rest/3.0/search/was/wasscan and scan results are downloadable.",
+      "source_url": "https://docs.qualys.com/en/was/api/scans/search_scan.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "WAS reports are searchable at POST /qps/rest/3.0/search/was/report and downloadable through the download report route.",
+      "source_url": "https://docs.qualys.com/en/was/api/reports/search_report.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The WAS APIs UI shows API assets with tags, open vulnerabilities, and TruRisk score, which makes API-asset views useful for application-oriented reporting beyond VMDR.",
+      "source_url": "https://docs.qualys.com/en/was/latest/api/view_apis.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use Search Findings for data pipelines and metric extraction. Use generated reports only when the requested output is a Qualys-produced artifact.",
+    "For application-security reporting by tag, scope web applications or API assets first, then search findings inside that scope.",
+    "WAS supports trendable dimensions such as firstDetectedDate, lastDetectedDate, and timesDetected, but they should stay in a WAS-specific reporting model.",
+    "Keep API assets in mind when the user asks about application or API vulnerability metrics; those are not VMDR host assets."
+  ],
+  "common_failures": [
+    "Confusing VMDR host assets with WAS web applications or API assets.",
+    "Trying to use report downloads when the use case needs queryable finding rows.",
+    "Using the wrong Qualys URL family or wrong tenant pod.",
+    "Treating WAS API assets as if they were the same object type as Global IT Asset Inventory assets."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/was/api/get_started/get_started.htm",
+    "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+    "https://docs.qualys.com/en/was/api/web_apps/search_webapps.htm",
+    "https://docs.qualys.com/en/was/api/scans/search_scan.htm",
+    "https://docs.qualys.com/en/was/api/scans/scan_results.htm",
+    "https://docs.qualys.com/en/was/api/reports/search_report.htm",
+    "https://docs.qualys.com/en/was/api/reports/download_report.htm",
+    "https://docs.qualys.com/en/was/latest/api/view_apis.htm"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-was-api-conventions",
+    "qualys-api-auth-conventions",
+    "qualys-module-capability-map"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-broader-capabilities-research"
+  ]
+}

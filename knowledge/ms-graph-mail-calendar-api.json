@@ -1,0 +1,82 @@
+{
+  "id": "ms-graph-mail-calendar-api",
+  "title": "Microsoft Graph - Mail And Calendar APIs: Send, Read, Attachments, And Automation Patterns",
+  "source_family": "microsoft-graph",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Sending formatted security report emails with attachments via Graph API",
+    "Reading and processing mailbox messages in automation workflows",
+    "Calendar event creation for reporting schedules and security reviews",
+    "Large attachment handling (upload session for files over 3MB)"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Send an email on behalf of a mailbox: `POST /users/{userId}/sendMail`. Body: `{ \"message\": { \"subject\": \"...\", \"body\": { \"contentType\": \"HTML\", \"content\": \"<html>...</html>\" }, \"toRecipients\": [{ \"emailAddress\": { \"address\": \"user@domain.com\" } }] }, \"saveToSentItems\": false }`. Requires Mail.Send application permission.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/user-sendmail",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Attach small files (< 3MB) inline in sendMail: add an `attachments` array to the message object: `[{ \"@odata.type\": \"#microsoft.graph.fileAttachment\", \"name\": \"report.xlsx\", \"contentType\": \"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\", \"contentBytes\": \"<base64string>\" }]`. Base64-encode the file content.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/user-sendmail",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Large attachment upload (> 3MB, up to 150MB): create a draft message first: `POST /users/{userId}/messages` with the message body. Then create an upload session: `POST /users/{userId}/messages/{messageId}/attachments/createUploadSession` with `{ \"AttachmentItem\": { \"attachmentType\": \"file\", \"name\": \"report.xlsx\", \"size\": <byteLength> } }`. Upload in 320KB chunks. Then send: `POST /users/{userId}/messages/{messageId}/send`.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/outlook-large-attachments",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "List messages in a mailbox folder: `GET /users/{userId}/mailFolders/Inbox/messages?$select=id,subject,from,receivedDateTime,isRead&$top=50&$orderby=receivedDateTime desc`. Filter by date: `$filter=receivedDateTime ge 2026-03-01T00:00:00Z`. Required permission: Mail.Read.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/mailfolder-list-messages",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Create a calendar event: `POST /users/{userId}/events` with body `{ \"subject\": \"Weekly Security Review\", \"start\": { \"dateTime\": \"2026-04-01T10:00:00\", \"timeZone\": \"UTC\" }, \"end\": { \"dateTime\": \"2026-04-01T11:00:00\", \"timeZone\": \"UTC\" }, \"attendees\": [{\"emailAddress\":{\"address\":\"user@domain.com\"}, \"type\": \"required\"}], \"isOnlineMeeting\": true, \"onlineMeetingProvider\": \"teamsForBusiness\" }`. Requires Calendars.ReadWrite permission.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/user-post-events",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "PowerShell sendMail via Graph SDK: `$mailParams = @{ Message = @{ Subject = 'Security Report'; Body = @{ ContentType = 'HTML'; Content = $htmlBody }; ToRecipients = @(@{ EmailAddress = @{ Address = 'recipient@domain.com' } }) }; SaveToSentItems = $false }; Send-MgUserMail -UserId $senderUpn -BodyParameter $mailParams`. Requires Microsoft.Graph.Mail sub-module.",
+      "source_url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.mail/send-mgusermail",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Mail.Send application permission allows the app to send as ANY user in the tenant. To restrict sending to a specific mailbox, apply an Exchange application access policy: `New-ApplicationAccessPolicy -AppId $appId -PolicyScopeGroupId $mailEnabledSecurityGroup -AccessRight RestrictAccess`. Only mailboxes in the group can be accessed by the app.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/auth-limit-mailbox-access",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For the security reporting pipeline, send the report email as the last step. Use a dedicated shared mailbox (e.g., security-reports@domain.com) as the sender. Apply an application access policy to restrict Graph mail access to that mailbox only.",
+    "For Excel report attachments, prefer the large file upload session pattern even for files just above 3MB — inline base64 encoding inflates payload size by ~33% and can trigger request size limits.",
+    "For HTML email bodies, test rendering in Outlook Web Access before sending to recipients. Outlook strips many CSS properties; use inline styles and table-based layouts for reliable rendering.",
+    "Use `saveToSentItems: false` for automated pipeline emails to avoid filling the sender mailbox's sent items folder."
+  ],
+  "caveats": [
+    "Mail.Send is a high-privilege permission. Always apply an Exchange application access policy to scope it to a specific mailbox group. Without this policy, the app can impersonate any user in the tenant.",
+    "The large attachment upload session URL is temporary (expires in ~24 hours). Complete the upload and send the message within the session lifetime.",
+    "Calendar event creation with `isOnlineMeeting: true` requires the user to have a Teams license assigned. Without a license, the Teams meeting link will not be generated."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/user-sendmail",
+    "https://learn.microsoft.com/en-us/graph/outlook-large-attachments",
+    "https://learn.microsoft.com/en-us/graph/auth-limit-mailbox-access",
+    "https://learn.microsoft.com/en-us/graph/api/user-post-events"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-oauth2-client-credentials",
+    "powershell-report-generation-excel-html-csv",
+    "powershell-security-reporting-pipeline-playbook"
+  ],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,127 @@
+{
+  "id": "qualys-vmdr-reporting-model",
+  "title": "Qualys VMDR - Reporting Model For Snapshot And Period Metrics",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Engine-built vulnerability reports for assets, asset groups, and tags",
+    "Snapshot, previous month, previous quarter, and trend reporting from Qualys VMDR"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "canonical_reporting_grain": "One vulnerability detection instance on one asset, enriched by KnowledgeBase metadata and asset inventory context.",
+  "required_dimensions": [
+    "assetId",
+    "hostId",
+    "assetName",
+    "address",
+    "dnsName or FQDN",
+    "tagName",
+    "QID",
+    "TITLE",
+    "STATUS",
+    "SEVERITY",
+    "SEVERITY_LEVEL",
+    "QDS",
+    "FIRST_FOUND_DATETIME",
+    "LAST_FOUND_DATETIME",
+    "LAST_FIXED_DATETIME",
+    "LAST_UPDATE_DATETIME",
+    "LAST_PROCESSED_DATETIME"
+  ],
+  "report_modes": [
+    {
+      "mode": "snapshot",
+      "description": "Current-state reporting at extraction time.",
+      "timestamp_basis": "Extraction timestamp plus current detection status.",
+      "usage": [
+        "Current open vulnerabilities for a single asset",
+        "Current severity distribution for a tag",
+        "Current top vulnerability titles across a selected asset scope"
+      ]
+    },
+    {
+      "mode": "period_activity",
+      "description": "Activity inside a defined date window such as previous month or previous quarter.",
+      "timestamp_basis": "One explicit event timestamp chosen for the question: FIRST_FOUND_DATETIME, LAST_FOUND_DATETIME, LAST_FIXED_DATETIME, LAST_UPDATE_DATETIME, or LAST_PROCESSED_DATETIME.",
+      "usage": [
+        "New findings during previous month",
+        "Fixed findings during previous quarter",
+        "Detections updated during the requested reporting period"
+      ]
+    },
+    {
+      "mode": "trend",
+      "description": "Repeated snapshot or repeated period activity grouped into month or quarter buckets.",
+      "timestamp_basis": "Consistent bucket rule selected by the report definition.",
+      "usage": [
+        "Monthly count of active findings",
+        "Quarterly severity trend",
+        "Month-over-month fixed versus newly found comparison"
+      ]
+    }
+  ],
+  "metric_catalog": [
+    "total detection rows",
+    "distinct QIDs",
+    "counts by Qualys severity",
+    "counts by QDS band",
+    "counts by status",
+    "counts by vulnerability title",
+    "counts by asset",
+    "counts by tag",
+    "newly found during period",
+    "fixed during period",
+    "reopened during period",
+    "aging from first found to extraction or fix date"
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "Qualys documents QDS as a 1 to 100 score with four severity bands: Critical 90-100, High 70-89, Medium 40-69, and Low 1-39.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Vulnerability Details page presents QID, Title, QDS, and Severity as primary reporting columns in the VMDR UI.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys severity levels are assigned in the KnowledgeBase and are based on security risk, exploitation complexity, vendor-provided severity, prevalence, and known attacks, and managers can edit the severity for KB vulnerabilities.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/knowledgebase/severity_levels.htm",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Host Detection List API exposes the timestamps needed to derive period-based reporting, including first found, last found, last update, and last processed dates, with optional reopened details.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Make the timestamp basis explicit in every period report. For example, 'previous month by first found date' is materially different from 'previous month by last updated date'.",
+    "For current open-vulnerability reports, use current statuses from the detection feed and exclude fully fixed rows unless the user explicitly asks for resolved items.",
+    "For point-in-time reports by tag or asset group, resolve the asset scope first, then pull detections for that scope, then enrich with KB titles and CVEs.",
+    "For monthly or quarterly trends, persist normalized extraction results or reproducible snapshots. The reviewed docs provide enough timestamps to build trends, but not a historical dashboard API that reconstructs old UI states for you.",
+    "Keep both detection severity and KB severity available. If the report asks only for severity, default to the customer-visible Qualys severity dimension and note when QDS is also available."
+  ],
+  "caveats": [
+    "The reviewed sources support building report logic, but they do not fully document how every VMDR dashboard widget is internally rolled up.",
+    "A true historical point-in-time snapshot for an old date usually requires stored historical extracts or snapshot persistence outside the live APIs.",
+    "Period-based reports can be misleading if the timestamp basis is implicit. The engine should spell out the chosen basis in report output."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+    "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+    "https://docs.qualys.com/en/vm/latest/knowledgebase/severity_levels.htm"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-global-asset-inventory-join-conventions",
+    "qualys-vmdr-metrics-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

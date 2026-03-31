@@ -1,0 +1,88 @@
+{
+  "id": "ms-graph-delta-query-change-tracking",
+  "title": "Microsoft Graph - Delta Query, Change Tracking, And Webhook Subscriptions",
+  "source_family": "microsoft-graph",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Incremental pulls from Graph instead of full dumps on every pipeline run",
+    "Tracking changes to SharePoint lists, users, or groups since the last sync",
+    "Webhook subscriptions for real-time change notifications",
+    "Efficient pagination through large result sets (100K+ items)"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Delta query returns only the objects that changed since a previous query. Initial request: `GET /users/delta?$select=displayName,userPrincipalName,accountEnabled`. Returns a page of results plus either `@odata.nextLink` (more pages in this sync) or `@odata.deltaLink` (end of current sync). Save the deltaLink token. Next incremental sync: `GET /users/delta?$deltatoken={token}` — returns only changed objects.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/delta-query-overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Resources that support delta query: users, groups, messages (per folder), events (per calendar), contacts, directoryObjects, educationUser, orgContact, servicePrincipal, application, and SharePoint list items (`/sites/{siteId}/lists/{listId}/items/delta`). Delta query for SharePoint list items returns changed and deleted items since the last deltaLink.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/delta-query-overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Deleted objects in delta query: items deleted since the previous sync are returned with `@removed: { \"reason\": \"deleted\" }` in the response body alongside the object `id`. Handle deletions explicitly in the sync logic — they are not returned in standard list queries.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/delta-query-overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Delta token expiry: deltaLink tokens expire after a resource-specific period (typically 7 days for users/groups, 30 days for SharePoint list items). If the token expires, restart with a full initial delta query. Detect expiry: a 410 Gone response indicates the token is invalid or expired.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/delta-query-overview",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Change notification subscriptions (webhooks): `POST /subscriptions` with body `{ \"changeType\": \"created,updated,deleted\", \"notificationUrl\": \"https://your-endpoint/notify\", \"resource\": \"/users\", \"expirationDateTime\": \"2026-04-27T00:00:00Z\", \"clientState\": \"secretToken\" }`. Graph sends a POST to notificationUrl when a subscribed resource changes. Requires a publicly accessible HTTPS endpoint.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Subscription max lifetime per resource: users and groups = 4230 minutes (~3 days). SharePoint list items = 4230 minutes. To maintain continuous notifications, renew subscriptions before expiry: `PATCH /subscriptions/{id}` with `{ \"expirationDateTime\": \"<new future time>\" }`. Set up a scheduled renewal job (Logic App or Azure Function) to extend subscriptions before they expire.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/subscription-update",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Validate webhook endpoint ownership: when creating a subscription, Graph sends a validation request with a `validationToken` query parameter to the notificationUrl. The endpoint must echo back the validationToken as plain text within 10 seconds. If validation fails, the subscription is not created.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/webhooks",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Paginate large result sets efficiently: for collections exceeding 1000 items, use `$top=999` and follow `@odata.nextLink` tokens. For maximum efficiency, combine with `$select` to reduce per-item payload size and `$orderby` to get consistent ordering across pages. Avoid `$skip` for deep pagination (>5 pages) — it degrades server-side performance; use `$filter` on a sortable indexed column instead.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/paging",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For the daily security pipeline, use delta query for SharePoint list items instead of re-reading the full list. Store the deltaLink in an Automation Account variable or Key Vault secret after each run. On the next run, use the saved deltaLink to fetch only rows added or updated since yesterday.",
+    "For Defender device inventory, delta query against /security is not supported directly — use $filter on LastSeen or RiskScore changed date to approximate incremental behavior.",
+    "Webhook subscriptions are the right tool for real-time BitSight rating drop alerts: subscribe to the relevant Graph security resource and trigger an immediate notification workflow when a security event fires.",
+    "Store deltaLink tokens durably (Key Vault or Automation variable). If the token is lost, the next run does a full initial sync — expensive but recoverable. Document the recovery procedure."
+  ],
+  "caveats": [
+    "Delta query does NOT guarantee delivery order. Changed items may appear out of order. Design sync logic to be idempotent rather than order-dependent.",
+    "Webhook notification payloads are lightweight — they contain the subscription ID, resource URL, and change type, but NOT the changed object's data. Always fetch the changed object explicitly after receiving a notification.",
+    "SharePoint list item delta requires the list to have versioning enabled. Without versioning, the delta endpoint may not reliably track all changes."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/delta-query-overview",
+    "https://learn.microsoft.com/en-us/graph/webhooks",
+    "https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions",
+    "https://learn.microsoft.com/en-us/graph/paging"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-api-conventions",
+    "ms-graph-sharepoint-list-item-crud-playbook",
+    "powershell-sharepoint-data-staging-upsert"
+  ],
+  "source_projects": ["shared-seed"]
+}

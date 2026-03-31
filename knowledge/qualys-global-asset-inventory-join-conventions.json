@@ -1,0 +1,91 @@
+{
+  "id": "qualys-global-asset-inventory-join-conventions",
+  "title": "Qualys Global IT Asset Inventory - Join And Scoping Conventions",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Qualys asset scoping for VMDR reports",
+    "Joining classic VM detections to gateway asset inventory data"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Global IT Asset Inventory v2 uses the gateway base URL and requires a JWT in the Authorization: Bearer header for API requests.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The main asset search route is POST /rest/2.0/search/am/asset and the single-asset detail route is GET /rest/2.0/get/am/asset.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Qualys documents includeFields and excludeFields parameters for limiting asset payloads returned by Asset Inventory APIs.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Asset Inventory responses expose pagination and incremental-sync fields including count, lastSeenAssetId, and hasMore.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The guide documents assetLastUpdated for filtering records updated on or after a UTC timestamp.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Example asset payloads include assetId, assetUUID, hostId, assetType, address, dnsName, assetName, netbiosName, lastModifiedDate, sensorLastUpdatedDate, operatingSystem data, and tag objects.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "join_keys": [
+    "Preferred: detection ASSET_ID -> asset inventory assetId",
+    "Fallback: classic host ID -> asset inventory hostId",
+    "Vulnerability metadata enrichment: detection QID -> KnowledgeBase QID"
+  ],
+  "report_scoping_fields": [
+    "assetId",
+    "assetUUID",
+    "hostId",
+    "assetType",
+    "address",
+    "dnsName",
+    "assetName",
+    "netbiosName",
+    "operatingSystem",
+    "tag.tagId",
+    "tag.tagName",
+    "tag.businessImpact",
+    "lastModifiedDate",
+    "sensorLastUpdatedDate"
+  ],
+  "implementation_notes": [
+    "Use search/am/asset as the main scoping surface for asset sets, especially when reports need grouping by tags, OS families, or other asset attributes not consistently present in classic VM host records.",
+    "Use includeFields to keep responses small when only a reporting join payload is needed. For most reporting flows, assetName, address, dnsName, netbiosName, operatingSystem, hostId, and tag are sufficient.",
+    "Use assetLastUpdated and lastSeenAssetId for incremental refreshes of the asset dimension instead of re-downloading the entire inventory for every report run.",
+    "The search route accepts filter bodies in JSON or XML, so asset set construction can be more expressive than only using classic host-list filters."
+  ],
+  "caveats": [
+    "Asset Inventory is a gateway API and has a different auth model from classic VM detection APIs, so the integration must manage both auth styles coherently.",
+    "Not every classic host detection response will contain ASSET_ID unless show_asset_id=1 is requested.",
+    "Tag coverage and business-impact fields depend on what is populated in the tenant inventory and tagging model."
+  ],
+  "authoritative_sources": [
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+    "https://www.qualys.com/platform-identification"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-detection-and-kb-metrics",
+    "qualys-vmdr-reporting-model",
+    "qualys-vmdr-metrics-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "qualys-vmdr-reporting-research"
+  ]
+}

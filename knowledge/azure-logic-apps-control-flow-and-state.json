@@ -1,0 +1,111 @@
+{
+  "id": "azure-logic-apps-control-flow-and-state",
+  "title": "Azure Logic Apps - Control Flow, Loops, Scopes, Variables, And Data State",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps workflows that need branching, iteration, grouping, or temporary state",
+    "Programmatic Logic Apps designs that transform and route data before persistence or downstream calls"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Condition control action evaluates an expression that returns true or false and routes the workflow into one of two action paths. Conditions can also be nested.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-conditional-statement?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Microsoft recommends using a Switch action instead of a Condition when the workflow must choose among more than two paths or when the criteria should not be restricted to a simple true or false outcome.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-conditional-statement?tabs=consumption",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Switch action evaluates an object, expression, or token, runs the single matching case, and supports only equality operators.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-switch-statement",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "By default, actions in a Logic Apps workflow run sequentially, but you can create parallel branches and later join those branches in the workflow.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-branches",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps loop types include For each for iterating over items in an array or collection and Until for repeating actions until a condition is met or a state changes.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "For each works only on arrays. By default its iterations run in parallel, but nested For each loops always run sequentially.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "If predictable results are required for operations such as variables inside a For each loop, Microsoft documents enabling Concurrency control and setting the degree of parallelism to 1 so iterations run sequentially.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "In code view, a For each action can be forced to run sequentially by setting operationOptions to Sequential.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Until loop runs the actions inside the loop and then checks the condition. If the condition is met, the loop stops; otherwise it repeats.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Scopes group actions together and can be paired with run-after rules so later logic depends on the grouped action status.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Logic Apps supports variables that must be initialized before use. Supported variable types include string, integer, float, boolean, array, and object, and related actions include Set variable, Increment variable, Decrement variable, Append to string variable, and Append to array variable.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Data Operations actions include Compose, Parse JSON, Select, Filter array, Join, Create CSV table, and Create HTML table.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use Condition for binary branching and Switch for multi-path routing keyed on exact values.",
+    "Treat parallel branches as a performance and separation tool, not as a default. If later steps depend on deterministic ordering or shared mutable state, stay sequential.",
+    "Do not update variables inside a parallel For each when deterministic accumulation matters. Force sequential execution first or redesign to avoid shared mutable state.",
+    "Use For each for per-item processing and Until for polling or wait-until-state-changes patterns.",
+    "Use scopes to model grouped phases such as retrieve, transform, persist, and cleanup so downstream run-after logic can react to phase-level outcome instead of individual actions.",
+    "Use variables sparingly. Prefer action outputs and expressions for simple data flow, and reserve variables for counters, accumulators, or state that truly spans multiple later actions.",
+    "Use Compose for lightweight shaping, Parse JSON for schema-backed tokens, Select for projection, and Filter array for record selection before writes or notifications."
+  ],
+  "caveats": [
+    "Switch supports equality matching only. Use Condition or expressions when you need greater-than, less-than, contains, or compound logic.",
+    "Parallel branches and parallel For each iterations can create race conditions when they mutate shared variables or rely on ordering.",
+    "Nested For each behavior differs from top-level For each because nested loops run sequentially.",
+    "Until loops can become expensive or slow if the stop condition and iteration limits are not designed carefully.",
+    "Overusing variables can make workflow state harder to reason about than direct action-to-action expressions."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-conditional-statement",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-switch-statement",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-branches",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-overview",
+    "azure-logic-apps-examples-and-scenarios",
+    "azure-logic-apps-http-and-data-patterns",
+    "azure-logic-apps-reliability-and-error-handling",
+    "azure-logic-apps-api-to-sharepoint-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "azure-logic-apps-research"
+  ]
+}

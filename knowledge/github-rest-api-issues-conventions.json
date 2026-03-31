@@ -1,0 +1,104 @@
+{
+  "id": "github-rest-api-issues-conventions",
+  "title": "GitHub REST API - Issues Endpoint, Auth, Pagination, And Rate Limits",
+  "source_family": "github",
+  "coverage_type": "workflow",
+  "applies_to": ["GitHub REST API v3", "issues endpoint", "personal access tokens", "GitHub Apps"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-23T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "GitHub REST repository issues endpoint is GET /repos/{owner}/{repo}/issues. Accepts API version via X-GitHub-Api-Version header; current stable version is 2022-11-28.",
+      "source_url": "https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Required request headers for GitHub REST API: Accept: application/vnd.github+json, Authorization: Bearer <token>, X-GitHub-Api-Version: 2022-11-28, and a non-empty User-Agent. Requests with no User-Agent are rejected.",
+      "source_url": "https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api?apiVersion=2022-11-28",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "The List repository issues endpoint supports filters: milestone, state (open|closed|all), assignee, type, creator, mentioned, labels, sort (created|updated|comments), direction (asc|desc), since, per_page (max 100), and page.",
+      "source_url": "https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub issue list endpoints may return pull requests in the response body. Pull requests can be identified and filtered by the presence of the pull_request key in each result object.",
+      "source_url": "https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Auth options for List repository issues: fine-grained PATs (require Issues: read repository permission), GitHub App user tokens, and GitHub App installation tokens. Classic PATs use repo scope (full access) or public_repo scope (public repos only). The endpoint works unauthenticated for public repos only.",
+      "source_url": "https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub recommends fine-grained personal access tokens over classic PATs for personal REST API use. GitHub Apps are recommended when using the API on behalf of an organization or another user.",
+      "source_url": "https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "For classic PATs in organizations enforcing SAML SSO, the token must be explicitly authorized for SSO after creation. Fine-grained PATs handle SSO authorization during token creation.",
+      "source_url": "https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub paginates REST results. When paginated, the response includes a Link header with rel=\"next\" and rel=\"last\" URL relations. Maximum page size is 100 for the issues endpoint.",
+      "source_url": "https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub primary rate limits: 60 requests/hour unauthenticated, 5000 requests/hour authenticated. Rate-limit state exposed in response headers: x-ratelimit-limit, x-ratelimit-remaining, x-ratelimit-used, x-ratelimit-reset.",
+      "source_url": "https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=latest",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub also enforces secondary rate limits (concurrency and endpoint burst protections). Honor the retry-after header when present.",
+      "source_url": "https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=latest",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "GitHub security guidance requires minimum permissions, no hardcoded tokens, and secrets stored in a secure manager such as Azure Key Vault.",
+      "source_url": "https://docs.github.com/en/rest/authentication/keeping-your-api-credentials-secure",
+      "verified_date": "2026-03-23",
+      "source_type": "live_verified"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28",
+    "https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api",
+    "https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api?apiVersion=latest",
+    "https://docs.github.com/en/rest/authentication/authenticating-to-the-rest-api",
+    "https://docs.github.com/en/rest/authentication/keeping-your-api-credentials-secure",
+    "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps"
+  ],
+  "implementation_notes": [
+    "Recommended query defaults for export-oriented pulls: state=all, sort=updated, direction=desc, per_page=100.",
+    "For repositories with more than 100 issues, loop over the page parameter until the returned page is empty.",
+    "Always filter pull requests from issue results by checking for the pull_request key unless PR data is intentionally included.",
+    "Field mapping for issue documents: number, title, state, html_url, user.login, assignees[*].login, labels[*].name, milestone.title, comments, created_at, updated_at, closed_at, body.",
+    "For raw HTTP implementations, include all four required headers: Authorization, Accept, X-GitHub-Api-Version, User-Agent.",
+    "Prefer fine-grained PATs scoped to the target repository with Issues: read for private repo access.",
+    "If the organization enforces SAML SSO and a classic PAT is used, explicitly call out SSO authorization as a required setup step.",
+    "Unauthenticated access is capped at 60 requests/hour and is not suitable for operational automations."
+  ],
+  "caveats": [
+    "Issue list endpoints return pull requests mixed with issues; clients must filter if only true issues are needed.",
+    "SAML SSO organizations require explicit token authorization for classic PATs after creation.",
+    "Secondary rate limits (burst/concurrency) are not publicly documented with exact thresholds; honor retry-after headers.",
+    "Link header pagination is not available in all Power Automate connector implementations — raw HTTP fallback may be required for reliable multi-page traversal."
+  ],
+  "last_verified": "2026-03-23T00:00:00Z",
+  "related_entries": ["power-automate-github-connector-conventions"],
+  "source_projects": ["implementation-guide-smoke-codex-2"]
+}

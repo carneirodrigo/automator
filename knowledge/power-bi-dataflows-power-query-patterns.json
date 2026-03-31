@@ -1,0 +1,82 @@
+{
+  "id": "power-bi-dataflows-power-query-patterns",
+  "title": "Power BI Dataflows - Creation, Incremental Refresh, And Power Query M Patterns",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Centralising SharePoint list data transformation for multiple Power BI reports",
+    "Incremental refresh of large security datasets in Power BI dataflows",
+    "Power Query M patterns for JSON, CSV, and SharePoint list data sources",
+    "Dataflow dependency chains for multi-stage data preparation"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Dataflows are Power Query transformations hosted in the Power BI service, independent of any single report or dataset. Create a dataflow: in a workspace, click New > Dataflow > Add new tables. Dataflows execute on a schedule and store the results as parquet files in Azure Data Lake Storage Gen2 (either Microsoft-managed or bring-your-own).",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-introduction-self-service",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Connect a Power BI dataset to a dataflow table: in Power BI Desktop, use the Power BI dataflows connector (Get Data > Power Platform > Dataflows). Select the workspace and dataflow table. This creates a reusable, centralised transformation layer — multiple reports share the same cleaned data without duplicating transformation logic.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-create-use",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Incremental refresh in dataflows: define a date/time column as the partition key. In the dataflow table settings, enable Incremental Refresh and set the rolling window (e.g., store 12 months, refresh last 7 days). The dataflow only re-processes rows within the refresh window on each scheduled run, dramatically reducing refresh time for large datasets.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-incremental-refresh",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Power Query M for SharePoint Online list as dataflow source: `let Source = SharePoint.Tables(\"https://tenant.sharepoint.com/sites/sitename\", [ApiVersion=15]), ListItems = Source{[Title=\"QualysHostDetections\"]}[Items], FilteredRows = Table.SelectRows(ListItems, each [LastUpdated] > DateTime.From(Date.AddDays(DateTime.LocalNow(), -7))) in FilteredRows`. The ApiVersion=15 parameter targets SharePoint REST API v15.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/connectors/sharepoint-list",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Power Query M for JSON transformation — parsing a JSON column in a SharePoint list: `Table.TransformColumns(Source, {{\"JsonColumn\", each Json.Document(_), type record}})`. Then expand the record: `Table.ExpandRecordColumn(Source, \"JsonColumn\", {\"field1\", \"field2\"})`. Use this to unpack nested JSON stored as text in SharePoint list columns.",
+      "source_url": "https://learn.microsoft.com/en-us/powerquery-m/json-document",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Linked tables: a dataflow can reference tables from another dataflow in the same workspace using linked entities. In the source dataflow, mark a table as 'Enabled load' and 'Enable linked entity'. In the downstream dataflow, use Get Data > Power BI Dataflows and select the linked table. Linked tables enable a medallion-style architecture without re-extracting source data.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-linked-tables",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Dataflow refresh scheduling: set via workspace > dataflow > Settings > Scheduled refresh. Up to 48 refresh times per day (Premium) or 8 per day (Pro). Dataflows in a dependency chain must be sequenced — refresh the upstream (source) dataflow before the downstream (linked) dataflow. Use Azure Data Factory or Power Automate to sequence refresh calls via the Power BI REST API.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-create-use",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "For the security reporting pipeline: create a single dataflow that reads all three SharePoint staging lists (QualysHostDetections, BitSightRatings, DefenderDevices), cleans and normalises the data, and outputs three tables. All Power BI reports connect to this dataflow, not directly to SharePoint. This gives a single transformation point to update when SharePoint column names change.",
+    "Use incremental refresh in the dataflow keyed on the LastUpdated column. With daily pipeline runs, only 1-7 days of rows are re-processed on each dataflow refresh — much faster than full table reload.",
+    "Sequence dataflow refresh after the PowerShell pipeline completes using the Power BI REST API refresh trigger from the pipeline playbook. This ensures the dataflow always sees the latest SharePoint data.",
+    "Power Query M column type annotations improve performance: add explicit type steps after source and after each major transformation: `Table.TransformColumnTypes(Source, {{\"Rating\", Int64.Type}, {\"LastUpdated\", type datetime}})`."
+  ],
+  "caveats": [
+    "Dataflows require a Premium workspace for linked tables and incremental refresh. In Pro workspaces, dataflows support basic refresh only.",
+    "SharePoint list connector in dataflows uses the SharePoint REST API and is subject to SharePoint throttling. For lists with >5,000 items, ensure the columns used in filter conditions are indexed.",
+    "Dataflow refresh errors are surfaced in the workspace dataflow history. Unlike dataset refresh, there is no built-in email alert for dataflow failures — use Power Automate with the Power BI connector to monitor dataflow refresh status."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-introduction-self-service",
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-incremental-refresh",
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-linked-tables",
+    "https://learn.microsoft.com/en-us/power-query/connectors/sharepoint-list"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-data-sources-and-refresh",
+    "power-bi-rest-api-automation",
+    "power-bi-gateway-configuration"
+  ],
+  "source_projects": ["shared-seed"]
+}

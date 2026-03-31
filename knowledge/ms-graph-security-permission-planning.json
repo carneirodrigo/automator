@@ -1,0 +1,125 @@
+{
+  "id": "ms-graph-security-permission-planning",
+  "title": "Microsoft Graph Security - Permission Planning By Surface",
+  "source_family": "microsoft-graph",
+  "coverage_type": "auth",
+  "applies_to": [
+    "Choosing least-privileged Microsoft Graph permissions for security workflows",
+    "Preflight planning for Graph security integrations",
+    "Separating auth scope selection from endpoint implementation"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Microsoft Graph permissions reference marks security permissions as admin-consent-required for both application and delegated modes.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/permissions-reference",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The least-privileged permission for GET /security/alerts_v2 is SecurityAlert.Read.All for both delegated work or school accounts and application access; the higher privilege is SecurityAlert.ReadWrite.All.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/security-list-alerts_v2?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The least-privileged permission for GET /security/incidents is SecurityIncident.Read.All for both delegated work or school accounts and application access; the higher privilege is SecurityIncident.ReadWrite.All.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/security-list-incidents?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The least-privileged permission for GET /security/secureScores is SecurityEvents.Read.All for both delegated work or school accounts and application access; the higher privilege is SecurityEvents.ReadWrite.All.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/securescore-get?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The least-privileged permission for POST /security/runHuntingQuery is ThreatHunting.Read.All for both delegated work or school accounts and application access, with no higher privileged permission listed.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/security-security-runhuntingquery?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The least-privileged permission for Microsoft Graph attack simulation read operations is AttackSimulation.Read.All for both delegated work or school accounts and application access, with personal Microsoft accounts not supported.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "surface_permission_map": [
+    {
+      "surface": "alerts_v2",
+      "route_example": "GET /v1.0/security/alerts_v2",
+      "least_privileged_delegated": "SecurityAlert.Read.All",
+      "least_privileged_application": "SecurityAlert.Read.All",
+      "higher_privilege": "SecurityAlert.ReadWrite.All",
+      "personal_accounts_supported": false
+    },
+    {
+      "surface": "incidents",
+      "route_example": "GET /v1.0/security/incidents",
+      "least_privileged_delegated": "SecurityIncident.Read.All",
+      "least_privileged_application": "SecurityIncident.Read.All",
+      "higher_privilege": "SecurityIncident.ReadWrite.All",
+      "personal_accounts_supported": false
+    },
+    {
+      "surface": "secure_scores",
+      "route_example": "GET /v1.0/security/secureScores/{secureScore-id}",
+      "least_privileged_delegated": "SecurityEvents.Read.All",
+      "least_privileged_application": "SecurityEvents.Read.All",
+      "higher_privilege": "SecurityEvents.ReadWrite.All",
+      "personal_accounts_supported": false
+    },
+    {
+      "surface": "advanced_hunting",
+      "route_example": "POST /v1.0/security/runHuntingQuery",
+      "least_privileged_delegated": "ThreatHunting.Read.All",
+      "least_privileged_application": "ThreatHunting.Read.All",
+      "higher_privilege": null,
+      "personal_accounts_supported": false
+    },
+    {
+      "surface": "attack_simulation_read",
+      "route_example": "GET /v1.0/security/attackSimulation/simulations/{simulationId}/report/simulationUsers",
+      "least_privileged_delegated": "AttackSimulation.Read.All",
+      "least_privileged_application": "AttackSimulation.Read.All",
+      "higher_privilege": null,
+      "personal_accounts_supported": false
+    }
+  ],
+  "implementation_notes": [
+    "Use this entry for permission preflight and route selection, then defer to the target endpoint page before implementation if the workflow needs write operations or less-common entities.",
+    "For automation, pair the application permission from this map with the authorization rules in ms-graph-security-authorization and the token mechanics in ms-graph-oauth2-client-credentials.",
+    "For delegated workflows, the least-privileged Graph permission is not sufficient on its own for many security routes; also check the Entra role requirement from ms-graph-security-authorization.",
+    "Treat permission planning as route-specific. Do not reuse SecurityEvents.Read.All as a generic permission for all Graph security surfaces just because it covers secure score and some legacy security events."
+  ],
+  "common_failure_patterns": [
+    "Using SecurityEvents.Read.All for incidents or alerts_v2 when the target route actually needs SecurityIncident.Read.All or SecurityAlert.Read.All.",
+    "Requesting delegated permissions and consent successfully but still failing because the workflow was designed for app-only automation.",
+    "Assuming a write-capable permission is required for simple reporting when a read-only permission would have been sufficient.",
+    "Testing with a personal Microsoft account even though the target Graph security API surface only supports work or school accounts."
+  ],
+  "caveats": [
+    "This entry is a planning shortcut for common security surfaces, not a complete copy of the Microsoft Graph permissions reference.",
+    "Write operations and niche security resources can require different permissions than the read routes summarized here.",
+    "Some older authorization guidance uses broader legacy permission families; prefer endpoint-specific least-privileged permissions for modern surfaces such as alerts_v2 and incidents."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/permissions-reference",
+    "https://learn.microsoft.com/en-us/graph/api/security-list-alerts_v2?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-list-incidents?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/securescore-get?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/security-security-runhuntingquery?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "ms-graph-security-authorization",
+    "ms-graph-oauth2-client-credentials",
+    "ms-graph-security-api-overview",
+    "ms-graph-security-alerts-incidents",
+    "ms-graph-security-hunting-posture-and-ti",
+    "ms-graph-attack-simulation-api"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "ms-graph-security-research"
+  ]
+}

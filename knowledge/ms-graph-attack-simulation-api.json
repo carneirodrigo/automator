@@ -1,0 +1,161 @@
+{
+  "id": "ms-graph-attack-simulation-api",
+  "title": "Microsoft Graph API - Attack Simulation Training Endpoints",
+  "source_family": "microsoft-graph",
+  "coverage_type": "endpoint",
+  "applies_to": ["Microsoft Graph security attack simulation endpoints"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Microsoft Graph v1.0 attackSimulationRoot resource exposes collections: simulations, simulationAutomations, trainings, payloads, loginPages, landingPages, endUserNotifications, and operations.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/attacksimulationroot?view=graph-rest-1.0",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "List simulations: GET https://graph.microsoft.com/v1.0/security/attackSimulation/simulations",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "List simulations supports $count, $filter, $orderby, $skipToken, $top, $select query params",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "Filterable properties on simulations: attackTechnique, attackType, completionDateTime, displayName, isAutomated, launchDateTime, status",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "Simulation object key fields: id, displayName, description, status, launchDateTime, completionDateTime, isAutomated, automationId, attackTechnique, attackType, payloadDeliveryPlatform",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/simulation?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    },
+    {
+      "fact": "Per-simulation detail: GET /v1.0/security/attackSimulation/simulations/{simulationId}",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/simulation-get?view=graph-rest-1.0",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Campaign overview metrics: GET /v1.0/security/attackSimulation/simulations/{simulationId}/report/overview",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/simulationreportoverview-get?view=graph-rest-1.0",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "simulationReportOverview fields: resolvedTargetsCount (Int32), simulationEventsContent (phishingSimulationEventsContent sub-object with click/compromise rates), trainingEventsContent (training completion metrics), and recommendedActions (array of attack simulation recommended action objects).",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/simulationreportoverview?view=graph-rest-1.0",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "User results: GET /v1.0/security/attackSimulation/simulations/{simulationId}/report/simulationUsers",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "simulationUsers endpoint only supports $count, $skipToken, $top — does NOT support $filter, $select, or $orderby",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "Both list and simulationUsers endpoints require AttackSimulation.Read.All application permission",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "Admin consent is required for AttackSimulation.Read.All in both delegated and application permission modes.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/permissions-reference?view=graph-rest-1.0",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "API is GA (v1.0) — no beta dependency required",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/simulation?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "Pagination uses @odata.nextLink with $skipToken — do NOT use $skip",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+      "verified_date": "2026-03-19"
+    },
+    {
+      "fact": "Attack Simulation Training workload requires Microsoft 365 E5 or Microsoft Defender for Office 365 Plan 2; only a limited subset is available via E3 trial.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-office-365/attack-simulation-training-get-started",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Attack sim Graph APIs are documented as unavailable in GCC High and DoD environments; the product exists in those clouds but without Graph API access.",
+      "source_url": "https://learn.microsoft.com/en-us/office365/servicedescriptions/microsoft-defender-for-office-365-features",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Attack Simulation Training is available in Worldwide, GCC, GCC High, and DoD environments, but Graph API access is only confirmed for Worldwide and GCC.",
+      "source_url": "https://learn.microsoft.com/en-us/office365/servicedescriptions/microsoft-defender-for-office-365-features",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Admin roles for Attack Simulation Training: Security Administrator or Attack Simulation Administrator for configuration; Security Reader and Security Operator can view all simulation data.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-office-365/attack-simulation-training-get-started",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "Attack Simulation Training supports on-premises mailboxes with reduced reporting functionality — user-level simulation detail may be incomplete in hybrid environments.",
+      "source_url": "https://learn.microsoft.com/en-us/defender-office-365/attack-simulation-training-get-started",
+      "verified_date": "2026-03-23"
+    },
+    {
+      "fact": "userSimulationDetails top-level fields: isCompromised (Boolean), compromisedDateTime (DateTimeOffset), reportedPhishDateTime (DateTimeOffset), assignedTrainingsCount (Int32), completedTrainingsCount (Int32), inProgressTrainingsCount (Int32)",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationdetails?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    },
+    {
+      "fact": "userSimulationDetails.simulationUser sub-object fields: userId (String — Entra user ID), displayName (String), email (String)",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/attacksimulationuser?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    },
+    {
+      "fact": "userSimulationDetails.simulationEvents[] sub-object fields: eventName (String — e.g. SuccessfullyDeliveredEmail, EmailLinkClicked, ReportedPhish), eventDateTime (DateTimeOffset), ipAddress (String), osPlatformDeviceDetails (String), browser (String)",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationeventinfo?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    },
+    {
+      "fact": "userSimulationDetails.trainingEvents[] sub-object fields: displayName (String — training name), latestTrainingStatus (Enum: unknown, assigned, inProgress, completed, overdue, unknownFutureValue), trainingAssignedProperties (userTrainingContentEventInfo), trainingUpdatedProperties (userTrainingContentEventInfo), trainingCompletedProperties (userTrainingContentEventInfo)",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/resources/usertrainingeventinfo?view=graph-rest-1.0",
+      "verified_date": "2026-03-27"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/api/resources/attacksimulationroot?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/attacksimulationroot-list-simulations?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/simulation?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/simulation-get?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/simulationreportoverview-get?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/simulationreportoverview?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/usersimulationdetails-list?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationdetails?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/attacksimulationuser?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/usersimulationeventinfo?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/api/resources/usertrainingeventinfo?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/graph/permissions-reference?view=graph-rest-1.0",
+    "https://learn.microsoft.com/en-us/defender-office-365/attack-simulation-training-get-started",
+    "https://learn.microsoft.com/en-us/office365/servicedescriptions/microsoft-defender-for-office-365-features"
+  ],
+  "implementation_notes": [
+    "Primary data retrieval shape: start with simulations list (id, displayName, status, dates), then for each simulation pull report/overview for summary metrics and report/simulationUsers for per-user detail.",
+    "Lookup strategy: first try $filter=displayName eq '{name}', if special characters cause issues, list all and match client-side",
+    "OData $filter with special characters (parentheses, slashes) may need URL encoding — have a fallback. Example: $filter=displayName eq 'AutomatedSimulation_Oct25 (2)_2/28/2026'",
+    "Pagination: check for '@odata.nextLink' in each response, GET that URL for next page, loop until absent. Use $top=100 for reasonable page sizes.",
+    "userSimulationDetails contains nested objects: flatten simulationUser fields to top level, serialize simulationEvents as individual rows or summarize key events (SuccessfullyDeliveredEmail, EmailLinkClicked, ReportedPhish), summarize training status from trainingEvents[].latestTrainingStatus.",
+    "Error handling: 401 (token expired), 403 (insufficient permissions), 404 (simulation not found), 429 (throttling — respect Retry-After header). Errors in standard OData format: {error: {code, message}}."
+  ],
+  "caveats": [
+    "simulationUsers endpoint does NOT support $filter or $select — all filtering must be done client-side",
+    "Simulation displayName may contain special characters that break OData $filter — always have a client-side fallback",
+    "trainingEvents.latestTrainingStatus enum: unknown, assigned, inProgress, completed, overdue, unknownFutureValue",
+    "Attack sim Graph APIs are unavailable in GCC High and DoD — do not document these as viable cloud targets for Graph-based retrieval.",
+    "Licensing prerequisite: the workload requires M365 E5 or Defender for Office 365 Plan 2; the API returns no data or errors if the tenant lacks the license.",
+    "On-premises mailbox support exists but with reduced reporting functionality; user-level simulation detail may be incomplete in hybrid environments."
+  ],
+  "last_verified": "2026-03-27T00:00:00Z",
+  "related_entries": ["ms-graph-oauth2-client-credentials", "graph-attack-simulation-playbook"],
+  "source_projects": ["shared-seed", "ms-attack-sim-results", "implementation-guide-smoke"]
+}

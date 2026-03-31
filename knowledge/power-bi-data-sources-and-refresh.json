@@ -1,0 +1,64 @@
+{
+  "id": "power-bi-data-sources-and-refresh",
+  "title": "Power BI - Data Sources, Connectivity, And Refresh Conventions",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI data connectivity design",
+    "Power BI scheduled refresh and data currency planning"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI can connect to many data sources, including files, databases, Azure data services, online services, and other sources documented in the data-sources catalog.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/power-bi-data-sources",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI supports different connectivity modes and source-specific requirements, and not every data source supports every capability or refresh pattern in the same way.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/power-bi-data-sources",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Scheduled refresh is configured in the Power BI service for imported semantic models and depends on source connectivity, credentials, and gateway configuration when required.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-scheduled-refresh",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "If a semantic model remains unused for two months, Power BI pauses scheduled refresh, and it resumes when the semantic model is viewed again.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-scheduled-refresh",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Scheduled refresh can fail because of credential issues, expired tokens or passwords, missing gateway configuration, source unavailability, or unsupported source scenarios.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-scheduled-refresh",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Treat refresh strategy as part of report design, not as an afterthought. A dashboard is only as useful as the semantic model refresh behind it.",
+    "Document the data source type, credential type, gateway requirement, and expected refresh cadence for every production report.",
+    "When prototyping with samples, be explicit about whether the final solution will use imported data, live connectivity, or another source pattern because this changes refresh design.",
+    "If freshness matters, add operational guidance for refresh monitoring, failure notification, and token or credential renewal."
+  ],
+  "caveats": [
+    "The data-sources catalog is broad and source-specific. Production implementations must re-check the exact source documentation for the chosen connector or source.",
+    "Refresh behavior depends on licensing, capacity, source type, and gateway placement.",
+    "A report design can be visually correct while still being operationally weak if refresh prerequisites are not met."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/power-bi-data-sources",
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-scheduled-refresh"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-samples-and-prototyping-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

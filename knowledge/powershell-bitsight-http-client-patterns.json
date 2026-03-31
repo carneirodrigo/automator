@@ -1,0 +1,88 @@
+{
+  "id": "powershell-bitsight-http-client-patterns",
+  "title": "PowerShell BitSight API HTTP Client Patterns - Auth, Pagination, And Response Handling",
+  "source_family": "bitsight",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "PowerShell scripts calling BitSight ratings and findings APIs",
+    "Building reusable BitSight HTTP client wrapper functions in PowerShell",
+    "Paginating and transforming BitSight JSON responses in PowerShell"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "BitSight API uses the API token as the username in HTTP Basic Auth with an empty password. Construct the header in PowerShell: `$encoded = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(\"${apiToken}:\")); $headers = @{ Authorization = \"Basic $encoded\" }`. Note the trailing colon with no password after it.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Base URL is `https://api.bitsighttech.com`. All BitSight API calls use HTTPS. No custom headers beyond Authorization are required for standard endpoints.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Current portfolio ratings: `$response = Invoke-RestMethod -Uri \"https://api.bitsighttech.com/ratings/v1/companies\" -Headers $headers -Method GET`. Returns a PSCustomObject with a `results` array. Each entry contains `guid`, `name`, `rating`, `rating_date`, `industry_percentile`, and `factors` array.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Company details (single company): `Invoke-RestMethod -Uri \"https://api.bitsighttech.com/ratings/v1/companies/$guid\" -Headers $headers`. Returns full company object with `rating_details`, `industry` data, `factors` breakdown per security category (Compromised Systems, Diligence, User Behavior, etc.).",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Rating history: `Invoke-RestMethod -Uri \"https://api.bitsighttech.com/ratings/v1/companies/$guid/ratings?limit=90\" -Headers $headers`. The `limit` parameter specifies the number of most-recent days to return. Response contains a `ratings` array where each entry has `x` (date string) and `y` (rating integer) fields.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Pagination: endpoints that return paginated results include a `links` object with a `next` property containing the full URL for the next page. PowerShell pagination loop: `do { $response = Invoke-RestMethod -Uri $url -Headers $headers; $allResults += $response.results; $url = $response.links.next } while ($response.links.next)`.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Rate limit is approximately 15,000 requests per hour. HTTP 429 responses indicate rate limit exceeded. Honor the Retry-After header if present. For portfolio-wide pulls across many companies, implement a per-request delay of 250ms to stay well within limits.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "All BitSight responses are JSON. Invoke-RestMethod automatically deserializes JSON to PSCustomObject. Access nested data using dot notation: `$response.results | ForEach-Object { $_.name, $_.rating, ($_.factors | Where-Object { $_.name -eq 'Compromised Systems' }).rating }`.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Build a reusable `Invoke-BitSightRequest` function that accepts a path suffix (e.g., '/ratings/v1/companies'), constructs the full URI, attaches the auth header, and handles pagination automatically by following links.next.",
+    "For portfolio-wide reporting, first call /ratings/v1/companies to get all GUIDs, then call /ratings/v1/companies/{guid} for each company that needs detailed factor breakdown. Batch the detail calls with a short sleep to avoid burst throttling.",
+    "Store the API token in Azure Key Vault or an Automation Account encrypted variable, not in the script file. Retrieve at runtime: `$apiToken = Get-AzKeyVaultSecret -VaultName $vault -Name 'BitSightToken' -AsPlainText`.",
+    "Flatten the nested factors array for SharePoint list storage: `$company.factors | ForEach-Object { [PSCustomObject]@{ Company=$company.name; Category=$_.name; Rating=$_.rating } }` produces a normalized row per category per company."
+  ],
+  "caveats": [
+    "The API token in the Authorization header has an empty password — the trailing colon after the token is required. Omitting it causes 401 Unauthorized.",
+    "Company GUIDs are BitSight-internal identifiers and differ from any external ID. They are stable and do not change.",
+    "Portfolio contents depend on subscription tier. Not all companies in a portfolio will have full factor breakdowns available.",
+    "Rating history `limit` parameter is in days, not number of records. A company with a long history but low rating change frequency will return fewer records than the limit."
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388",
+    "https://help.bitsighttech.com/"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-api-auth-conventions",
+    "bitsight-current-ratings-api",
+    "bitsight-findings-api",
+    "powershell-http-retry-rate-limit-patterns",
+    "powershell-credential-management-key-vault"
+  ],
+  "source_projects": ["shared-seed"]
+}

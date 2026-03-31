@@ -1,0 +1,52 @@
+{
+  "id": "power-bi-embedding-and-apis",
+  "title": "Power BI - Embedding And API-Oriented Integration Patterns",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI embedding scenarios",
+    "Programmatic Power BI integration planning"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI documentation includes a dedicated embedded analytics area for integrating Power BI reports and analytics into applications.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI Client APIs can embed interactive reports inside applications for organizational scenarios where users sign in to Power BI.",
+      "source_url": "https://learn.microsoft.com/en-us/javascript/api/overview/powerbi/embed-quick-report",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI quick report embedding can create a dataset and report from application data and let users explore and customize the generated report experience.",
+      "source_url": "https://learn.microsoft.com/en-us/javascript/api/overview/powerbi/embed-quick-report",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use this entry as a routing indicator when a Power BI request is about embedding, programmatic report experiences, or app integration rather than standard Desktop or service authoring.",
+    "For embedded scenarios, separate the questions of data modeling, report authoring, authentication, and client-side embedding. They are related but not the same implementation step.",
+    "If a user wants dashboards or reports inside another application, embedding is usually the right research branch rather than workspace or app distribution alone."
+  ],
+  "caveats": [
+    "Embedding is a distinct delivery pattern from normal Power BI service sharing and app distribution.",
+    "This pass only establishes the existence and purpose of embedding guidance. Deeper API-by-API extraction should happen when a project explicitly targets embedded analytics."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/",
+    "https://learn.microsoft.com/en-us/javascript/api/overview/powerbi/embed-quick-report"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-row-level-security-and-governance"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

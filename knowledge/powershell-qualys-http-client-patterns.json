@@ -1,0 +1,99 @@
+{
+  "id": "powershell-qualys-http-client-patterns",
+  "title": "PowerShell Qualys API HTTP Client Patterns - Auth, Request Construction, And Response Parsing",
+  "source_family": "qualys",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "PowerShell scripts calling Qualys VMDR, WAS, or Asset Inventory APIs",
+    "Building reusable Qualys HTTP client wrapper functions in PowerShell",
+    "Parsing Qualys XML and JSON API responses in PowerShell"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Qualys API uses HTTP Basic Auth. Construct the Authorization header in PowerShell: `$encoded = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(\"${username}:${password}\")); $headers = @{ Authorization = \"Basic $encoded\"; 'X-Requested-With' = 'PowerShell' }`. The X-Requested-With header is mandatory for all Qualys V2 API endpoints and must be a non-empty string.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Platform base URL varies by subscription pod. Identify your platform URL using `https://www.qualys.com/platform-identification` before coding. Common URLs: qualysapi.qualys.com (US1), qualysapi.qg2.apps.qualys.com (US2), qualysapi.qg3.apps.qualys.com (US3), qualysapi.eu.apps.qualys.com (EU1). Hardcode the resolved URL; do not auto-detect at runtime in production.",
+      "source_url": "https://www.qualys.com/platform-identification",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "VMDR Host Detection API call in PowerShell: `$response = Invoke-RestMethod -Uri \"https://$qualysBase/api/2.0/fo/asset/host/vm/detection/?action=list&truncation_limit=1000\" -Headers $headers -Method GET`. Returns XML. PowerShell's Invoke-RestMethod auto-parses XML to an XmlDocument object when Content-Type is application/xml.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Navigate Qualys XML response in PowerShell: `$xml.HOST_LIST_VM_DETECTION_OUTPUT.RESPONSE.HOST_LIST.HOST` gives the array of host elements. Each HOST contains `IP`, `DNS`, `DETECTION_LIST` with child `DETECTION` elements. Access nested values: `$host.DETECTION_LIST.DETECTION | ForEach-Object { $_.QID, $_.SEVERITY }.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Global IT Asset Inventory API uses JSON and POST method. PowerShell call: `$body = '{\"ServiceRequest\":{\"preferences\":{\"startFromOffset\":0,\"limitResults\":100}}}'; $response = Invoke-RestMethod -Uri \"https://$qualysBase/qps/rest/2.0/search/am/asset\" -Headers $headers -Method POST -Body $body -ContentType \"application/json\"`. Returns PSCustomObject from JSON.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-user-guide.pdf",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Global IT Asset Inventory pagination: check `$response.ServiceResponse.hasMoreRecords`. If `true`, increment `startFromOffset` by `limitResults` and repeat the call. Continue until `hasMoreRecords` is `false` or the returned `count` is less than `limitResults`.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-user-guide.pdf",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "VMDR detection pagination: use `id_min` filter incremented to the last returned host ID. Example: append `&id_min=$lastId` to the request URI on each subsequent call. Alternatively use `since_datetime` to fetch only changed detections since a timestamp.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "WAS API (Web Application Scanning) call in PowerShell: `$body = '{\"ServiceRequest\":{\"preferences\":{\"startFromOffset\":0,\"limitResults\":100}}}'; Invoke-RestMethod -Uri \"https://$qualysBase/qps/rest/3.0/search/was/webapp\" -Headers $headers -Method POST -Body $body -ContentType \"application/json\"`. Response: `$response.ServiceResponse.data.WebApp`.",
+      "source_url": "https://docs.qualys.com/en/was/api/3.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    },
+    {
+      "fact": "Rate limits: Qualys enforces per-module hourly call limits (approximately 300 requests/hour for VMDR per user). HTTP 429 responses indicate rate limit exceeded. Qualys does not reliably provide a Retry-After header; default to a 60-second sleep on 429 responses.",
+      "source_url": "https://docs.qualys.com/en/vm/api/2.0/",
+      "verified_date": "2026-03-28",
+      "source_type": "live_verified"
+    }
+  ],
+  "implementation_notes": [
+    "Build a reusable `Invoke-QualysRequest` function that accepts URI, method, and optional body, handles header construction, detects response format (XML vs JSON by Content-Type), and includes retry logic for 429 and 503 responses.",
+    "Resolve and cache the platform base URL as a script-level variable `$script:QualysBase` set once at script startup, not re-resolved on every call.",
+    "Convert Qualys XML detection data to PSCustomObjects early in the pipeline using `Select-Xml` or XPath expressions, then work with objects rather than XML nodes throughout the rest of the script.",
+    "For bulk asset or detection exports, prefer `since_datetime` filters over full dumps to reduce API call volume and response size on incremental runs.",
+    "Validate that the X-Requested-With header value is a non-empty string. Some PowerShell versions may silently drop headers with null or empty values."
+  ],
+  "caveats": [
+    "X-Requested-With header is mandatory for all V2 API calls. Omitting it returns 403 Forbidden with no meaningful error body.",
+    "Platform URL is subscription-specific. Using the wrong pod URL returns authentication errors that look identical to wrong credentials.",
+    "Some Qualys modules return XML even when output_format=JSON is specified in the query string. Always check Content-Type of the response before parsing.",
+    "The VMDR detection endpoint truncates results at the specified truncation_limit (max 1000 per call). Always implement pagination for production environments with large host counts.",
+    "Qualys session-based auth (via /api/2.0/fo/session/ login endpoint) is an alternative but stateful model. Prefer stateless Basic Auth for unattended scripts to avoid session management complexity."
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/2.0/",
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-user-guide.pdf",
+    "https://docs.qualys.com/en/was/api/3.0/",
+    "https://www.qualys.com/platform-identification"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "qualys-api-auth-conventions",
+    "qualys-vmdr-api-conventions",
+    "qualys-global-asset-inventory-api",
+    "qualys-was-api-conventions",
+    "powershell-http-retry-rate-limit-patterns",
+    "powershell-credential-management-key-vault"
+  ],
+  "source_projects": ["shared-seed"]
+}

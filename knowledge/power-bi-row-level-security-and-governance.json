@@ -1,0 +1,65 @@
+{
+  "id": "power-bi-row-level-security-and-governance",
+  "title": "Power BI - Row-Level Security, Workspaces, And Apps",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI access control and distribution planning",
+    "Power BI workspace, app, and row-level security design"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Row-level security in Power BI can restrict data access for specific users by using filters within roles on a semantic model.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-admin-rls",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "RLS can be defined in Power BI Desktop and then managed in the Power BI service after publishing.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/enterprise/service-admin-rls",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Workspaces are collaborative containers in the Power BI service for reports, dashboards, semantic models, and other items.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/collaborate-share/service-new-workspaces",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Apps are packaged, read-only collections of Power BI content distributed from a workspace to consumers.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/collaborate-share/service-create-distribute-apps",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Workspace roles determine what members can do inside a workspace, while apps provide a controlled distribution mechanism for consumers.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/collaborate-share/service-new-workspaces",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use RLS when the same report and semantic model must serve different audiences with different data visibility.",
+    "Design workspaces for authoring and collaboration, then publish apps for broader consumer distribution.",
+    "Treat workspace membership and app audience as separate concerns. Workspace roles govern who can build or manage content; app audiences govern who can consume curated content.",
+    "When a report request includes sensitive regional, customer, or business-unit scoping, ask whether RLS is required before calling the model complete."
+  ],
+  "caveats": [
+    "RLS is model-level security, not a replacement for careful workspace governance.",
+    "A well-designed app still depends on the underlying workspace and semantic model permissions being correct.",
+    "Governance failures often come from mixing author access and consumer access without a clear workspace-plus-app strategy."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/enterprise/service-admin-rls",
+    "https://learn.microsoft.com/en-us/power-bi/collaborate-share/service-new-workspaces",
+    "https://learn.microsoft.com/en-us/power-bi/collaborate-share/service-create-distribute-apps"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-overview-and-routing",
+    "power-bi-reports-and-dashboards",
+    "power-bi-modeling-dax-and-relationships"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}

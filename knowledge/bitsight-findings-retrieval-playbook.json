@@ -1,0 +1,64 @@
+{
+  "id": "bitsight-findings-retrieval-playbook",
+  "title": "Playbook - BitSight Findings Retrieval",
+  "source_family": "bitsight",
+  "coverage_type": "workflow",
+  "applies_to": ["Retrieve BitSight findings by company entity and risk vector"],
+  "verification_status": "current",
+  "fresh_until": "2026-04-19T18:40:00Z",
+  "prerequisites": [
+    "Valid BitSight API token",
+    "Entity GUID for the target company or a prior company-discovery step",
+    "Selected risk vector or findings class"
+  ],
+  "required_permissions": [
+    "BitSight token with access to the target entity and findings data",
+    "Prefer company API tokens for service workflows"
+  ],
+  "request_sequence": [
+    "Authenticate with HTTP Basic Auth using the token as username and an empty password",
+    "Resolve or supply the target company entity GUID",
+    "Call GET /v1/companies/{entity_guid}/findings with a risk_vector filter where appropriate",
+    "Normalize findings fields and attach the risk vector as part of your output schema",
+    "Handle pagination or follow-up calls according to the specific findings family documentation"
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "BitSight uses Basic Auth with token-as-username and empty password.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "Findings are exposed for a company entity under paths like GET /v1/companies/{entity_guid}/findings with risk_vector filters.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360007940393-Potentially-Exploited-Findings",
+      "verified_date": "2026-03-20"
+    },
+    {
+      "fact": "BitSight uses standard HTTP status codes, including 401 for missing or invalid token and 403 for insufficient permissions.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360036941374-Errors-and-Status-Codes",
+      "verified_date": "2026-03-20"
+    }
+  ],
+  "implementation_notes": [
+    "Model risk_vector as a first-class filter because BitSight organizes many findings families around it.",
+    "Keep company/entity resolution separate from findings retrieval if multiple companies are processed in one run.",
+    "Normalize findings classes carefully because different vectors can expose different detail fields."
+  ],
+  "common_failures": [
+    "401 from malformed Basic Auth token usage",
+    "403 when the token lacks access to the entity or product area",
+    "Schema drift across different risk vectors if all findings are forced into one flat shape without null handling"
+  ],
+  "authoritative_sources": [
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management",
+    "https://help.bitsighttech.com/hc/en-us/articles/360007940393-Potentially-Exploited-Findings",
+    "https://help.bitsighttech.com/hc/en-us/articles/360036941374-Errors-and-Status-Codes",
+    "https://help.bitsighttech.com/hc/en-us/articles/231872628-API-Documentation-Overview"
+  ],
+  "last_verified": "2026-03-20T18:40:00Z",
+  "related_entries": [
+    "bitsight-findings-api-conventions",
+    "bitsight-api-auth-conventions"
+  ],
+  "source_projects": ["shared-seed"]
+}

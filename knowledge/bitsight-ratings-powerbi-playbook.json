@@ -1,0 +1,95 @@
+{
+  "id": "bitsight-ratings-powerbi-playbook",
+  "title": "Playbook - BitSight Security Ratings For Power BI And Reporting",
+  "source_family": "bitsight",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Using BitSight security ratings in Power BI",
+    "Building rating reports and dashboards from BitSight data",
+    "Building time-series rating reports with or without SharePoint staging"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "prerequisites": [
+    "Valid BitSight API token",
+    "Access to the BitSight Security Ratings product",
+    "Power BI Desktop March 2021 or later when using the Power BI connector",
+    "Decision on whether the report uses direct connector access, direct API-fed imports, or SharePoint as a staging layer"
+  ],
+  "required_permissions": [
+    "BitSight token with access to the target rating data",
+    "Power BI access to build semantic models, reports, and dashboards as needed"
+  ],
+  "request_sequence": [
+    "Choose the ingestion path: the native BitSight Power BI connector for quick one-company exploration, or direct BitSight API extraction for custom portfolio reporting and durable history.",
+    "For current-state portfolio reporting, call GET /ratings/v1/current-ratings and persist guid, name, rating, rating_category, and rating_as_of.",
+    "For one-company time-series reporting, call GET /ratings/v1/companies/{company_guid} and flatten ratings[] into one row per company per rating_date.",
+    "If the project needs durable trend history or easier refresh operations, store the normalized rows in SharePoint first and connect Power BI to the staged data.",
+    "If using the Power BI connector, retrieve the API token, connect through the connector, preview the available tables, and load or transform the selected data.",
+    "Design the report or dashboard using current rating as a KPI, rating_category or range as a banding dimension, and rating_as_of or rating_date as the business observation date."
+  ],
+  "confirmed_facts": [
+    {
+      "fact": "The Power BI Bitsight Security Ratings connector is generally available for Power BI semantic models, Power BI dataflows, and Fabric Dataflow Gen2, and it supports API key authentication.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/connectors/bitsight-security-ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The connector supports Import mode.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/connectors/bitsight-security-ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Power BI connector guidance states that users must have a BitSight Security Ratings product to access BitSight data in Power BI.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/connectors/bitsight-security-ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Power BI connector currently can only view data on one company at a time and assumes the parent company, though the parent company can be changed.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/connectors/bitsight-security-ratings",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Company Details API includes one year of daily ratings for a company in a ratings array.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Ratings History Report in the BitSight application covers a selected company's ratings history over the last 12 months with daily data and can be downloaded as CSV.",
+      "source_url": "https://help.bitsighttech.com/hc/en-us/articles/25697909802135-Ratings-History-Report",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "implementation_notes": [
+    "Use the native Power BI connector when the goal is fast analyst-led report prototyping and the connector's one-company limitation is acceptable.",
+    "Use the raw Current Ratings API when you need portfolio-wide control, custom paging, richer transformations, or integration into non-Power BI pipelines.",
+    "Use Company Details when you need one company's daily rating series over roughly the last year.",
+    "Model rating_as_of and rating_date as business dates. Do not confuse them with Power BI refresh timestamps.",
+    "If the reporting scope includes many companies, the direct API path is usually more flexible than the connector because the connector is constrained to one company view at a time.",
+    "SharePoint is usually the safer source for Power BI when the project needs historical snapshots, portfolio-wide history, or an auditable persisted extraction layer."
+  ],
+  "caveats": [
+    "The Power BI connector is vendor-provided and subject to its own limitations and release behavior.",
+    "Import mode means freshness depends on Power BI refresh design rather than a live direct-query experience.",
+    "A current ratings snapshot is not the same as a trend history; if historical trend reporting is required, you need to persist periodic extracts or use the company history feed where it fits the scope.",
+    "The Ratings History Report is useful as a downloadable CSV artifact, but it is not as flexible as normalized API rows for model design and automation."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-query/connectors/bitsight-security-ratings",
+    "https://help.bitsighttech.com/hc/en-us/articles/18061514582551-GET-Current-Ratings",
+    "https://help.bitsighttech.com/hc/en-us/articles/360015690713-GET-Company-Details",
+    "https://help.bitsighttech.com/hc/en-us/articles/25697909802135-Ratings-History-Report",
+    "https://help.bitsighttech.com/hc/en-us/articles/115014888388-API-Token-Management"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "bitsight-api-auth-conventions",
+    "bitsight-current-ratings-api",
+    "bitsight-company-details-ratings-history",
+    "azure-logic-apps-bitsight-ratings-playbook"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "bitsight-ratings-research"
+  ]
+}

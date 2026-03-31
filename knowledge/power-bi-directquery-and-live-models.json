@@ -1,0 +1,77 @@
+{
+  "id": "power-bi-directquery-and-live-models",
+  "title": "Power BI - DirectQuery, Live Connections, Composite Models, And Direct Lake",
+  "source_family": "power-bi",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Power BI live-data design",
+    "DirectQuery and composite-model planning",
+    "Choosing between import, live connection, DirectQuery, and Direct Lake"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2026-04-27T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Power BI learning path routes live-data scenarios through DirectQuery, live connection and DirectQuery comparison, semantic model modes, composite models, Direct Lake, and DirectQuery model guidance.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI documentation distinguishes import, DirectQuery, and composite models as separate semantic-model modes for balancing freshness, performance, and modeling flexibility.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Power BI documentation includes Direct Lake as a Fabric-oriented high-performance query mode alongside DirectQuery and import-based designs.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "Using DirectQuery with dataflows requires the enhanced compute engine to be explicitly turned on in the dataflow settings and the dataflow to be refreshed before it can be consumed in DirectQuery mode.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-directquery",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "When DirectQuery is available for a dataflow, Power BI Desktop prompts whether to connect through DirectQuery or Import.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-directquery",
+      "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The DirectQuery-with-dataflows page states that in DirectQuery mode you can quickly interrogate large-scale semantic models locally, but you cannot currently perform other transformations there.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-directquery",
+      "verified_date": "2026-03-28"
+    }
+  ],
+  "selection_rules": [
+    "Use import mode when shaping flexibility, rich modeling, and predictable report performance matter more than immediate source freshness.",
+    "Use DirectQuery when the primary requirement is live or near-live access to large source data and the source can sustain interactive query workloads.",
+    "Use composite models when some entities need imported performance while other entities must stay live.",
+    "Use Direct Lake when the request explicitly targets Fabric lakehouse or OneLake-native reporting and the solution depends on Fabric architecture."
+  ],
+  "implementation_notes": [
+    "Treat connectivity mode as a first-order architecture decision. It changes performance, refresh, gateway, transformation, and report-behavior expectations.",
+    "Do not default to DirectQuery just because a dataset is large. Large models can still perform better with import or composite designs depending on latency and modeling needs.",
+    "When the data source is a dataflow, check enhanced compute engine state before planning a DirectQuery workflow.",
+    "If the user asks for 'live Power BI data', clarify whether they mean live connection, DirectQuery, low-refresh-latency import, or Fabric-native Direct Lake."
+  ],
+  "caveats": [
+    "DirectQuery pushes many performance and concurrency constraints back to the source system.",
+    "Not every transformation or connector behavior available in import mode is appropriate in a DirectQuery design.",
+    "Fabric-specific modes such as Direct Lake should not be treated as generic substitutes for DirectQuery in non-Fabric environments."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-learning-path-directory",
+    "https://learn.microsoft.com/en-us/power-bi/transform-model/dataflows/dataflows-directquery",
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-use-directquery"
+  ],
+  "last_verified": "2026-03-28T00:00:00Z",
+  "related_entries": [
+    "power-bi-learning-path-routing",
+    "power-bi-data-sources-and-refresh",
+    "power-bi-modeling-dax-and-relationships"
+  ],
+  "source_projects": [
+    "shared-seed",
+    "power-bi-research"
+  ]
+}
