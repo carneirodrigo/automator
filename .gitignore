@@ -1,0 +1,47 @@
+# Self-ignore (this file is auto-created by the engine)
+.gitignore
+
+# Python (noise)
+__pycache__/
+*.pyc
+.venv/
+
+# Auto-created symlinks (engine creates on run — root-level only)
+/ORCHESTRATION.md
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+
+# Security (local config/secrets)
+.env
+.claude/
+.codex/
+.gemini/
+.github/
+
+# Projects — all per-project content including registry (local only)
+projects/*
+projects/registry.json
+projects/registry.csv
+
+# Personal config — track README template, ignore user files
+personal/*
+!personal/README.md
+
+# Inputs inbox
+inputs/
+
+# Skills — track indexes and config, ignore cached content
+skills/.cache/
+skills/*/
+!skills/catalog.json
+!skills/sources.json
+!skills/manifest.json
+
+# Knowledge base — track shared knowledge entries and indexes
+
+# Debug captures
+debug/
+
+# Backend configuration (API keys, secrets)
+config/

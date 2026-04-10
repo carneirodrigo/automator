@@ -68,7 +68,7 @@ __pycache__/
 .gemini/
 .github/
 
-# Projects — ignore per-project content but keep registry files
+# Projects — all per-project content including registry (local only)
 projects/*
 projects/registry.json
 projects/registry.csv
