@@ -22,8 +22,10 @@ _MAX_STAGE_RETRIES = 2
 _RETRY_BACKOFF_BASE = 5  # seconds; doubles each retry
 
 
-def _normalize_review_status(raw: str) -> str:
+def _normalize_review_status(raw: Any) -> str:
     """Map an LLM review status to 'pass' or 'fail'."""
+    if not isinstance(raw, str) or not raw.strip():
+        return "fail"
     return "pass" if raw.strip().lower() in _REVIEW_PASS_VALUES else "fail"
 
 
@@ -39,8 +41,8 @@ def _run_with_retry(
     """
     last_result: dict[str, Any] = {}
     for attempt in range(_MAX_STAGE_RETRIES + 1):
-        last_result = run_fn()
-        if last_result["status"] != "failed":
+        last_result = run_fn() or {}
+        if last_result.get("status") != "failed":
             return last_result
         category = last_result.get("error_category", "unknown")
         if category not in _RETRIABLE_ERRORS or attempt >= _MAX_STAGE_RETRIES:
@@ -54,16 +56,16 @@ def _run_with_retry(
     return last_result
 
 
-def _validate_agent_output(output: dict[str, Any], role: str) -> str | None:
+def _validate_agent_output(output: Any, role: str) -> str | None:
     """Check that agent output has minimum required fields.
 
     Returns an error message if validation fails, None if output is acceptable.
     """
-    if not output:
+    if not output or not isinstance(output, dict):
         return f"{role} returned empty output"
     if role in ("worker",) and not output.get("summary"):
         return f"{role} output is missing 'summary' field"
-    if role == "review" and "status" not in output:
+    if role == "review" and not output.get("status"):
         return f"review output is missing 'status' field — treating as fail"
     return None
 
@@ -123,6 +125,8 @@ def _needs_planning(request: str) -> bool:
     Returns False for short, simple, or rework requests — these go straight
     to the worker.  Returns True when multiple complexity signals are present.
     """
+    if not request:
+        return False
     # Never plan on rework, continue, or acceptance flows.
     if any(kw in request.lower() for kw in ("rework required", "rework based on", "continue:")):
         return False
@@ -160,13 +164,13 @@ def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[st
             return True
         return False
 
-    for entry in output.get("artifacts", []):
+    for entry in output.get("artifacts") or []:
         if not isinstance(entry, str) or not entry.strip():
             continue
         if not _exists(entry):
             missing.append(f"artifact not found: {entry}")
 
-    for entry in output.get("changes_made", []):
+    for entry in output.get("changes_made") or []:
         if not isinstance(entry, str):
             continue
         # Format is "path/to/file: what changed" — extract the path part.
@@ -191,15 +195,18 @@ def _require(name: str) -> Any:
 
 
 def _next_project_id(registry: dict[str, Any]) -> str:
+    projects = (registry or {}).get("projects") or []
     nums = [
         int(p["project_id"])
-        for p in registry.get("projects", [])
-        if p.get("project_id", "").isdigit()
+        for p in projects
+        if isinstance(p, dict) and p.get("project_id", "").isdigit()
     ]
     return str(max(nums) + 1 if nums else 1).zfill(3)
 
 
 def _project_name_from_request(request: str) -> str:
+    if not request:
+        return "Untitled Project"
     # Strip engine-injected framing so the name reflects the user's actual task.
     cleaned = re.sub(
         r"^(?:start\s+new\s+project\.?\s*(?:task:\s*)?|fork\s+\S+\s+into\s+a\s+new\s+project\.?\s*(?:task:\s*)?)",
@@ -369,7 +376,7 @@ def run_orchestration(
             ),
             "worker", emit_progress,
         )
-        plan_output = plan_res.get("output") or {} if plan_res.get("status") != "failed" else {}
+        plan_output = (plan_res.get("output") or {}) if plan_res.get("status") != "failed" else {}
         plan_steps = plan_output.get("plan", [])
         plan_questions = plan_output.get("questions", [])
 

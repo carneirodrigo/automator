@@ -30,6 +30,8 @@ from engine.work.orchestrator import (
     _needs_planning,
     _next_project_id,
     _project_name_from_request,
+    _run_with_retry,
+    _validate_agent_output,
     _verify_delivery_files,
     configure_orchestrator_environment,
     run_orchestration,
@@ -962,6 +964,176 @@ class TestReviewEnforcement(unittest.TestCase):
         # Should have 4 calls: worker → review(demoted) → rework → final review
         roles = [c[0][0] for c in run_agent.call_args_list]
         self.assertEqual(roles, ["worker", "review", "worker", "review"])
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _needs_planning
+# ---------------------------------------------------------------------------
+
+class TestNeedsPlanningEdgeCases(unittest.TestCase):
+    def test_none_input(self):
+        self.assertFalse(_needs_planning(None))
+
+    def test_empty_string(self):
+        self.assertFalse(_needs_planning(""))
+
+    def test_whitespace_only(self):
+        self.assertFalse(_needs_planning("   "))
+
+    def test_single_repeated_signal(self):
+        # Same signal repeated should count as 1, not many.
+        self.assertFalse(_needs_planning("authenticate " * 20))
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _validate_agent_output
+# ---------------------------------------------------------------------------
+
+class TestValidateAgentOutputEdgeCases(unittest.TestCase):
+    def test_string_output(self):
+        result = _validate_agent_output("not a dict", "worker")
+        self.assertIsNotNone(result)
+        self.assertIn("empty output", result)
+
+    def test_list_output(self):
+        result = _validate_agent_output(["a", "b"], "worker")
+        self.assertIsNotNone(result)
+
+    def test_none_output(self):
+        result = _validate_agent_output(None, "worker")
+        self.assertIsNotNone(result)
+
+    def test_review_empty_status(self):
+        result = _validate_agent_output({"status": ""}, "review")
+        self.assertIsNotNone(result)
+        self.assertIn("missing", result)
+
+    def test_review_valid_status(self):
+        self.assertIsNone(_validate_agent_output({"status": "pass"}, "review"))
+
+    def test_worker_valid(self):
+        self.assertIsNone(_validate_agent_output({"summary": "did stuff"}, "worker"))
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _run_with_retry
+# ---------------------------------------------------------------------------
+
+class TestRunWithRetryEdgeCases(unittest.TestCase):
+    def test_none_return_from_run_fn(self):
+        """run_fn returning None should not crash."""
+        result = _run_with_retry(lambda: None, "worker", lambda msg: None)
+        self.assertEqual(result, {})
+
+    def test_missing_status_key(self):
+        """run_fn returning dict without 'status' should not crash."""
+        result = _run_with_retry(lambda: {"output": "hi"}, "worker", lambda msg: None)
+        self.assertEqual(result, {"output": "hi"})
+
+    def test_success_on_first_try(self):
+        result = _run_with_retry(
+            lambda: {"status": "completed", "output": {"summary": "ok"}},
+            "worker", lambda msg: None,
+        )
+        self.assertEqual(result["status"], "completed")
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _verify_delivery_files
+# ---------------------------------------------------------------------------
+
+class TestVerifyDeliveryFilesEdgeCases(unittest.TestCase):
+    def test_artifacts_is_none(self):
+        """artifacts: None should not crash."""
+        result = _verify_delivery_files({"artifacts": None}, "/tmp")
+        self.assertEqual(result, [])
+
+    def test_changes_made_is_none(self):
+        result = _verify_delivery_files({"changes_made": None}, "/tmp")
+        self.assertEqual(result, [])
+
+    def test_mixed_garbage_in_artifacts(self):
+        result = _verify_delivery_files(
+            {"artifacts": [None, 123, "", "  ", True]}, "/tmp"
+        )
+        self.assertEqual(result, [])
+
+    def test_mixed_garbage_in_changes_made(self):
+        result = _verify_delivery_files(
+            {"changes_made": [None, 123, True]}, "/tmp"
+        )
+        self.assertEqual(result, [])
+
+    def test_changes_made_empty_path_before_colon(self):
+        result = _verify_delivery_files(
+            {"changes_made": [": just description"]}, "/tmp"
+        )
+        self.assertEqual(result, [])
+
+    def test_both_none(self):
+        result = _verify_delivery_files(
+            {"artifacts": None, "changes_made": None}, "/tmp"
+        )
+        self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _normalize_review_status
+# ---------------------------------------------------------------------------
+
+from engine.work.orchestrator import _normalize_review_status
+
+class TestNormalizeReviewStatusEdgeCases(unittest.TestCase):
+    def test_none(self):
+        self.assertEqual(_normalize_review_status(None), "fail")
+
+    def test_empty_string(self):
+        self.assertEqual(_normalize_review_status(""), "fail")
+
+    def test_integer(self):
+        self.assertEqual(_normalize_review_status(123), "fail")
+
+    def test_pass_variants(self):
+        self.assertEqual(_normalize_review_status("pass"), "pass")
+        self.assertEqual(_normalize_review_status("PASS"), "pass")
+        self.assertEqual(_normalize_review_status("  pass  "), "pass")
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _project_name_from_request
+# ---------------------------------------------------------------------------
+
+class TestProjectNameEdgeCases(unittest.TestCase):
+    def test_none(self):
+        self.assertEqual(_project_name_from_request(None), "Untitled Project")
+
+    def test_empty(self):
+        self.assertEqual(_project_name_from_request(""), "Untitled Project")
+
+    def test_only_punctuation(self):
+        self.assertEqual(_project_name_from_request("!!!@@@###"), "Untitled Project")
+
+
+# ---------------------------------------------------------------------------
+# Edge case robustness: _next_project_id
+# ---------------------------------------------------------------------------
+
+class TestNextProjectIdEdgeCases(unittest.TestCase):
+    def test_none_registry(self):
+        self.assertEqual(_next_project_id(None), "001")
+
+    def test_empty_dict(self):
+        self.assertEqual(_next_project_id({}), "001")
+
+    def test_projects_is_none(self):
+        self.assertEqual(_next_project_id({"projects": None}), "001")
+
+    def test_projects_with_non_dict_entries(self):
+        self.assertEqual(_next_project_id({"projects": ["garbage", 123, None]}), "001")
+
+    def test_normal_increment(self):
+        registry = {"projects": [{"project_id": "003"}, {"project_id": "001"}]}
+        self.assertEqual(_next_project_id(registry), "004")
 
 
 if __name__ == "__main__":
