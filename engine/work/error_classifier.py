@@ -15,7 +15,7 @@ def classify_error(error_msg: str) -> str:
         return "timeout"
     if "prompt is too long" in lower:
         return "prompt_too_long"
-    if any(kw in lower for kw in ("invalid json", "json", "parse")):
+    if any(kw in lower for kw in ("invalid json", "json decode", "json parse", "jsondecodeerror")):
         return "invalid_output"
     if any(kw in lower for kw in ("permission denied", "eacces", "eperm", "access denied")):
         return "permission_denied"
@@ -25,6 +25,8 @@ def classify_error(error_msg: str) -> str:
         return "environmental"
     if "already in use" in lower and "session" in lower:
         return "session_conflict"
-    if any(kw in lower for kw in ("rate limit", "http 429", "too many requests", "error 429", "status 429", "code: 429", "code 429", "model_capacity_exhausted", "resource_exhausted", "quotaexceeded", "quota exceeded")):
+    if any(kw in lower for kw in ("rate limit", "http 429", "too many requests", "error 429", "status 429", "code: 429", "code 429", "model_capacity_exhausted", "resource_exhausted", "quotaexceeded", "quota exceeded", "overloaded", "server_overloaded", "529")):
         return "rate_limited"
+    if any(kw in lower for kw in ("http 500", "http 502", "http 503", "http 504", "internal server error", "bad gateway", "service unavailable", "gateway timeout")):
+        return "provider_error"
     return "unknown"

@@ -1,0 +1,89 @@
+{
+  "id": "powerbi-time-intelligence-mom-qoq-yoy",
+  "title": "Power BI - Time Intelligence DAX: MoM, QoQ, YoY, Rolling Windows, Missing Periods",
+  "description": "Production DAX patterns for period-over-period comparisons: MoM, QoQ, YoY (absolute and %), running totals, last-N-periods rolling windows, and handling months with no snapshot data using COALESCE and LASTNONBLANK",
+  "tags": ["power-bi", "dax", "time-intelligence", "mom", "qoq", "yoy", "dateadd", "security-reporting", "rolling-window"],
+  "source": "web-research",
+  "references": [
+    "https://learn.microsoft.com/en-us/dax/time-intelligence-functions-dax",
+    "https://learn.microsoft.com/en-us/dax/dateadd-function-dax",
+    "https://learn.microsoft.com/en-us/dax/previousmonth-function-dax",
+    "https://learn.microsoft.com/en-us/dax/sameperiodlastyear-function-dax",
+    "https://learn.microsoft.com/en-us/dax/lastnonblank-function-dax",
+    "https://dax.guide/dateadd/",
+    "https://dax.guide/lastnonblank/"
+  ],
+  "content": {
+    "prerequisites": {
+      "marked_date_table": "All time intelligence DAX functions require a date table marked as a Date Table (Table Tools > Mark as date table). Without this, PREVIOUSMONTH, TOTALYTD, SAMEPERIODLASTYEAR etc. either return errors or silently wrong results.",
+      "contiguous_dates": "The Date column in the date table must be contiguous — no gaps. If Jan 31 is missing, PREVIOUSMONTH for March returns incorrect results.",
+      "base_measure": "Always define a base measure first. All period-comparison measures reference it:\nVulnCount = SUM(SecuritySnapshots[Value])\n// or for snapshot data that should show last known value rather than sum:\nVulnCount = SUMX(SecuritySnapshots, SecuritySnapshots[Value])"
+    },
+    "mom_patterns": {
+      "previous_month_measure": "// Method 1: PREVIOUSMONTH — recommended for month-granularity snapshots\nVulnCount PM =\n    CALCULATE(\n        [VulnCount],\n        PREVIOUSMONTH('DateTable'[Date])\n    )\n\n// Method 2: DATEADD — equivalent, but explicit about the interval\nVulnCount PM =\n    CALCULATE(\n        [VulnCount],\n        DATEADD('DateTable'[Date], -1, MONTH)\n    )",
+      "mom_absolute_change": "MoM Change =\nVAR _Current = [VulnCount]\nVAR _Prior   = [VulnCount PM]\nRETURN\n    IF(\n        NOT ISBLANK(_Current) && NOT ISBLANK(_Prior),\n        _Current - _Prior,\n        BLANK()\n    )",
+      "mom_percent_change": "MoM Change % =\nVAR _Current = [VulnCount]\nVAR _Prior   = [VulnCount PM]\nRETURN\n    IF(\n        ISBLANK(_Prior) || _Prior = 0,\n        BLANK(),\n        DIVIDE(_Current - _Prior, ABS(_Prior))\n    )\n// Note: use ABS(_Prior) when the metric can be negative (e.g. net change scores)\n// Format this measure as Percentage in the Modeling pane",
+      "mom_direction_flag": "// Useful for conditional formatting icons\nMoM Direction =\nVAR _Chg = [MoM Change]\nRETURN\n    IF(ISBLANK(_Chg), BLANK(),\n    IF(_Chg > 0, 1,           -- 1 = increase (red for vulnerabilities)\n    IF(_Chg < 0, -1, 0)))     -- -1 = decrease (green), 0 = no change",
+      "previous_month_note": "PREVIOUSMONTH returns ALL dates in the previous calendar month relative to the last date in the current filter context. In a matrix with months as columns, each column's filter context gives the correct previous month automatically — no looping required."
+    },
+    "qoq_patterns": {
+      "previous_quarter_measure": "// Method 1: PREVIOUSQUARTER\nVulnCount PQ =\n    CALCULATE(\n        [VulnCount],\n        PREVIOUSQUARTER('DateTable'[Date])\n    )\n\n// Method 2: DATEADD\nVulnCount PQ =\n    CALCULATE(\n        [VulnCount],\n        DATEADD('DateTable'[Date], -1, QUARTER)\n    )",
+      "qoq_absolute": "QoQ Change =\nVAR _Current = [VulnCount]\nVAR _Prior   = [VulnCount PQ]\nRETURN\n    IF(NOT ISBLANK(_Current) && NOT ISBLANK(_Prior), _Current - _Prior, BLANK())",
+      "qoq_percent": "QoQ Change % =\nVAR _Current = [VulnCount]\nVAR _Prior   = [VulnCount PQ]\nRETURN\n    IF(ISBLANK(_Prior) || _Prior = 0, BLANK(), DIVIDE(_Current - _Prior, ABS(_Prior)))",
+      "quarter_aggregation_note": "When the matrix has quarters as columns (not months), PREVIOUSQUARTER works correctly. When months are columns but you want QoQ, use DATEADD(-1, QUARTER) — it shifts the current month back by one quarter, e.g. February 2026 → November 2025."
+    },
+    "yoy_patterns": {
+      "sameperiodlastyear_measure": "// SAMEPERIODLASTYEAR — shifts the entire current filter context back exactly 1 year\nVulnCount LY =\n    CALCULATE(\n        [VulnCount],\n        SAMEPERIODLASTYEAR('DateTable'[Date])\n    )",
+      "previousyear_measure": "// PREVIOUSYEAR — returns ALL dates in the prior calendar year (Jan 1 – Dec 31)\n// Use this for full-year YTD comparisons, not for month-by-month columns\nVulnCount PY =\n    CALCULATE(\n        [VulnCount],\n        PREVIOUSYEAR('DateTable'[Date])\n    )",
+      "dateadd_year_measure": "// DATEADD for YoY — same result as SAMEPERIODLASTYEAR for most cases\nVulnCount LY =\n    CALCULATE(\n        [VulnCount],\n        DATEADD('DateTable'[Date], -1, YEAR)\n    )",
+      "yoy_absolute": "YoY Change =\nVAR _Current = [VulnCount]\nVAR _LY      = [VulnCount LY]\nRETURN\n    IF(NOT ISBLANK(_Current) && NOT ISBLANK(_LY), _Current - _LY, BLANK())",
+      "yoy_percent": "YoY Change % =\nVAR _Current = [VulnCount]\nVAR _LY      = [VulnCount LY]\nRETURN\n    IF(ISBLANK(_LY) || _LY = 0, BLANK(), DIVIDE(_Current - _LY, ABS(_LY)))",
+      "sameperiodlastyear_vs_previousyear": "SAMEPERIODLASTYEAR: shifts current period back 1 year. In a monthly matrix, March 2026 column shows March 2025 value. PREVIOUSYEAR: returns the entire prior year regardless of current period. Used for full-year vs full-year comparison in YTD measures. For month-by-month columns in a security dashboard, use SAMEPERIODLASTYEAR or DATEADD(-1, YEAR)."
+    },
+    "running_total_patterns": {
+      "ytd_measure": "// Year-to-Date using TOTALYTD (shorthand)\nVulnCount YTD =\n    TOTALYTD([VulnCount], 'DateTable'[Date])\n// Equivalent to:\n// CALCULATE([VulnCount], DATESYTD('DateTable'[Date]))",
+      "fiscal_ytd": "// Fiscal YTD — fiscal year ends September 30\nVulnCount FYTD =\n    TOTALYTD([VulnCount], 'DateTable'[Date], \"09-30\")\n// The third argument is the fiscal year end date in MM-DD format",
+      "running_total_alltime": "// Cumulative total from the very first period to current\nVulnCount Running Total =\nVAR _CurrentMonthKey = MAX('DateTable'[MonthSort])   -- e.g. 202603\nRETURN\n    CALCULATE(\n        [VulnCount],\n        FILTER(\n            ALL('DateTable'),\n            'DateTable'[MonthSort] <= _CurrentMonthKey\n        )\n    )\n// Uses MonthSort (integer YYYYMM) for correct ordering of text-keyed rows",
+      "qtd_measure": "VulnCount QTD =\n    TOTALQTD([VulnCount], 'DateTable'[Date])"
+    },
+    "rolling_window_patterns": {
+      "last_3_months": "// Rolling 3-month window ending at the current filter context date\nVulnCount L3M =\n    CALCULATE(\n        [VulnCount],\n        DATESINPERIOD(\n            'DateTable'[Date],\n            LASTDATE('DateTable'[Date]),\n            -3,\n            MONTH\n        )\n    )",
+      "last_12_months": "VulnCount L12M =\n    CALCULATE(\n        [VulnCount],\n        DATESINPERIOD(\n            'DateTable'[Date],\n            LASTDATE('DateTable'[Date]),\n            -12,\n            MONTH\n        )\n    )",
+      "rolling_average": "// 3-month rolling average — used for trend smoothing\nVulnCount 3M Avg =\nVAR _Window = DATESINPERIOD('DateTable'[Date], LASTDATE('DateTable'[Date]), -3, MONTH)\nVAR _Sum    = CALCULATE(SUM(SecuritySnapshots[Value]), _Window)\nVAR _Count  = CALCULATE(DISTINCTCOUNT('DateTable'[MonthSort]), _Window,\n                         NOT ISBLANK([VulnCount]))\nRETURN\n    IF(_Count > 0, DIVIDE(_Sum, _Count), BLANK())",
+      "last_n_quarters": "// Last 4 quarters rolling\nVulnCount L4Q =\n    CALCULATE(\n        [VulnCount],\n        DATESINPERIOD(\n            'DateTable'[Date],\n            LASTDATE('DateTable'[Date]),\n            -4,\n            QUARTER\n        )\n    )",
+      "datesinperiod_note": "DATESINPERIOD(dates, start_date, number_of_intervals, interval). The start_date is the anchor point; negative number_of_intervals goes backward. LASTDATE('DateTable'[Date]) within a filter context returns the last date of the current period — so in a monthly matrix column for March 2026, it returns 2026-03-31, giving the 3-month window Feb–Mar or Jan–Mar depending on the interval boundary."
+    },
+    "missing_period_handling": {
+      "problem": "Security snapshot pipelines occasionally miss a month — a Logic App run fails, a CSV is not uploaded. When a month has no data in the fact table, [VulnCount] returns BLANK() for that month. Time intelligence functions treat BLANK as zero in some contexts and as 'no data' in others, producing incorrect MoM calculations.",
+      "lastnonblank_pattern": "// Show the last known value when a month has no snapshot\n// Use this as the 'current value' measure when data may be missing\nVulnCount Safe =\n    CALCULATE(\n        LASTNONBLANK(\n            'DateTable'[Date],\n            CALCULATE(SUM(SecuritySnapshots[Value]))\n        )\n    )\n// LASTNONBLANK returns the last date where the expression is non-blank,\n// then evaluates the expression at that date.",
+      "coalesce_pattern": "// Simpler: use COALESCE to substitute 0 or a prior value when blank\nVulnCount Or Zero =\n    COALESCE([VulnCount], 0)\n\n// For MoM when current month might be missing:\nMoM Change Safe =\nVAR _Current = COALESCE([VulnCount], 0)\nVAR _Prior   = COALESCE([VulnCount PM], 0)\nRETURN\n    IF(_Prior = 0, BLANK(), DIVIDE(_Current - _Prior, _Prior))\n// Note: using 0 can make MoM changes look dramatic; prefer BLANK() for missing months in trend charts",
+      "calculate_with_lastnonblank": "// Last non-blank value up to the current period (carry-forward pattern)\nVulnCount CarryForward =\nVAR _LastDate =\n    CALCULATE(\n        LASTNONBLANK('DateTable'[Date], [VulnCount]),\n        FILTER(\n            ALL('DateTable'),\n            'DateTable'[Date] <= MAX('DateTable'[Date])\n        )\n    )\nRETURN\n    CALCULATE([VulnCount], 'DateTable'[Date] = _LastDate)",
+      "handling_advice": "For security dashboards: use BLANK() (not 0) for missing months in trend charts — gaps are visible and honest. Use COALESCE with 0 only in KPI cards where blank looks broken. For MoM calculations, check both numerator and denominator for blanks before dividing.",
+      "detecting_missing_periods": "// Diagnostic measure to identify which months have no data\nHasData =\n    IF(ISBLANK([VulnCount]), \"Missing\", \"Present\")\n// Add to a table visual with Month on rows to audit coverage"
+    },
+    "dateadd_reference": {
+      "syntax": "DATEADD(dates, number_of_intervals, interval)\n// interval: DAY, MONTH, QUARTER, YEAR",
+      "examples": [
+        "DATEADD('DateTable'[Date], -1, MONTH)   -- previous month",
+        "DATEADD('DateTable'[Date], -3, MONTH)   -- 3 months ago",
+        "DATEADD('DateTable'[Date], -1, QUARTER) -- previous quarter",
+        "DATEADD('DateTable'[Date], -1, YEAR)    -- same period last year",
+        "DATEADD('DateTable'[Date], +1, MONTH)   -- next month (forecast comparison)"
+      ],
+      "vs_previousmonth": "DATEADD(-1, MONTH) and PREVIOUSMONTH produce identical results for month-level granularity. Prefer PREVIOUSMONTH for readability when you specifically mean 'previous month'. Use DATEADD when working with variable intervals or forward-shifting."
+    },
+    "multi_metric_pattern": {
+      "description": "Security dashboards track multiple metrics simultaneously (Sev5, Sev4, External vulns, Internal vulns, Alert count). Each metric needs its own MoM/YoY calculation. The cleanest approach uses a Metric dimension with a single set of measures that adapt to the metric in context.",
+      "metric_dimension_measures": "// Assumes tall fact table: SecuritySnapshots[MetricName], SecuritySnapshots[Value]\n// One base measure works for ALL metrics when MetricName is on matrix rows:\nMetric Value = SUM(SecuritySnapshots[Value])\n\n// MoM for ALL metrics in one measure:\nMetric MoM Change % =\nVAR _Current = [Metric Value]\nVAR _Prior   = CALCULATE([Metric Value], PREVIOUSMONTH('DateTable'[Date]))\nRETURN\n    IF(ISBLANK(_Prior) || _Prior = 0, BLANK(), DIVIDE(_Current - _Prior, ABS(_Prior)))\n\n// Put MetricName on matrix rows, MonthYear on columns\n// Both measures adapt to each metric row automatically"
+    },
+    "common_mistakes": [
+      "Using PREVIOUSMONTH or SAMEPERIODLASTYEAR without a marked date table — always returns BLANK().",
+      "Applying time intelligence inside SUMX or FILTER iterators — time intelligence functions only work in CALCULATE modifier position, not in row context. Move them to CALCULATE.",
+      "Dividing by zero when prior period is zero — always check || _Prior = 0 in the DIVIDE guard.",
+      "Using DIVIDE(a - b, b) when b could be negative — use ABS(b) in the denominator for correct percentage direction.",
+      "Confusing PREVIOUSYEAR (full prior year) with SAMEPERIODLASTYEAR (same period shifted 1 year) — they differ when the current context is a partial year.",
+      "DATESINPERIOD for rolling windows returning wrong boundaries — the anchor date is LASTDATE of the context, not the start. For a '3 months ending current month' window, the anchor is the last day of the current month.",
+      "Forgetting BLANK() returns in trend line charts cause line breaks — decide consciously whether gaps (BLANK) or zeros are correct for each metric."
+    ]
+  }
+}

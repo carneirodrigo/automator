@@ -772,16 +772,20 @@
         "switch",
         "loops",
         "variables",
-        "scopes"
+        "scopes",
+        "filter-array",
+        "increment-variable",
+        "compose",
+        "accumulator-pattern"
       ],
       "source_family": "azure-logic-apps",
       "coverage_type": "workflow",
       "source_project_id": "shared-seed",
       "created": "2026-03-28T00:00:00Z",
-      "updated": "2026-03-28T00:00:00Z",
-      "last_verified": "2026-03-28T00:00:00Z",
-      "fresh_until": "2026-04-27T00:00:00Z",
-      "summary": "Branching, looping, scope, variable, and data-state guidance for Logic Apps workflows that need control flow beyond simple linear steps"
+      "updated": "2026-04-08T00:00:00Z",
+      "last_verified": "2026-04-08T00:00:00Z",
+      "fresh_until": "2026-07-08T00:00:00Z",
+      "summary": "Branching, looping, scope, variable, and data-state guidance including confirmed runtime constraints: Filter array where must be an expression string not a condition object; IncrementVariable requires literal integers or Compose intermediary; SetVariable self-reference is blocked; all IncrementVariable actions must run sequentially"
     },
     {
       "id": "azure-logic-apps-api-to-sharepoint-playbook",
@@ -2325,6 +2329,34 @@
       "fresh_until": "2027-01-01T00:00:00Z"
     },
     {
+      "id": "azure-logic-apps-expression-date-patterns",
+      "title": "Azure Logic Apps - Expression Date And Time Patterns: Month/Year Extraction, Quarter Calculation",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "file": "azure-logic-apps-expression-date-patterns.json",
+      "tags": [
+        "azure",
+        "logic-apps",
+        "expressions",
+        "datetime",
+        "formatDateTime",
+        "quarter",
+        "kql",
+        "production-verified"
+      ],
+      "summary": "Locale-safe month/year extraction from yyyy-MM-dd format, previous quarter and year calculation expressions (NZ-aware), and correct KQL datetime() injection syntax",
+      "source_project_id": "manual-analysis",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "related_entries": [
+        "azure-logic-apps-control-flow-code-patterns",
+        "azure-logic-apps-production-patterns",
+        "azure-logic-apps-http-and-data-patterns"
+      ]
+    },
+    {
       "id": "azure-logic-apps-connectors-blob-servicebus-loganalytics",
       "title": "Azure Logic Apps - Managed Connectors: Blob Storage, Service Bus, and Azure Monitor Logs",
       "source_family": "azure-logic-apps",
@@ -2373,6 +2405,501 @@
         "infrastructure-as-code"
       ],
       "fresh_until": "2027-01-01T00:00:00Z"
+    },
+    {
+      "id": "logic-apps-arm-template-structure",
+      "title": "Azure Logic Apps - ARM Template Structure And Workflow Definition Envelope",
+      "description": "Complete ARM template skeleton for a Logic App: schema, parameters, resources, definition structure, and connection wiring.",
+      "tags": [
+        "logic-apps",
+        "arm-template",
+        "workflow-definition",
+        "parameters",
+        "connections"
+      ],
+      "file": "logic-apps-arm-template-structure.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "Complete ARM template envelope for a Logic App including definition.$schema, contentVersion, parameters.$connections declaration, outer parameters value structure, managed identity block, and real-world connection examples for all connectors seen in production playbooks"
+    },
+    {
+      "id": "logic-apps-triggers",
+      "title": "Azure Logic Apps - Trigger Types With Exact JSON From Real Sentinel Playbooks",
+      "description": "All trigger types found in real-world Sentinel playbook examples: incident trigger, alert trigger, recurrence, HTTP request, and manual.",
+      "tags": [
+        "logic-apps",
+        "triggers",
+        "sentinel",
+        "incident-trigger",
+        "alert-trigger",
+        "webhook",
+        "recurrence"
+      ],
+      "file": "logic-apps-triggers.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "Microsoft Sentinel incident trigger (ApiConnectionWebhook, path /incident-creation) and alert trigger (path /subscribe) with full JSON, all available triggerBody() field paths, workspace info expressions, and recurrence/HTTP trigger structures"
+    },
+    {
+      "id": "logic-apps-actions-core",
+      "title": "Azure Logic Apps - Core Action Types With Complete JSON From Real Examples",
+      "description": "Every core built-in action type: InitializeVariable, SetVariable, AppendToArrayVariable, Compose, Table, Select, Foreach, If (Condition), HTTP, and runAfter chaining.",
+      "tags": [
+        "logic-apps",
+        "actions",
+        "variables",
+        "foreach",
+        "condition",
+        "compose",
+        "http",
+        "runafter",
+        "control-flow"
+      ],
+      "file": "logic-apps-actions-core.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "Complete JSON for InitializeVariable (all types), SetVariable, AppendToArrayVariable, Compose, Table (CSV/HTML), Select, Foreach (parallel and sequential), If/Condition (equals/contains/or/and/not/endsWith), HTTP action, runAfter with Succeeded/Failed status arrays"
+    },
+    {
+      "id": "logic-apps-actions-connectors",
+      "title": "Azure Logic Apps - Connector Actions With Complete JSON From Real Sentinel Playbooks",
+      "description": "All managed connector actions observed in real examples: Sentinel, Azure AD, Office 365 Outlook, SharePoint Online, Microsoft Defender for Endpoint (wdatp).",
+      "tags": [
+        "logic-apps",
+        "connectors",
+        "sentinel",
+        "azure-ad",
+        "office365",
+        "sharepoint",
+        "wdatp",
+        "defender-endpoint"
+      ],
+      "file": "logic-apps-actions-connectors.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "Verbatim JSON for Sentinel entity extraction (Accounts, Hosts), watchlist CRUD (get/add/create/delete), alert suppression; Azure AD get-user, get-groups, add-to-group, disable-account, revoke-sessions; Office 365 send-email; SharePoint create-file; MDE isolate/restrict/scan/investigate; Teams webhook adaptive card"
+    },
+    {
+      "id": "logic-apps-expressions",
+      "title": "Azure Logic Apps - Expression Language Reference With Verbatim Examples From Real Playbooks",
+      "description": "Complete expression language reference: triggerBody, body, items, variables, outputs, parameters, string functions, and null-safe navigation \u2014 all sourced from real Sentinel playbook examples.",
+      "tags": [
+        "logic-apps",
+        "expressions",
+        "workflow-language",
+        "triggerBody",
+        "body",
+        "items",
+        "variables",
+        "outputs"
+      ],
+      "file": "logic-apps-expressions.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "Verbatim @{...} vs @ expression syntax, all triggerBody() incident/alert/workspace field paths, body()/outputs()/items()/variables()/parameters() with real examples, encodeURIComponent patterns, join/concat/replace/dayOfWeek/formatDateTime functions, null-safe ?['field'] chaining"
+    },
+    {
+      "id": "logic-apps-sentinel-playbook-patterns",
+      "title": "Azure Logic Apps - Sentinel Playbook Patterns From Real-World Examples",
+      "description": "Complete step-by-step playbook patterns: email notification, group change, user block, MDE isolation, watchlist management, SharePoint write, Teams notification.",
+      "tags": [
+        "logic-apps",
+        "sentinel",
+        "playbook",
+        "security-automation",
+        "incident-response",
+        "watchlist",
+        "mde",
+        "azure-ad"
+      ],
+      "file": "logic-apps-sentinel-playbook-patterns.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "workflow",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "9 named playbook patterns with step sequences and runAfter chains: incident email notification, AAD group change with idempotency check, user block (disable+revoke+group), MDE machine isolation (workstation vs server), watchlist add-or-create, watchlist delete, SharePoint file write, Teams adaptive card, alert suppression"
+    },
+    {
+      "id": "logic-apps-connections",
+      "title": "Azure Logic Apps - Connection Object Structure And Managed API Reference",
+      "description": "How connections work in Logic Apps: $connections parameter structure, connectionId format, managed API paths, authentication types, and how to reference connections in actions.",
+      "tags": [
+        "logic-apps",
+        "connections",
+        "managed-api",
+        "connectors",
+        "authentication",
+        "msi",
+        "arm-template"
+      ],
+      "file": "logic-apps-connections.json",
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "real-world-examples",
+      "created": "2026-04-01T00:00:00Z",
+      "updated": "2026-04-01T00:00:00Z",
+      "last_verified": "2026-04-01T00:00:00Z",
+      "fresh_until": "2027-04-01T00:00:00Z",
+      "summary": "Full $connections parameter two-layer design, id/connectionId/connectionName/connectionProperties schema, real-world values for azuresentinel/azuread/office365/sharepointonline/wdatp, MSI vs service-account authentication types, managed API name reference table, multi-connection patterns with suffix naming"
+    },
+    {
+      "id": "powerbi-sharepoint-csv-datasource",
+      "title": "Power BI - SharePoint CSV Data Source Connection",
+      "description": "Connect Power BI to CSV files in SharePoint document libraries using the Folder connector and Power Query M",
+      "tags": [
+        "power-bi",
+        "sharepoint",
+        "csv",
+        "power-query"
+      ],
+      "file": "powerbi-sharepoint-csv-datasource.json"
+    },
+    {
+      "id": "powerbi-monthly-dynamic-reports",
+      "title": "Power BI - Dynamic Monthly Reports from SharePoint CSVs",
+      "description": "Auto-adjusting monthly reports: combine CSVs by month, date dimension, time intelligence, slicer patterns",
+      "tags": [
+        "power-bi",
+        "sharepoint",
+        "csv",
+        "monthly",
+        "dynamic",
+        "dax"
+      ],
+      "file": "powerbi-monthly-dynamic-reports.json"
+    },
+    {
+      "id": "powerbi-visualizations-and-dax",
+      "title": "Power BI - Visualizations, Charts, and DAX Measures",
+      "description": "All visual types, how to configure them, DAX measure patterns including time intelligence",
+      "tags": [
+        "power-bi",
+        "dax",
+        "charts",
+        "visualizations",
+        "measures"
+      ],
+      "file": "powerbi-visualizations-and-dax.json"
+    },
+    {
+      "id": "powerbi-power-query-m-reference",
+      "title": "Power BI - Power Query M Language Reference",
+      "description": "M language syntax, SharePoint functions, CSV parsing, table/text/date functions, complete templates",
+      "tags": [
+        "power-bi",
+        "power-query",
+        "m-language",
+        "sharepoint",
+        "csv"
+      ],
+      "file": "powerbi-power-query-m-reference.json"
+    },
+    {
+      "id": "powerbi-rest-api-and-deployment",
+      "title": "Power BI - REST API, Deployment and .pbix Structure",
+      "description": "REST API endpoints for import/refresh/credentials, authentication, .pbix file format internals, workspace concepts",
+      "tags": [
+        "power-bi",
+        "rest-api",
+        "deployment",
+        "pbix",
+        "automation"
+      ],
+      "file": "powerbi-rest-api-and-deployment.json"
+    },
+    {
+      "id": "powerbi-date-calendar-table-patterns",
+      "title": "Power BI - Date/Calendar Table Production Patterns for Security Reporting",
+      "description": "Production DAX and M patterns for a fully-featured date dimension: CALENDAR, CALENDARAUTO, all required columns (Year, Quarter, QuarterLabel, Month, MonthYear, MonthSort, QuarterSort, WeekNum), mark as date table, relationships to snapshot fact tables, snapshot vs range join strategy",
+      "tags": [
+        "power-bi",
+        "dax",
+        "date-table",
+        "calendar",
+        "time-intelligence",
+        "security-reporting",
+        "star-schema"
+      ],
+      "file": "powerbi-date-calendar-table-patterns.json",
+      "source_family": "power-bi",
+      "coverage_type": "pattern",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-03T00:00:00Z",
+      "summary": "Full production DAX date table with CALENDAR/CALENDARAUTO, all display and sort columns (MonthYear, QuarterLabel, MonthSort, QuarterSort, WeekNum, fiscal year), mark-as-date-table requirements and validation, Sort by Column setup, and snapshot join strategy including YearMonthKey integer key for robust period matching"
+    },
+    {
+      "id": "powerbi-time-intelligence-mom-qoq-yoy",
+      "title": "Power BI - Time Intelligence DAX: MoM, QoQ, YoY, Rolling Windows, Missing Periods",
+      "description": "Production DAX for period-over-period comparisons: MoM, QoQ, YoY absolute and percent change, YTD/QTD, running totals, last-N-periods rolling windows, DATEADD patterns, and handling missing snapshot months with COALESCE and LASTNONBLANK",
+      "tags": [
+        "power-bi",
+        "dax",
+        "time-intelligence",
+        "mom",
+        "qoq",
+        "yoy",
+        "dateadd",
+        "security-reporting",
+        "rolling-window",
+        "missing-data"
+      ],
+      "file": "powerbi-time-intelligence-mom-qoq-yoy.json",
+      "source_family": "power-bi",
+      "coverage_type": "pattern",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-03T00:00:00Z",
+      "summary": "Complete DAX patterns for MoM/QoQ/YoY change (absolute and %), PREVIOUSMONTH/PREVIOUSQUARTER/SAMEPERIODLASTYEAR, DATEADD, DATESINPERIOD rolling windows, TOTALYTD/QTD, LASTNONBLANK carry-forward for missing months, and multi-metric single-measure pattern"
+    },
+    {
+      "id": "powerbi-matrix-table-advanced-patterns",
+      "title": "Power BI - Matrix and Table Visual Advanced Patterns for Security Reporting",
+      "description": "Production patterns for the security reporting matrix layout (metrics as rows, periods as columns), RAG conditional formatting with icons and color scales, delta columns, fixed column ordering, grand total override with ISINSCOPE, drill-through, and sparklines",
+      "tags": [
+        "power-bi",
+        "matrix",
+        "table",
+        "conditional-formatting",
+        "security-reporting",
+        "rag",
+        "drill-through",
+        "period-comparison",
+        "isinscope",
+        "sparkline"
+      ],
+      "file": "powerbi-matrix-table-advanced-patterns.json",
+      "source_family": "power-bi",
+      "coverage_type": "pattern",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-03T00:00:00Z",
+      "summary": "Matrix visual configuration for security dashboards: rows=metric, columns=period, Sort by Column fix for chronological ordering, conditional formatting rules for RAG icons and background colors, delta columns with MoM labels, grand total suppression and ISINSCOPE override, drill-through setup, and native sparklines"
+    },
+    {
+      "id": "powerbi-period-slicer-and-crossfilter",
+      "title": "Power BI - Period Slicer, Sync, Bookmarks, and Field Parameters for Security Dashboards",
+      "description": "Production patterns for date slicers (between, relative, dropdown, tile), syncing slicers across pages, default last-12-months behaviour, bookmarks for Monthly/Quarterly/Yearly view switching, and field parameters for dynamic axis switching without bookmarks",
+      "tags": [
+        "power-bi",
+        "slicer",
+        "cross-filter",
+        "bookmarks",
+        "field-parameters",
+        "sync-slicers",
+        "security-reporting",
+        "date-slicer",
+        "relative-date"
+      ],
+      "file": "powerbi-period-slicer-and-crossfilter.json",
+      "source_family": "power-bi",
+      "coverage_type": "pattern",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-03T00:00:00Z",
+      "summary": "Slicer types (list, dropdown, between date range, relative date, tile), sync slicers across pages, default last-12-months pattern, bookmark-based Monthly/Quarterly/Yearly view switcher with hidden visual groups, field parameters for dynamic axis switching, and cross-filter Edit interactions control"
+    },
+    {
+      "id": "powerbi-security-dashboard-layout-patterns",
+      "title": "Power BI - Security Metrics Dashboard Layout Patterns",
+      "description": "Production patterns for security reporting: KPI cards with prior-period comparison, RAG traffic-light status columns, multi-metric matrix layout with sparklines, threshold-driven conditional formatting, dynamic titles, trend charts, and drill-through from summary to detail",
+      "tags": [
+        "power-bi",
+        "security-reporting",
+        "kpi",
+        "rag",
+        "dashboard-layout",
+        "sparkline",
+        "drill-through",
+        "conditional-formatting",
+        "vulnerability-reporting",
+        "kpi-card"
+      ],
+      "file": "powerbi-security-dashboard-layout-patterns.json",
+      "source_family": "power-bi",
+      "coverage_type": "pattern",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-03T00:00:00Z",
+      "summary": "Security dashboard page layout: KPI card row with vs-prior-month comparison, RAG icon column with per-metric thresholds from MetricDim via SELECTEDVALUE, multi-metric matrix rows with sparklines, trend line chart with normalisation for mixed-scale metrics, and drill-through configuration"
+    },
+    {
+      "id": "powerbi-snapshot-data-modeling",
+      "title": "Power BI - Data Modeling for Security Snapshot Data: Star Schema, Unpivoting, and Period Combination",
+      "description": "Production modeling for periodic security snapshot data: star schema design, MetricDim dimension table, unpivoting wide CSVs to tall fact tables in Power Query M, combining monthly and quarterly snapshots, YearMonthKey join pattern, and why deltas must stay in DAX not the fact table",
+      "tags": [
+        "power-bi",
+        "data-modeling",
+        "star-schema",
+        "power-query",
+        "unpivot",
+        "security-reporting",
+        "snapshot-data",
+        "fact-table",
+        "sharepoint-csv",
+        "metric-dimension"
+      ],
+      "file": "powerbi-snapshot-data-modeling.json",
+      "source_family": "power-bi",
+      "coverage_type": "pattern",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-04-03T00:00:00Z",
+      "summary": "Star schema for security snapshots: SecuritySnapshots fact table grain (one row per period per metric), MetricDim with thresholds and sort order, YearMonthKey integer join key, Table.UnpivotOtherColumns M pattern to convert wide CSV exports to tall fact tables, combining monthly and quarterly snapshots with PeriodType flag, and Excel file variant"
+    },
+    {
+      "id": "sentinel-rest-api-direct-http-patterns",
+      "title": "Microsoft Sentinel REST API - Direct ARM HTTP Calls From Logic Apps",
+      "file": "sentinel-rest-api-direct-http-patterns.json",
+      "tags": [
+        "azure-logic-apps",
+        "microsoft-sentinel",
+        "arm-rest-api",
+        "managed-identity",
+        "incidents",
+        "alerts",
+        "watchlists",
+        "analytics-rules",
+        "pagination",
+        "security-automation"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "endpoint",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-06-01T00:00:00Z",
+      "summary": "Direct ARM REST calls to Sentinel API (incidents, alerts, watchlists, analytics rules) from Logic Apps using MSI. Base URL, api-version, OData filter syntax, pagination via nextLink Until loop, and when to use REST vs managed connector."
+    },
+    {
+      "id": "defender-for-cloud-rest-api-patterns",
+      "title": "Microsoft Defender for Cloud REST API - Security Posture and Alerts From Logic Apps",
+      "file": "defender-for-cloud-rest-api-patterns.json",
+      "tags": [
+        "azure-logic-apps",
+        "defender-for-cloud",
+        "mdfc",
+        "arm-rest-api",
+        "managed-identity",
+        "secure-score",
+        "security-alerts",
+        "recommendations",
+        "assessments",
+        "security-posture"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "endpoint",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-06-01T00:00:00Z",
+      "summary": "MDFC REST API endpoints for secure score, score controls, alerts, recommendations, and assessments. Subscription-scope vs resource-scope, Security Reader RBAC requirement, api-version reference, and monthly posture report assembly pattern."
+    },
+    {
+      "id": "defender-xdr-unified-api-patterns",
+      "title": "Microsoft Defender XDR Unified API - Advanced Hunting, Incidents, and Alerts From Logic Apps",
+      "file": "defender-xdr-unified-api-patterns.json",
+      "tags": [
+        "azure-logic-apps",
+        "defender-xdr",
+        "microsoft-365-defender",
+        "advanced-hunting",
+        "kql",
+        "incidents",
+        "alerts",
+        "graph-api",
+        "managed-identity",
+        "cross-product"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "endpoint",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-06-01T00:00:00Z",
+      "summary": "XDR unified API vs MDE API comparison. Graph runHuntingQuery (MSI-compatible) vs direct XDR API (client credentials). Cross-product KQL tables (AlertInfo, IdentityLogonEvents, CloudAppEvents). Response schema differences (lowercase vs PascalCase Results field)."
+    },
+    {
+      "id": "azure-monitor-logs-connector-advanced-patterns",
+      "title": "Azure Monitor Logs Connector - Advanced Patterns: Multi-Workspace, Pagination, Large Results, and Timeouts",
+      "file": "azure-monitor-logs-connector-advanced-patterns.json",
+      "tags": [
+        "azure-logic-apps",
+        "azure-monitor-logs",
+        "log-analytics",
+        "kql",
+        "multi-workspace",
+        "pagination",
+        "large-results",
+        "timeout",
+        "cross-workspace",
+        "security-reporting"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "workflow",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-06-01T00:00:00Z",
+      "summary": "Connector 110s timeout and 500k row limit. No native pagination — time-window decomposition pattern with Until loop. Cross-workspace KQL via workspace() function. Multi-workspace fan-out via Log Analytics REST API. Compose for large result caching."
+    },
+    {
+      "id": "logic-apps-msi-arm-http-auth-pattern",
+      "title": "Logic Apps Managed Identity HTTP Auth Pattern - ARM REST APIs, Graph, and Security APIs",
+      "file": "logic-apps-msi-arm-http-auth-pattern.json",
+      "tags": [
+        "azure-logic-apps",
+        "managed-identity",
+        "msi",
+        "http-action",
+        "authentication",
+        "arm-rest-api",
+        "microsoft-graph",
+        "rbac",
+        "permissions",
+        "security-automation"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "created": "2026-04-03T00:00:00Z",
+      "updated": "2026-04-03T00:00:00Z",
+      "last_verified": "2026-04-03T00:00:00Z",
+      "fresh_until": "2027-06-01T00:00:00Z",
+      "summary": "Complete MSI HTTP auth reference: exact JSON block for system-assigned and user-assigned MSI, audience values per API (ARM with trailing slash, Graph without), PowerShell patterns to grant Graph/WDATP app permissions, RBAC role assignment, and common 401/403 failure modes."
     }
   ]
 }

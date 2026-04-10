@@ -25,9 +25,9 @@ If `config/` does not exist or `config/backends.json` is missing, every backend 
   "version": 2,
   "mode": "cli",
   "provider": "anthropic",
-  "default_model": "claude-sonnet-4-20250514",
+  "default_model": "claude-sonnet-4-6",
   "role_overrides": {
-    "worker": { "model": "claude-opus-4-20250514" },
+    "worker": { "model": "claude-opus-4-6" },
     "research": { "provider": "google", "model": "gemini-2.5-pro" }
   }
 }

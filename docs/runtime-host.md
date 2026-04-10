@@ -35,7 +35,7 @@ The runtime host is not an agent. It is the local execution layer that:
 
 The runtime host is not the orchestration brain. It must not:
 
-- decide the next stage on its own beyond the fixed pipeline (research → worker → review)
+- decide the next stage on its own beyond the fixed pipeline (worker → [research → worker] → review)
 - reinterpret review findings semantically
 - act as a hidden fallback agent
 - replace a required spawned agent with local reasoning

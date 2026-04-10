@@ -75,6 +75,16 @@
       "fact": "Action names use the convention Verb_Noun_-_Qualifier with underscores as word separators and ' - ' between the base name and the data-segment qualifier. Examples: Run_Defender_TVM_API_-_Devices, Save_CSV_into_Sharepoint_-_Servers.",
       "verified_date": "2026-03-31",
       "source": "production Logic App — consistent naming across all 20 actions"
+    },
+    {
+      "fact": "In a For Each + Switch pattern, non-matching Switch cases show status 'Skipped (branching condition not satisfied)' in Logic Apps run history. This is correct behavior, not an error. For each item in the loop only the matching case executes; all other cases are skipped. Do not treat skipped Switch cases as failures.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — For Each + Switch routing confirmed working; skipped branches observed and verified as normal"
+    },
+    {
+      "fact": "Qualys API calls from Logic Apps should use Basic Auth per-request (Authorization: Basic base64(user:pass)) rather than session-based auth (login/logout). Basic Auth does not consume Qualys concurrent session slots, whereas session-based auth consumes the 2-session limit and causes error 2014 when multiple requests run concurrently.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — Qualys pagination loop with Basic Auth confirmed working; session-based approach caused error 2014"
     }
   ],
   "token_fetch_pattern": {

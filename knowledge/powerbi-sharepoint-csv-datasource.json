@@ -1,0 +1,81 @@
+{
+  "id": "powerbi-sharepoint-csv-datasource",
+  "title": "Power BI - SharePoint CSV Data Source Connection",
+  "description": "How to connect Power BI to CSV files stored in SharePoint using the Folder connector and Power Query M",
+  "tags": ["power-bi", "sharepoint", "csv", "power-query", "data-source"],
+  "source": "web-research",
+  "references": [
+    "https://learn.microsoft.com/en-us/power-query/connectors/sharepoint-folder",
+    "https://learn.microsoft.com/en-us/power-query/combine-files-csv",
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-data"
+  ],
+  "content": {
+    "connector_choice": {
+      "sharepoint_folder": "Use 'SharePoint Folder' connector (Get Data > SharePoint folder) to connect to a SharePoint document library. Returns all files as rows — ideal for combining multiple CSVs.",
+      "sharepoint_list": "Use 'SharePoint List' connector only when data lives in a SharePoint List, not a document library.",
+      "when_to_use_folder": "Always use SharePoint Folder when CSVs are stored in a SharePoint document library. This allows combining all CSVs in a folder into one table automatically.",
+      "supported_products": ["Power BI Desktop", "Power BI Dataflows", "Fabric Dataflow Gen2", "Power Apps Dataflows", "Excel"]
+    },
+    "connection_url": {
+      "format": "Root site URL only — do NOT include the library path. Example: https://contoso.sharepoint.com/sites/MySite",
+      "correct_example": "https://contoso.sharepoint.com/sites/DataReports",
+      "incorrect_example": "https://contoso.sharepoint.com/sites/DataReports/Shared Documents/Reports/",
+      "api_version": "Use [ApiVersion=15] for SharePoint Online in M code",
+      "note": "The library and folder path is filtered in M code after connection, not in the connector URL. Only modern SharePoint home page URLs are supported — classic SharePoint URLs fail to connect.",
+      "site_picker": "Power BI Desktop and Fabric Dataflow Gen2 include a SharePoint site picker that lets you browse Recent/Favourite sites instead of manually copying URLs"
+    },
+    "m_query_connect_and_combine": "let\n    // Step 1: Connect to SharePoint site root\n    Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/MySite\", [ApiVersion=15]),\n\n    // Step 2: Filter to specific library/folder path\n    FilteredFiles = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Shared Documents/Reports/\")),\n\n    // Step 3: Keep only CSV files\n    CSVFilesOnly = Table.SelectRows(FilteredFiles, each [Extension] = \".csv\"),\n\n    // Step 4: Add a helper column with parsed CSV content\n    AddContent = Table.AddColumn(CSVFilesOnly, \"ParsedCSV\", each Csv.Document([Content], [Delimiter=\",\", Columns=null, Encoding=65001, QuoteStyle=QuoteStyle.None])),\n\n    // Step 5: Promote headers in each parsed CSV\n    PromoteHeaders = Table.TransformColumns(AddContent, {\"ParsedCSV\", each Table.PromoteHeaders(_, [PromoteAllScalars=true])}),\n\n    // Step 6: Add source filename column before expanding (useful for month tracking)\n    AddFilename = Table.AddColumn(PromoteHeaders, \"SourceFile\", each [Name]),\n\n    // Step 7: Expand all CSV rows into the main table\n    // Replace col1, col2, col3 with actual column names from your CSV headers\n    Expanded = Table.ExpandTableColumn(AddFilename, \"ParsedCSV\", Table.ColumnNames(PromoteHeaders{0}[ParsedCSV]))\nin\n    Expanded",
+    "columns_returned_by_sharepoint_folder_connector": [
+      "Content (binary — the raw file bytes)",
+      "Name (filename with extension, e.g. report_2024_01.csv)",
+      "Extension (e.g. .csv)",
+      "Date accessed",
+      "Date modified",
+      "Date created",
+      "Attributes (record with additional metadata)",
+      "Folder Path (full SharePoint folder path)"
+    ],
+    "authentication": {
+      "organizational_account": "Use 'Organizational account' (OAuth2) for interactive Power BI Desktop. Sign in with a Microsoft 365 account that has Read access to the SharePoint site.",
+      "service_principal": "Service principals cannot directly authenticate to SharePoint Online via Power BI datasets for scheduled refresh. Use a licensed service account (M365 user) with OAuth2 credentials configured in the dataset settings in Power BI Service.",
+      "no_gateway_needed": "SharePoint Online is a cloud source. No on-premises data gateway is required for scheduled refresh.",
+      "required_permissions": "The authenticating account must have at minimum Read access to the SharePoint site, the document library, and any folders leading to the CSV files.",
+      "oauth_token_expiry_note": "SharePoint Online uses Microsoft Entra ID OAuth. If a scheduled refresh takes longer than 1 hour, the OAuth token may expire mid-refresh. For long-running refreshes, ensure the account credentials are refreshed or use incremental refresh to reduce refresh duration."
+    },
+    "combine_files_wizard_pattern": {
+      "description": "Power BI Desktop has a built-in 'Combine Files' button when browsing a folder. It auto-generates a Transform Sample File helper query and a combining function.",
+      "auto_combine_steps": [
+        "1. Get Data > SharePoint Folder",
+        "2. Enter the site root URL (e.g. https://contoso.sharepoint.com/sites/MySite), click OK",
+        "3. Authenticate with Organizational Account",
+        "4. In Navigator, select the folder row (not an individual file)",
+        "5. Click 'Combine' dropdown > 'Combine & Transform Data'",
+        "6. In the Combine Files dialog, select the example file (defaults to First file) and configure delimiter/encoding",
+        "7. Click Transform data — Power BI auto-generates: a 'Transform Sample File' query, a 'Transform File' custom function, and the main combining query",
+        "8. The main query's leftmost column 'Source.Name' contains the original filename — useful for extracting month/year",
+        "9. In the 'Transform Sample File' query, add transformations (remove top rows, promote headers, etc.) — they apply to ALL files automatically"
+      ],
+      "auto_generated_m_structure": "The wizard produces three components in the Queries pane:\n- 'Parameter1 (Sample File)': Holds a reference to the first file binary\n- 'Transform Sample File': Contains the transformation steps applied to a single file\n- 'Transform File': A custom function wrapping Transform Sample File, applied to every file\n- Main query: Calls Table.Combine after applying the function to each file row"
+    },
+    "manual_m_vs_wizard": {
+      "wizard_pros": "Fast, no code required, auto-handles schema changes if all files match",
+      "wizard_cons": "Generated M is verbose and harder to customize; adding filename-based date columns requires editing the auto-generated steps",
+      "manual_pros": "Full control over column extraction, date parsing, and error handling",
+      "manual_cons": "Requires knowledge of M functions",
+      "recommendation": "Use the wizard for simple uniform CSVs. Use manual M when you need to extract date from filename, handle variable schemas, or add custom columns before combining."
+    },
+    "special_characters_warning": "Filenames containing # % $ will cause authentication errors because the filename is truncated in the SharePoint URL. Rename files to remove these characters before connecting.",
+    "scheduled_refresh_behaviour": {
+      "sharepoint_online_cloud_source": "No gateway required for SharePoint Online.",
+      "auto_sync_csv": "If your dataset is created from a single CSV file on SharePoint Online/OneDrive, Power BI auto-synchronises changes about every hour. Scheduled refresh cannot be configured separately for single CSV files.",
+      "pbix_with_sharepoint_folder": "When a .pbix uses the SharePoint Folder connector, you CAN configure scheduled refresh in Power BI Service. Go to Dataset Settings > Data source credentials > sign in with OAuth2. Then configure Schedule refresh with up to 8 refreshes/day (Pro) or 48/day (Premium).",
+      "new_file_pickup": "When a new CSV is added to the SharePoint folder, it is automatically included in the next scheduled refresh — no Power BI changes needed. The M query dynamically re-reads all files matching the filter on every refresh."
+    },
+    "troubleshooting": {
+      "all_files_must_have_same_schema": "Combining fails if files have different column names or counts. Use the Transform Sample File query to normalise before combining.",
+      "filter_out_non_csv_files": "If the SharePoint folder contains Excel or other files, add Extension = \".csv\" filter before combining to avoid errors.",
+      "error_column_not_found": "When editing the Transform Sample File query, any added/removed columns can break the main Expanded step. Delete the erroring step in Applied Steps and re-expand.",
+      "file_in_subfolder": "SharePoint.Files returns files from all subfolders. Use Text.Contains([Folder Path], \"/specific-subfolder/\") to restrict to one folder."
+    }
+  }
+}

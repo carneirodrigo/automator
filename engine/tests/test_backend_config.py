@@ -287,7 +287,11 @@ class TestConfigCaching(unittest.TestCase):
         set_config_dir(self.config_dir)
         c1 = load_backend_config()
         c2 = load_backend_config()
-        self.assertIs(c1, c2)
+        self.assertEqual(c1, c2)
+        # Mutations to a returned copy must not corrupt the cached value.
+        c1["mutated"] = True
+        c3 = load_backend_config()
+        self.assertNotIn("mutated", c3)
 
     def test_reset_cache_forces_reload(self):
         data = {"version": 2, "mode": "cli"}

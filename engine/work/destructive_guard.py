@@ -101,6 +101,8 @@ ROLE_ALLOWED_CAPABILITIES: dict[str, frozenset[str]] = {
             "run_command",
             "run_tests",
             "persist_artifact",
+            "load_memory",
+            "save_memory",
             "http_request_with_secret_binding",
             "test_credentials",
             "validate_logic_app_workflow",
@@ -118,6 +120,8 @@ ROLE_ALLOWED_CAPABILITIES: dict[str, frozenset[str]] = {
     "research": frozenset(
         {
             "persist_artifact",
+            "load_memory",
+            "save_memory",
             "http_request_with_secret_binding",
             "test_credentials",
         }
@@ -189,7 +193,7 @@ def register_created_path(path: Path | str) -> None:
     Called by capabilities._cap_write_file after a successful new-file write.
     Persists the entry to disk so re-runs can still update the same file.
     """
-    abs_str = str(Path(path).resolve() if not Path(path).is_absolute() else Path(path))
+    abs_str = str(Path(path).resolve())
     _ENGINE_CREATED_PATHS.add(abs_str)
 
     project_id = _project_id_from_path(Path(abs_str))
@@ -211,8 +215,7 @@ def register_created_path(path: Path | str) -> None:
 
 def is_engine_created(path: Path | str) -> bool:
     """Return True if this path was created by the engine (current or prior session)."""
-    p = Path(path)
-    abs_str = str(p.resolve() if not p.is_absolute() else p)
+    abs_str = str(Path(path).resolve())
     if abs_str in _ENGINE_CREATED_PATHS:
         return True
     project_id = _project_id_from_path(Path(abs_str))
@@ -586,6 +589,24 @@ def _find_script_in_command(cmd: list, cwd: str | None = None) -> "Path | None":
     return None
 
 
+# Regex to extract inline code from interpreter -c/--command invocations.
+# Matches: python3 -c "code", node -e "code", ruby -e "code", perl -e "code"
+_INLINE_CODE_RE = re.compile(
+    r"""(?:python[23]?|ruby|perl|node)\s+"""
+    r"""(?:-c|--command|-e)\s+"""
+    r"""(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|(\S+))""",
+    re.IGNORECASE,
+)
+
+
+def _extract_inline_code(cmd_str: str) -> str | None:
+    """Extract inline code from `interpreter -c/-e "code"` patterns."""
+    m = _INLINE_CODE_RE.search(cmd_str)
+    if not m:
+        return None
+    return m.group(1) or m.group(2) or m.group(3) or None
+
+
 # ---------------------------------------------------------------------------
 # Protected write paths
 # ---------------------------------------------------------------------------
@@ -643,7 +664,7 @@ def _check_http_request(
         if method in blocked_methods and pattern.search(url):
             return _blocked(
                 capability,
-                f"{description} is permanently prohibited. "
+                f"{description} requires operator approval. "
                 f"Method: {method}  URL: {url}",
             )
 
@@ -741,6 +762,17 @@ def _check_run_command(
             except Exception:  # noqa: BLE001
                 pass  # Non-fatal — guard must never crash the pipeline
 
+    # Inline code scan — catch `python3 -c "os.system('rm -rf /')"` etc.
+    inline_code = _extract_inline_code(cmd_str)
+    if inline_code:
+        issue = _scan_script_content(inline_code)
+        if issue:
+            return _blocked(
+                capability,
+                f"Inline code argument contains a destructive pattern: "
+                f"{issue}. Command: {cmd_str[:300]}",
+            )
+
     return None
 
 
@@ -764,13 +796,19 @@ def _check_write_file(
         path = Path(raw_path)
         if not path.is_absolute():
             path = REPO_ROOT / path
+        # Resolve symlinks and '..' to prevent traversal bypasses like
+        # "projects/001/delivery/../../engine/work/evil.py"
+        path = path.resolve()
 
         # 1. Protected directory check
         try:
-            rel = str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+            rel = str(path.relative_to(REPO_ROOT.resolve())).replace("\\", "/")
         except ValueError:
-            # Outside repo — caught by ensure_within_repo in the handler
-            return None
+            # Outside repo — block rather than defer to handler (defense-in-depth)
+            return _blocked(
+                capability,
+                f"Write path resolves outside the repository tree: {path}",
+            )
 
         for prefix in _PROTECTED_WRITE_PREFIXES:
             if rel.startswith(prefix) or rel == prefix.rstrip("/"):
@@ -802,9 +840,13 @@ def _check_write_file(
                         f"Review the script before writing.",
                     )
 
-    except Exception:  # noqa: BLE001
-        # Guard must never crash the pipeline; pass through on unexpected errors
-        pass
+    except Exception as exc:  # noqa: BLE001
+        # Guard must fail closed — deny when guard logic itself errors.
+        return _blocked(
+            capability,
+            f"Write guard encountered an internal error and denied the request "
+            f"as a safety precaution: {type(exc).__name__}: {exc}",
+        )
 
     return None
 
@@ -838,10 +880,15 @@ def check_capability(
     capability = request.get("capability", "")
     arguments = request.get("arguments") or {}
 
-    # 1. Role-based allowlist
+    # 1. Role-based allowlist — unknown roles fall back to worker allowlist
     if role is not None and role not in _PERMISSIVE_ROLES:
         allowed = ROLE_ALLOWED_CAPABILITIES.get(role)
-        if allowed is not None and capability not in allowed:
+        if allowed is None:
+            # Unknown/legacy role: fall back to worker allowlist rather than
+            # granting unrestricted access. This covers legacy roles like
+            # "coding", "platform-builder", etc.
+            allowed = ROLE_ALLOWED_CAPABILITIES.get("worker", frozenset())
+        if capability not in allowed:
             return _blocked(
                 capability,
                 f"Role '{role}' is not permitted to use capability '{capability}'. "
@@ -849,6 +896,20 @@ def check_capability(
             )
 
     # 2. Capability-specific destructive checks
+    return _check_capability_specific(capability, arguments, delivery_mode)
+
+
+def _check_capability_specific(
+    capability: str,
+    arguments: dict[str, Any],
+    delivery_mode: str | None,
+) -> dict[str, Any] | None:
+    """Run only the capability-specific destructive checks (no role check).
+
+    Separated from check_capability so that session-allowed role-allowlist
+    bypasses can still enforce capability-level guards (shell blocklist,
+    write-file protection, HTTP mutation checks, etc.).
+    """
     if capability == "http_request_with_secret_binding":
         return _check_http_request(capability, arguments, delivery_mode)
 

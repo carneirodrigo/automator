@@ -1,0 +1,347 @@
+{
+  "id": "logic-apps-sentinel-playbook-patterns",
+  "title": "Azure Logic Apps - Sentinel Playbook Patterns From Real-World Examples",
+  "description": "Complete step-by-step playbook patterns: email notification, group change, user block, MDE isolation, watchlist management, SharePoint write, Teams notification.",
+  "tags": ["logic-apps", "sentinel", "playbook", "security-automation", "incident-response", "watchlist", "mde", "azure-ad"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Add-UserToWatchlist-SidToUPN.txt",
+    "Block-AADUser-Incident.txt",
+    "CyberSecurityASM-Notification-Email.txt",
+    "From-Sentinel-to-PAD.txt",
+    "Group-Change-AADUser-Incident-Brute-Force.txt",
+    "Group-Change-AADUser-Incident-Modern-auth.txt",
+    "Isolate-MDEMachine.txt",
+    "MFA-Send-basic-email.txt",
+    "Pagerduty-Notification-Email.txt",
+    "Risk-followed-MFA-change-Notification.txt",
+    "Send-basic-email.txt",
+    "Send-to-SharePoint.txt",
+    "Teams-notifications-webhook.txt",
+    "Watchlist-Management.txt",
+    "Watchlist-Travelling-Management.txt",
+    "Watchlist-UPN-Management.txt"
+  ],
+  "content": {
+    "pattern_1_incident_email_notification": {
+      "name": "Incident Email Notification",
+      "description": "Send a detailed email to a security team when a Sentinel incident is created. Most fundamental playbook pattern.",
+      "examples_in_files": ["CyberSecurityASM-Notification-Email.txt", "MFA-Send-basic-email.txt", "Send-basic-email.txt", "Pagerduty-Notification-Email.txt", "Risk-followed-MFA-change-Notification.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident (ApiConnectionWebhook, path /incident-creation)",
+        "2. Select_Entities: Project relatedEntities into {Entity, Entity Type} pairs",
+        "3. Create_HTML_table_with_Entities: Table action, format HTML, from Select output",
+        "4. Compose_Incident_link: Compose action, HTML anchor tag with incidentUrl",
+        "5. Initialize_variables (optional): Initialize a string variable for defanged entities",
+        "6. Send_an_email_with_Incident_details: Office 365 V2 Mail action with full HTML body"
+      ],
+      "action_chain_runAfter": {
+        "Select_Entities": "runAfter: {} (runs after trigger)",
+        "Create_HTML_table_with_Entities": "runAfter: Select_Entities [Succeeded]",
+        "Compose_Incident_link": "runAfter: Create_HTML_table_with_Entities [Succeeded]",
+        "Initialize_variables": "runAfter: Compose_Incident_link [Succeeded]",
+        "Send_an_email_with_Incident_details": "runAfter: Initialize_variables [Succeeded] OR Compose_Incident_link [Succeeded]"
+      },
+      "email_body_pattern": {
+        "fields_typically_included": [
+          "Incident title: @{triggerBody()?['object']?['properties']?['title']}",
+          "Incident ID: @{triggerBody()?['object']?['properties']?['incidentNumber']}",
+          "Creation time: @{triggerBody()?['object']?['properties']?['createdTimeUtc']}",
+          "Severity: @{triggerBody()?['object']?['properties']?['severity']}",
+          "Alert providers: @{join(triggerBody()?['object']?['properties']?['additionalData']?['alertProductNames'], '<br />')}",
+          "Tactics: @{join(triggerBody()?['object']?['properties']?['additionalData']?['tactics'], '<br />')}",
+          "Description: @{triggerBody()?['object']?['properties']?['description']}",
+          "Entities: @{body('Create_HTML_table_with_Entities')}",
+          "Incident link: @{outputs('Compose_Incident_link')}"
+        ]
+      },
+      "variant_with_foreach": {
+        "description": "Some notification playbooks iterate over account entities and send one email per account (e.g., MFA-Send-basic-email.txt). Uses Foreach over Entities_-_Get_Accounts output.",
+        "pattern": "Trigger → Entities_-_Get_Accounts → Compose_Incident_link → For_each(Accounts) → Send_email_per_account"
+      }
+    },
+
+    "pattern_2_aad_group_change": {
+      "name": "AAD Group Change Playbook (Conditional Policy Enforcement)",
+      "description": "Add a user to an AAD security group to apply a conditional access policy. Checks if the user is already in the group before adding.",
+      "examples_in_files": ["Group-Change-AADUser-Incident-Brute-Force.txt", "Group-Change-AADUser-Incident-Modern-auth.txt", "Group-Change-AADUser-Incident-Password-Spray.txt"],
+      "simple_pattern_step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Entities_-_Get_Accounts: Extract account entities",
+        "3. For_each (Accounts):",
+        "   a. Send_an_email (notify security team of action being taken)",
+        "   b. Add_user_to_group (add to conditional access policy group)",
+        "   Optional: also send a notification email to the affected user"
+      ],
+      "advanced_pattern_with_idempotency_check": {
+        "description": "Check if the user is already in the group before adding (Group-Change-AADUser-Incident-Modern-auth.txt pattern).",
+        "step_sequence": [
+          "1. Trigger: Microsoft_Sentinel_incident",
+          "2. Entities_-_Get_Accounts",
+          "3. Initialize_variables: ModernAuth_Applied = false",
+          "4. For_each (Accounts):",
+          "   a. Get_user: Look up user by AadUserId",
+          "   b. Get_groups_of_a_user_(V2): Get user's current group memberships",
+          "   c. For_each_1 (group GUIDs): Check each group",
+          "      - If group equals target group GUID: Set_variable ModernAuth_Applied = true",
+          "   d. Condition_1: If ModernAuth_Applied == false:",
+          "      - Add_user_to_group",
+          "      - Send_an_email_(V2) to the affected user"
+        ]
+      },
+      "key_action_snippets": {
+        "add_user_to_group": {
+          "body": { "@@odata.id": "@items('For_each')?['AadUserId']" },
+          "path": "/v1.0/groups/@{encodeURIComponent('{groupGuid}')}/members/$ref",
+          "method": "post"
+        },
+        "idempotency_condition": {
+          "expression": {
+            "and": [
+              { "equals": ["@variables('ModernAuth_Applied')", false] }
+            ]
+          }
+        }
+      }
+    },
+
+    "pattern_3_user_block": {
+      "name": "Block AAD User (Disable + Revoke Sessions + Add to Group)",
+      "description": "Comprehensive user blocking: disable the account, revoke all sessions, and add to a restricted group.",
+      "examples_in_files": ["Block-AADUser-Incident.txt", "Group-Change-AADUser-Incident.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Entities_-_Get_Accounts",
+        "3. For_each (Accounts):",
+        "   a. Send_an_email_(V2) — notify security team",
+        "   b. Update_user_-_disable_user — PATCH /v1.0/users/{id} with {accountEnabled: false}",
+        "   c. Refresh_tokens — POST /v1.0/users/{id}/revokeSignInSessions",
+        "   d. Add_user_to_group — POST /v1.0/groups/{groupId}/members/$ref",
+        "   e. Add_user_to_group_2 (optional) — add to a second group"
+      ],
+      "action_chain_runAfter_inside_foreach": {
+        "Send_an_email_(V2)": "runAfter: {} (first in loop)",
+        "Update_user_-_disable_user": "runAfter: Send_an_email_(V2) [Succeeded]",
+        "Refresh_tokens": "runAfter: Update_user_-_disable_user [Succeeded]",
+        "Add_user_to_group": "runAfter: Refresh_tokens [Succeeded]",
+        "Add_user_to_group_2": "runAfter: Add_user_to_group [Succeeded]"
+      },
+      "key_actions": {
+        "disable_account": {
+          "method": "patch",
+          "path": "/v1.0/users/@{encodeURIComponent(items('For_each')?['AadUserId'])}",
+          "body": { "accountEnabled": false }
+        },
+        "revoke_sessions": {
+          "method": "post",
+          "path": "/v1.0/users/@{encodeURIComponent(items('For_each')?['AadUserId'])}/revokeSignInSessions"
+        }
+      }
+    },
+
+    "pattern_4_mde_machine_isolation": {
+      "name": "MDE Machine Isolation",
+      "description": "Isolate a machine in Microsoft Defender for Endpoint when suspicious activity is detected. Includes server/workstation branching.",
+      "examples_in_files": ["Isolate-MDEMachine.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Entities_-_Get_Hosts: Extract host entities",
+        "3. Initialize_variables: Server = false, Stop = false",
+        "4. For_each (Hosts):",
+        "   a. Machines_-_Get_single_machine: GET /api/machines/{OMSAgentID}",
+        "   b. Condition_1: Is it a workstation (not server)?",
+        "      - True: Set_variable_1 Server = false",
+        "      - False (server): Set_variable Server = true",
+        "   c. Condition (testing gate): If Stop == false:",
+        "      - Branch: Is it a workstation?",
+        "        - True: (workstation isolation sequence)",
+        "          1. Actions_-_Restrict_app_execution",
+        "          2. Actions_-_Isolate_machine (Selective)",
+        "          3. Actions_-_Collect_investigation_package",
+        "          4. Actions_-_Start_automated_investigation_on_a_machine",
+        "          5. Actions_-_Run_antivirus_scan (Full)",
+        "          6. Send_an_email_(V2) — notify team of isolation",
+        "        - False (server):",
+        "          1. Actions_-_Collect_investigation_package_2",
+        "          2. Condition_2: If osPlatform contains 'Server':",
+        "             - Actions_-_Start_automated_investigation",
+        "          3. Actions_-_Run_antivirus_scan_2 (Quick)",
+        "          4. Send_an_email_(V2)_2 — notify that machine was NOT isolated (servers not isolated automatically)"
+      ],
+      "key_machine_classification_condition": {
+        "expression": {
+          "or": [
+            {
+              "not": {
+                "contains": ["@body('Machines_-_Get_single_machine')?['rbacGroupName']", "Servers"]
+              }
+            },
+            {
+              "and": [
+                { "not": { "contains": ["@body('Machines_-_Get_single_machine')?['osPlatform']", "Server"] } },
+                { "not": { "endsWith": ["@body('Machines_-_Get_single_machine')?['computerDnsName']", ".ods.vuw.ac.nz"] } }
+              ]
+            }
+          ]
+        }
+      },
+      "isolation_order": "Restrict execution → Isolate → Collect package → Start investigation → Run AV scan → Send email"
+    },
+
+    "pattern_5_watchlist_add_or_create": {
+      "name": "Watchlist Add Or Create Pattern",
+      "description": "Check if a watchlist exists; if it does, add items to it; if it doesn't, create it from scratch with CSV data.",
+      "examples_in_files": ["Add-UserToWatchlist-IncidentTrigger.txt", "Add-UserToWatchlist-SidToUPN.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Entities_-_Get_Accounts",
+        "3. Initialize_variable_-_Users: array variable 'accounts' = []",
+        "4. Initialize_variable_-_Watchlist_alias: string variable = 'UserRemediation' (or other alias)",
+        "5. Watchlists_-_Get_a_watchlist_by_alias: GET watchlist — runAfter [Succeeded, Failed]",
+        "6. Condition (Watchlist_alias): If statusCode == 200 (watchlist exists):",
+        "   True branch:",
+        "     - For_each (Accounts): Watchlists_-_Add_a_new_watchlist_item",
+        "   False branch (create new):",
+        "     - For_each_user_-_add_to_user_array_variable: AppendToArrayVariable for each account",
+        "     - Create_CSV_table_with_users: Table(CSV) from accounts array",
+        "     - Watchlists_-_Create_a_new_watchlist_with_data: PUT with CSV content"
+      ],
+      "critical_runAfter": {
+        "Watchlists_-_Get_a_watchlist_by_alias": "Must run with runAfter: [Succeeded, Failed] — 404 is a 'failed' response but expected",
+        "condition": "runAfter: Watchlists_-_Get_a_watchlist_by_alias [Succeeded, Failed]",
+        "statusCode_check": "@outputs('Watchlists_-_Get_a_watchlist_by_alias')['statusCode'] equals 200"
+      },
+      "watchlist_item_body_examples": {
+        "simple": { "Name": "@{items('For_each')?['Name']}" },
+        "sid_upn_mapping": {
+          "AccountDisplayName": "@{items('For_each')?['NTDomain']}",
+          "Sid": "@{items('For_each')?['Sid']}",
+          "Upn": "@{items('For_each')?['Name']}"
+        }
+      }
+    },
+
+    "pattern_6_watchlist_delete_item": {
+      "name": "Watchlist Item Delete Pattern",
+      "description": "Remove specific items from an existing watchlist by user identifier.",
+      "examples_in_files": ["Watchlist-Management.txt", "Watchlist-Travelling-Management.txt", "Watchlist-UPN-Management.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Entities_-_Get_Accounts",
+        "3. For_each (Accounts):",
+        "   - Watchlists_-_Delete_a_watchlist_item: DELETE with watchlist alias and user ID in path"
+      ],
+      "delete_path_pattern": "/Watchlists/{workspacePath}/watchlists/@{encodeURIComponent('{WatchlistAlias}')}/watchlistItem/@{encodeURIComponent(items('For_each')?['AadUserId'])}",
+      "examples": {
+        "delete_from_UserRemediation": "/watchlists/@{encodeURIComponent('UserRemediation')}/watchlistItem/@{encodeURIComponent(items('For_each')?['AadUserId'])}",
+        "delete_from_Travelling": "/watchlists/@{encodeURIComponent('Travelling')}/watchlistItem/@{encodeURIComponent(items('For_each')?['AadUserId'])}",
+        "delete_from_UpnToSid": "/watchlists/@{encodeURIComponent('UpnToSid')}/watchlistItem/@{encodeURIComponent(items('For_each')?['AadUserId'])}"
+      }
+    },
+
+    "pattern_7_sharepoint_file_write": {
+      "name": "SharePoint File Write Pattern",
+      "description": "Write a log or data file to a SharePoint document library for each incident entity.",
+      "examples_in_files": ["Send-to-SharePoint.txt", "Send-to-SharePoint-AATP.txt", "From-Sentinel-to-PAD.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Entities_-_Get_Accounts",
+        "3. For_each (Accounts):",
+        "   - Create_file: POST to SharePoint connector with text content and dynamic file name"
+      ],
+      "create_file_pattern": {
+        "connector": "sharepointonline",
+        "method": "post",
+        "path": "/datasets/@{encodeURIComponent(encodeURIComponent('{siteUrl}'))}/files",
+        "queries": {
+          "folderPath": "/Security/Security Tools/SIEM/flow_integration",
+          "name": "user_alert_@{items('For_each')?['AadUserId']}_@{triggerBody()?['object']?['properties']?['incidentNumber']}_@{triggerBody()?['object']?['properties']?['createdTimeUtc']}.log",
+          "queryParametersSingleEncoded": true
+        },
+        "body": "SIEMRecogniser=SentinelIncidentAndRemediation FlowType=UserExtraction Action=BlockUser AlertDateTime=@{triggerBody()?['object']?['properties']?['createdTimeUtc']} AlertTitle=@{triggerBody()?['object']?['properties']?['title']} UPN=@{items('For_each')?['Name']}",
+        "runtimeConfiguration": {
+          "contentTransfer": { "transferMode": "Chunked" }
+        }
+      },
+      "notes": [
+        "The site URL is double-encoded: encodeURIComponent(encodeURIComponent('https://...'))",
+        "File name combines user ID, incident number, and timestamp for uniqueness",
+        "Content is a flat key=value string (common for SIEM integration files)",
+        "queryParametersSingleEncoded: true prevents double-encoding of the folder path and name query params"
+      ]
+    },
+
+    "pattern_8_teams_adaptive_card": {
+      "name": "Teams Notification via Incoming Webhook",
+      "description": "Post an Adaptive Card to a Teams channel using an Incoming Webhook URL. No connector needed.",
+      "examples_in_files": ["Teams-notifications-webhook.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_incident",
+        "2. Initialize_variable: EntitiesJSON = [] (array)",
+        "3. For_each_1 (relatedEntities) — sequential (concurrency.repetitions: 1):",
+        "   a. Compose: {title: entity.kind, value: entity.properties.friendlyname}",
+        "   b. Append_to_array_variable: append Compose output to EntitiesJSON",
+        "4. HTTP: POST adaptive card to Teams webhook URL"
+      ],
+      "teams_message_structure": {
+        "type": "message",
+        "attachments": [{
+          "contentType": "application/vnd.microsoft.card.adaptive",
+          "contentUrl": null,
+          "content": {
+            "type": "AdaptiveCard",
+            "version": "1.5",
+            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "body": [
+              "TextBlock (title)",
+              "ColumnSet (incident number + creation time)",
+              "FactSet (entities array from @json(concat('[', join(variables('EntitiesJSON'), ','), ']')))"
+            ],
+            "actions": [{ "type": "Action.OpenUrl", "title": "Sentinel Incident", "url": "{incidentUrl}" }]
+          }
+        }]
+      },
+      "sequential_foreach_note": "The entities foreach uses concurrency.repetitions: 1 to ensure entities are appended in order before building the card"
+    },
+
+    "pattern_9_alert_suppression": {
+      "name": "Alert Suppression Pattern",
+      "description": "Triggered by Sentinel alert trigger; removes the alert from its incident under specific conditions (time, day, alert name).",
+      "examples_in_files": ["Suppress_Tenable_SAMR_alerts.txt"],
+      "step_sequence": [
+        "1. Trigger: Microsoft_Sentinel_alert (path /subscribe)",
+        "2. Condition_1: If alert has content (length > 0)",
+        "   True branch:",
+        "   a. Alert_-_Get_incident: GET incident ARM ID for the alert",
+        "   b. Condition: If (day == Friday AND alert contains 'SAMR' AND hour > 21)",
+        "      True: Remove_alert_from_incident: POST /Incidents/Relation/Delete"
+      ],
+      "suppression_condition": {
+        "and": [
+          { "equals": ["@dayOfWeek(triggerBody()?['StartTimeUtc'])", 5] },
+          { "contains": ["@triggerBody()?['AlertDisplayName']", "User and group membership reconnaissance (SAMR)"] },
+          { "greater": ["@formatDateTime(triggerBody()?['StartTimeUtc'],'HH')", 21] }
+        ]
+      }
+    },
+
+    "common_architectural_decisions": {
+      "dual_sentinel_connections": {
+        "description": "Many playbooks use two Sentinel connections: one (MSI) for the trigger registration, another (service account) for action API calls. This is because the trigger webhook registration and the action API calls may require different authentication contexts.",
+        "pattern": {
+          "trigger_connection": "azuresentinel (MSI) — used in trigger.host.connection",
+          "action_connection": "azuresentinel_1 (service account) — used in action.host.connection"
+        }
+      },
+      "entity_extraction_first": {
+        "description": "Always extract entities as the first action after the trigger. Entities_-_Get_Accounts or Entities_-_Get_Hosts must run before any foreach that needs entity data.",
+        "reason": "The relatedEntities payload from the trigger is untyped. The entity extraction actions return typed, structured entity objects (Accounts, Hosts, etc.)"
+      },
+      "error_handling_watchlist_check": {
+        "description": "Watchlist GET must use runAfter: [Succeeded, Failed] on the condition that follows, because a 404 (not found) comes back as a Failed action — but that's the expected 'create' path.",
+        "pattern": "GET watchlist → runAfter[Succeeded, Failed] → Condition on statusCode==200"
+      }
+    }
+  }
+}

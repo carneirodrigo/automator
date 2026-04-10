@@ -39,6 +39,36 @@
       "fact": "Qualys UI documentation for Vulnerability Details lists QID, Title, QDS, and Severity as core vulnerability-view columns, which aligns with deriving dashboard-style metrics from host detections plus KnowledgeBase enrichment.",
       "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
       "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "tag_set_exclude REQUIRES tag_set_include to be present. Using tag_set_exclude alone (without tag_set_include) returns error 1903. Always supply a tag_set_include alongside any tag_set_exclude.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — Qualys tag filtering confirmed; error 1903 reproduced and resolved"
+    },
+    {
+      "fact": "Qualys tag names are case-sensitive. Using 'info: Managed by Digital Services' (lowercase i) returns error 1905. The correct tag name is 'Info: Managed by Digital Services' (capital I).",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — tag name case error 1905 observed and corrected"
+    },
+    {
+      "fact": "Confirmed working tag names in this environment (as of April 2026): 'External IPs', 'Info: Managed by Digital Services', 'Info: Managed by Faculity' (note: 'Faculity' is a canonical typo in the Qualys tenant — do not correct it in queries). The tag 'Internal IPs' did not exist at time of testing and must be created manually in the Qualys console before use.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — tag-filtered queries confirmed working with these exact names"
+    },
+    {
+      "fact": "Basic Auth (per-request Authorization: Basic base64(user:pass)) does not consume Qualys concurrent session slots. Session-based auth (login/logout flow) consumes the 2-session limit and causes error 2014 when multiple requests run concurrently. Use Basic Auth for Logic Apps and automation workflows.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — Basic Auth confirmed working without session exhaustion; session-based auth caused error 2014"
+    },
+    {
+      "fact": "The complete authoritative parameter allowlist for the Host Detection API action=list (confirmed from API error 1901 response, April 2026): host scoping: ips, ids, id_min, id_max, ag_ids, ag_titles, os_pattern, network_ids, use_tags, show_tags, show_asset_id, show_results, show_host_services, show_cloud_tags, cloud_tag_fields, host_metadata, host_metadata_fields, compliance_enabled; detection filtering: status, severities, qids, show_igs, include_ignored, include_disabled, active_kernels_only, filter_superseded_qids, show_reopened_info, include_vuln_type, include_search_list_titles, exclude_search_list_titles, include_search_list_ids, exclude_search_list_ids; QDS: show_qds, qds_min, qds_max, show_qds_factors; time filters: no_vm_scan_since, vm_scan_since, vm_processed_after, vm_processed_before, vm_scan_date_before, vm_scan_date_after, vm_auth_scan_date_before, vm_auth_scan_date_after, max_days_since_last_vm_scan, max_days_since_detection_updated, detection_last_tested_since_days, detection_last_tested_before_days, detection_updated_since, detection_updated_before, detection_processed_after, detection_processed_before, detection_last_tested_since, detection_last_tested_before; ARF: arf_kernel_filter, arf_service_filter, arf_config_filter, arf_filter_keys, show_arf_data; output: output_format, truncation_limit, suppress_duplicated_data_from_csv, echo_request; other: mitre_attack_details.",
+      "verified_date": "2026-04-09",
+      "source": "API error 1901 response — complete allowed parameter list returned by Qualys when unrecognized parameters were submitted"
+    },
+    {
+      "fact": "Common wrong parameter names for action=list and their correct equivalents: show_disabled_flag -> include_disabled, exclude_non_running_kernels -> active_kernels_only, show_superseded_patches -> filter_superseded_qids. All three wrong names return error 1901. Correct exclusion filter set: show_igs=0 (ignored), include_disabled=0 (disabled), active_kernels_only=1 (non-running kernels), filter_superseded_qids=1 (superseded patches), status=New,Active,Re-Opened (fixed).",
+      "verified_date": "2026-04-09",
+      "source": "production Logic App — error 1901 confirmed wrong names; correct names validated against API allowlist"
     }
   ],
   "authoritative_sources": [

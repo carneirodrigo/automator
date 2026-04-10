@@ -1,0 +1,245 @@
+{
+  "id": "logic-apps-arm-template-structure",
+  "title": "Azure Logic Apps - ARM Template Structure And Workflow Definition Envelope",
+  "description": "Complete ARM template skeleton for a Logic App: schema, parameters, resources, definition structure, and connection wiring.",
+  "tags": ["logic-apps", "arm-template", "workflow-definition", "parameters", "connections"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Block-AADUser-Incident.txt",
+    "CyberSecurityASM-Notification-Email.txt",
+    "Isolate-MDEMachine.txt",
+    "Teams-notifications-webhook.txt"
+  ],
+  "content": {
+    "overview": "Every Logic App workflow definition exported from the portal consists of two top-level objects: 'definition' (the workflow logic) and 'parameters' (runtime connection values). When deployed via ARM, both are embedded inside a Microsoft.Logic/workflows resource.",
+
+    "minimal_arm_template": {
+      "description": "Full ARM template for a Logic App with one managed connection. Replace placeholder values before deploying.",
+      "template": {
+        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+          "logicAppName": { "type": "string" },
+          "location": { "type": "string", "defaultValue": "[resourceGroup().location]" }
+        },
+        "resources": [
+          {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2019-05-01",
+            "name": "[parameters('logicAppName')]",
+            "location": "[parameters('location')]",
+            "identity": {
+              "type": "SystemAssigned"
+            },
+            "properties": {
+              "state": "Enabled",
+              "definition": {
+                "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                "contentVersion": "1.0.0.0",
+                "parameters": {
+                  "$connections": {
+                    "type": "Object",
+                    "defaultValue": {}
+                  }
+                },
+                "triggers": {},
+                "actions": {},
+                "outputs": {}
+              },
+              "parameters": {
+                "$connections": {
+                  "value": {
+                    "azuresentinel": {
+                      "id": "/subscriptions/{subscriptionId}/providers/Microsoft.Web/locations/{location}/managedApis/azuresentinel",
+                      "connectionId": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Web/connections/{connectionName}",
+                      "connectionName": "{connectionName}",
+                      "connectionProperties": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+
+    "portal_export_format": {
+      "description": "The format you get when exporting a Logic App from the Azure portal or the Logic App designer. This wraps just 'definition' and 'parameters' without the ARM envelope.",
+      "structure": {
+        "definition": {
+          "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "$connections": {
+              "type": "Object",
+              "defaultValue": {}
+            }
+          },
+          "triggers": {},
+          "actions": {},
+          "outputs": {}
+        },
+        "parameters": {
+          "$connections": {
+            "type": "Object",
+            "value": {}
+          }
+        }
+      },
+      "notes": [
+        "The '$schema' inside 'definition' is always 'https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#'",
+        "The '$connections' parameter declared inside 'definition.parameters' has type Object and defaultValue {}",
+        "The '$connections' value under the outer 'parameters' object holds the actual connection resource IDs"
+      ]
+    },
+
+    "definition_object_fields": {
+      "$schema": {
+        "value": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "required": true,
+        "notes": "Always this exact URL for Consumption Logic Apps"
+      },
+      "contentVersion": {
+        "value": "1.0.0.0",
+        "required": true
+      },
+      "parameters": {
+        "description": "Parameter declarations used inside the workflow. The '$connections' parameter is always present when any connector is used.",
+        "example": {
+          "$connections": {
+            "type": "Object",
+            "defaultValue": {}
+          }
+        }
+      },
+      "triggers": {
+        "description": "Exactly one trigger per workflow. Key is the trigger name (used in designer). Value is the trigger definition object.",
+        "required": true
+      },
+      "actions": {
+        "description": "All workflow actions as a flat dictionary keyed by action name. Names with spaces use underscores in references. runAfter chains define execution order.",
+        "required": true
+      },
+      "outputs": {
+        "description": "Usually an empty object {} for Sentinel playbooks.",
+        "required": true
+      }
+    },
+
+    "parameters_object_fields": {
+      "description": "The outer 'parameters' object (sibling to 'definition') holds the runtime connection values. This is separate from the parameter declarations inside definition.parameters.",
+      "structure": {
+        "$connections": {
+          "type": "Object",
+          "value": {
+            "{connectionKeyName}": {
+              "id": "/subscriptions/{subId}/providers/Microsoft.Web/locations/{location}/managedApis/{apiName}",
+              "connectionId": "/subscriptions/{subId}/resourceGroups/{rgName}/providers/Microsoft.Web/connections/{connectionResourceName}",
+              "connectionName": "{connectionResourceName}",
+              "connectionProperties": {}
+            }
+          }
+        }
+      }
+    },
+
+    "managed_identity": {
+      "description": "System-assigned managed identity block added to the resource when the Logic App uses MSI authentication for connector connections.",
+      "arm_resource_property": {
+        "identity": {
+          "type": "SystemAssigned"
+        }
+      },
+      "connection_properties_with_msi": {
+        "connectionProperties": {
+          "authentication": {
+            "type": "ManagedServiceIdentity"
+          }
+        }
+      },
+      "notes": [
+        "Connections that use MSI have 'connectionProperties.authentication.type = ManagedServiceIdentity'",
+        "Connections using a service account or OAuth have empty 'connectionProperties: {}'",
+        "In the examples, the MSI-authenticated connection is typically a separate azuresentinel connection used for the trigger, while a shared azuresentinel connection is used for actions"
+      ]
+    },
+
+    "real_world_connection_examples": {
+      "azuresentinel_service_account": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/azuresentinel",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/azuresentinel-3",
+        "connectionName": "azuresentinel-3",
+        "connectionProperties": {}
+      },
+      "azuresentinel_msi": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/azuresentinel",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/azuresentinel-Send-to-SharePoint",
+        "connectionName": "azuresentinel-Send-to-SharePoint",
+        "connectionProperties": {
+          "authentication": {
+            "type": "ManagedServiceIdentity"
+          }
+        }
+      },
+      "microsoftsentinel_msi": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/Azuresentinel",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/MicrosoftSentinel-Add-UserToWatchlist-SidToUPN",
+        "connectionName": "MicrosoftSentinel-Add-UserToWatchlist-SidToUPN",
+        "connectionProperties": {
+          "authentication": {
+            "type": "ManagedServiceIdentity"
+          }
+        }
+      },
+      "azuread": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/azuread",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/azuread-1",
+        "connectionName": "azuread-1",
+        "connectionProperties": {}
+      },
+      "office365": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/office365",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/office365-3",
+        "connectionName": "office365-3",
+        "connectionProperties": {}
+      },
+      "sharepointonline": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/sharepointonline",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/sharepointonline-1",
+        "connectionName": "sharepointonline-1",
+        "connectionProperties": {}
+      },
+      "wdatp": {
+        "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/wdatp",
+        "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/wdatp",
+        "connectionName": "wdatp",
+        "connectionProperties": {}
+      }
+    },
+
+    "api_name_to_managed_api_path": {
+      "description": "The 'id' field in each connection entry follows the pattern: /subscriptions/{subId}/providers/Microsoft.Web/locations/{region}/managedApis/{apiName}",
+      "mappings": {
+        "azuresentinel": "Microsoft Sentinel (legacy connector key)",
+        "Azuresentinel": "Microsoft Sentinel (MSI-capable variant, note capital A)",
+        "microsoftsentinel": "Microsoft Sentinel (newer connector key)",
+        "azuread": "Azure Active Directory / Entra ID connector",
+        "office365": "Office 365 Outlook connector",
+        "sharepointonline": "SharePoint Online connector",
+        "wdatp": "Microsoft Defender for Endpoint (Windows Defender ATP) connector"
+      }
+    },
+
+    "multiple_connections_same_api": {
+      "description": "A single workflow can reference multiple connections to the same managed API (e.g., one for the trigger using MSI, another for actions using a service account). Each gets a unique key in the $connections object. Suffixes like _1, _2 or descriptive names are common.",
+      "example_pattern": {
+        "azuresentinel": "Used for trigger (MSI-authenticated Sentinel connection)",
+        "azuresentinel_1": "Used for Entities actions (service-account Sentinel connection)",
+        "azuread": "Used for AAD group and user operations",
+        "azuread_1": "Alternative AAD connection"
+      }
+    }
+  }
+}

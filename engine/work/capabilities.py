@@ -70,16 +70,6 @@ Available capabilities with argument shapes:
 - save_secret: {"project_id": "my-project", "key": "...", "value": "...", "type": "generic"} — use to store a discovered or user-provided secret in the project vault.
 - fetch_skill: {"skill_id": "vendor--skill-name"} — use to fetch a skill from the local catalog/cache for evaluation.
 - get_kb_candidates: {"task": "...", "reason": "...", "project_desc": "...", "offset": 10, "limit": 10, "exclude_ids": ["entry-id"]} — request another compact batch of local KB candidate cards without loading the full manifest.
-- list_projects: {} — [engine internal] list all known projects
-- resolve_project: {"project_id": "my-project"} — [engine internal] load a project entry from the registry
-- init_project: {"project_id": "...", "project_name": "...", "project_root": "projects/<project-id>/delivery"} — [engine internal] create project folders from a bootstrap decision
-- load_task_state: {"runtime_dir": "/path/to/runtime"} — [engine internal] load active task state
-- save_task_state: {"runtime_dir": "/path/to/runtime", "state": {...}} — [engine internal] save active task state
-- load_memory: {"runtime_dir": "/path/to/runtime"} — [engine internal] load all memory entries
-- save_memory: {"runtime_dir": "/path/to/runtime", "key": "name", "data": {...}} — [engine internal] save memory entry
-- validate_schema: {"schema_name": "file.schema.json", "data": {...}} — [engine internal] check required fields from a local schema
-- fetch_source: {"url": "..."} — compatibility alias that redirects to host-supported source fetch behavior when native web fetch is unavailable.
-- search_sources: {"query": "..."} — compatibility alias that redirects to host-supported source search behavior when native search is unavailable.
 - http_request_with_secret_binding: {"project_id": "my-project", "method": "GET", "url": "...", "headers": {"Authorization": "Bearer {{secret:graph_token}}"}} — send an HTTPS request with secrets bound at runtime.
 - validate_logic_app_workflow: {"path": "/absolute/path/workflow.json"} or {"definition": {...}} — validate a Logic Apps workflow or workflow resource shape.
 - deploy_logic_app_definition: {"template_path": "/absolute/path/template.json", "resource_group": "rg-name"} — deploy a Logic Apps ARM template via Azure CLI.
@@ -123,7 +113,14 @@ def _load_secret_map(project_id: str, keys: list[str] | None = None) -> dict[str
 def _bind_secret_placeholders(value: Any, secret_map: dict[str, str]) -> Any:
     if isinstance(value, str):
         result = value
+        # Cap iterations to prevent infinite loops when a secret value itself
+        # contains {{secret:...}} placeholders (e.g. mutual references).
+        max_replacements = len(secret_map) + 5
+        iterations = 0
         while "{{secret:" in result:
+            iterations += 1
+            if iterations > max_replacements:
+                raise ValueError("Secret placeholder expansion exceeded maximum iterations — possible circular reference")
             start = result.find("{{secret:")
             end = result.find("}}", start)
             if end == -1:
@@ -187,6 +184,7 @@ def _powerbi_request(
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             raw_body = resp.read().decode("utf-8", errors="replace")
+            raw_body = _redact_secrets_from_text(raw_body, secret_map)
             content_type = resp.headers.get("Content-Type", "")
             parsed_body: Any = raw_body
             if "json" in content_type.lower() and raw_body:
@@ -206,6 +204,7 @@ def _powerbi_request(
             }
     except urllib.error.HTTPError as exc:
         body_text = exc.read().decode("utf-8", errors="replace")
+        body_text = _redact_secrets_from_text(body_text, secret_map)
         return {
             "capability": capability,
             "status": "failed",
@@ -362,7 +361,12 @@ def _cap_save_memory(capability: str, arguments: dict[str, Any]) -> dict[str, An
         safe_dir = ensure_within_repo(Path(runtime_dir), "save_memory runtime_dir")
     except ValueError as exc:
         return {"capability": capability, "status": "failed", "result": None, "issues": [str(exc)]}
-    memory_path = safe_dir / "memory" / f"{arguments.get('key', '')}.json"
+    key = str(arguments.get("key", "")).replace("/", "_").replace("\\", "_").replace("..", "_")
+    memory_path = safe_dir / "memory" / f"{key}.json"
+    try:
+        ensure_within_repo(memory_path, "save_memory final path")
+    except ValueError as exc:
+        return {"capability": capability, "status": "failed", "result": None, "issues": [str(exc)]}
     try:
         write_json(memory_path, arguments.get("data", {}))
         return {"capability": capability, "status": "ok", "result": {"path": str(memory_path)}, "issues": []}
@@ -423,7 +427,12 @@ def _cap_persist_artifact(capability: str, arguments: dict[str, Any]) -> dict[st
     artifacts_dir = safe_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-    artifact_path = artifacts_dir / f"{arguments.get('agent', 'unknown')}_result_{ts}.json"
+    agent_name = str(arguments.get('agent', 'unknown')).replace("/", "_").replace("\\", "_").replace("..", "_")
+    artifact_path = artifacts_dir / f"{agent_name}_result_{ts}.json"
+    try:
+        ensure_within_repo(artifact_path, "persist_artifact final path")
+    except ValueError as exc:
+        return {"capability": capability, "status": "failed", "result": None, "issues": [str(exc)]}
     write_json(artifact_path, data)
     return {"capability": capability, "status": "ok", "result": {"path": str(artifact_path)}, "issues": []}
 
@@ -502,6 +511,9 @@ def _cap_run_command(capability: str, arguments: dict[str, Any]) -> dict[str, An
     timeout_limit = _require("SPAWN_TIMEOUT_SECONDS")
     inline_limit = _require("CMD_OUTPUT_INLINE_LIMIT")
     cmd = arguments.get("command", [])
+    if isinstance(cmd, str):
+        import shlex  # noqa: PLC0415
+        cmd = shlex.split(cmd)
     cwd = arguments.get("cwd", str(repo_root))
     try:
         safe_cwd = ensure_within_repo(Path(cwd), "run_command cwd")
@@ -707,7 +719,7 @@ def _cap_http_request_with_secret_binding(capability: str, arguments: dict[str, 
         data = str(raw_body).encode("utf-8")
 
     req = urllib.request.Request(bound_url, data=data, headers=headers or {}, method=method)
-    timeout = int(arguments.get("timeout", 120))
+    timeout = min(int(arguments.get("timeout", 120)), 300)  # Cap at 5 minutes
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
@@ -719,11 +731,12 @@ def _cap_http_request_with_secret_binding(capability: str, arguments: dict[str, 
                     body = json.loads(raw)
                 except json.JSONDecodeError:
                     body = raw
+            redacted_url = _redact_secrets_from_text(bound_url, secret_map)
             return {
                 "capability": capability,
                 "status": "ok",
                 "result": {
-                    "url": bound_url,
+                    "url": redacted_url,
                     "status_code": getattr(resp, "status", 200),
                     "headers": dict(resp.headers.items()),
                     "body": body,
@@ -733,10 +746,11 @@ def _cap_http_request_with_secret_binding(capability: str, arguments: dict[str, 
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace")
         error_body = _redact_secrets_from_text(error_body, secret_map)
+        redacted_url = _redact_secrets_from_text(bound_url, secret_map)
         return {
             "capability": capability,
             "status": "failed",
-            "result": {"url": bound_url, "status_code": exc.code, "body": error_body},
+            "result": {"url": redacted_url, "status_code": exc.code, "body": error_body},
             "issues": [f"HTTP {exc.code}: {error_body[:500]}"],
         }
     except OSError as exc:
@@ -846,6 +860,25 @@ def _cap_deploy_logic_app_definition(capability: str, arguments: dict[str, Any])
         return {"capability": capability, "status": "failed", "result": None, "issues": ["Deployment command timed out after 600s"]}
 
 
+def _check_write_path_allowed(safe_path: Path, capability: str) -> dict[str, Any] | None:
+    """Shared check: block writes to protected directories (engine/, agents/, docs/, etc.)."""
+    from engine.work.repo_paths import REPO_ROOT  # noqa: PLC0415
+    try:
+        rel = str(safe_path.relative_to(REPO_ROOT)).replace("\\", "/")
+    except ValueError:
+        return None
+    from engine.work.destructive_guard import _PROTECTED_WRITE_PREFIXES  # noqa: PLC0415
+    for prefix in _PROTECTED_WRITE_PREFIXES:
+        if rel.startswith(prefix) or rel == prefix.rstrip("/"):
+            return {
+                "capability": capability,
+                "status": "failed",
+                "result": None,
+                "issues": [f"Writing to '{prefix}' is not permitted. Deliverables must be in the projects/ directory."],
+            }
+    return None
+
+
 def _cap_create_sharepoint_list_schema(capability: str, arguments: dict[str, Any]) -> dict[str, Any]:
     target_path = arguments.get("path", "")
     schema = arguments.get("schema")
@@ -853,6 +886,9 @@ def _cap_create_sharepoint_list_schema(capability: str, arguments: dict[str, Any
         return {"capability": capability, "status": "failed", "result": None, "issues": ["path and schema are required"]}
     try:
         safe_path = ensure_within_repo(Path(target_path), "create_sharepoint_list_schema path")
+        blocked = _check_write_path_allowed(safe_path, capability)
+        if blocked:
+            return blocked
         _write_json_file(safe_path, schema)
         return {"capability": capability, "status": "ok", "result": {"path": target_path}, "issues": []}
     except (ValueError, OSError) as exc:
@@ -866,6 +902,9 @@ def _cap_create_powerbi_import_bundle(capability: str, arguments: dict[str, Any]
         return {"capability": capability, "status": "failed", "result": None, "issues": ["path and bundle are required"]}
     try:
         safe_path = ensure_within_repo(Path(target_path), "create_powerbi_import_bundle path")
+        blocked = _check_write_path_allowed(safe_path, capability)
+        if blocked:
+            return blocked
         _write_json_file(safe_path, bundle)
         return {"capability": capability, "status": "ok", "result": {"path": target_path}, "issues": []}
     except (ValueError, OSError) as exc:
@@ -1603,13 +1642,28 @@ def _cap_read_file_lines(capability: str, arguments: dict[str, Any]) -> dict[str
         rel = str(safe_path)
 
     try:
-        with open(safe_path, encoding="utf-8", errors="replace") as fh:
-            all_lines = fh.readlines()
+        if mode == "head":
+            selected = []
+            total = 0
+            with open(safe_path, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    total += 1
+                    if len(selected) < n:
+                        selected.append(line)
+            # Count remaining lines without storing
+        else:
+            # Tail: use a deque to keep only last N lines in memory.
+            from collections import deque  # noqa: PLC0415
+            tail_buf: deque[str] = deque(maxlen=n)
+            total = 0
+            with open(safe_path, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    total += 1
+                    tail_buf.append(line)
+            selected = list(tail_buf)
     except OSError as exc:
         return {"capability": capability, "status": "failed", "result": None, "issues": [str(exc)]}
 
-    total = len(all_lines)
-    selected = all_lines[:n] if mode == "head" else all_lines[-n:]
     # Strip trailing newlines for clean output
     lines = [line.rstrip("\n") for line in selected]
 
@@ -1679,4 +1733,14 @@ def execute_capability(request: dict[str, Any]) -> dict[str, Any]:
             "result": None,
             "issues": [f"Unknown capability: {capability}"],
         }
-    return handler(capability, arguments)
+    try:
+        return handler(capability, arguments)
+    except Exception as exc:
+        # Never let a capability handler crash the pipeline — return a
+        # structured error so the agent can react or the engine can continue.
+        return {
+            "capability": capability,
+            "status": "failed",
+            "result": None,
+            "issues": [f"Internal error in capability handler: {type(exc).__name__}: {exc}"],
+        }

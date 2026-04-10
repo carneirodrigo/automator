@@ -1,0 +1,137 @@
+{
+  "id": "powerbi-monthly-dynamic-reports",
+  "title": "Power BI - Dynamic Monthly Reports from SharePoint CSVs",
+  "description": "Auto-adjusting monthly reports: combine CSVs by month, date dimension, time intelligence, slicer patterns",
+  "tags": ["power-bi", "sharepoint", "csv", "monthly", "dynamic", "dax", "power-query"],
+  "source": "web-research",
+  "references": [
+    "https://learn.microsoft.com/en-us/power-query/combine-files-csv",
+    "https://learn.microsoft.com/en-us/power-bi/guidance/model-date-tables",
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/incremental-refresh-overview",
+    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualization-slicers",
+    "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-scheduled-refresh"
+  ],
+  "content": {
+    "file_naming_strategy": {
+      "description": "Consistent file naming is critical for extracting year/month in Power Query M. Choose one convention and apply it to all CSV files in the SharePoint folder.",
+      "recommended_patterns": [
+        {
+          "pattern": "report_YYYY_MM.csv",
+          "example": "report_2024_01.csv",
+          "extraction_m": "FileYear = Number.FromText(Text.Middle([Name], 7, 4)),\nFileMonth = Number.FromText(Text.Middle([Name], 12, 2))",
+          "notes": "Most unambiguous. Text.Middle uses zero-based offset: 'report_' is 7 chars, year is 4 chars at offset 7, underscore at 11, month at 12."
+        },
+        {
+          "pattern": "YYYY-MM.csv",
+          "example": "2024-01.csv",
+          "extraction_m": "Parts = Text.Split(Text.Start([Name], Text.Length([Name]) - 4), \"-\"),\nFileYear = Number.FromText(Parts{0}),\nFileMonth = Number.FromText(Parts{1})",
+          "notes": "Split on hyphen after stripping .csv extension. Clean and simple."
+        },
+        {
+          "pattern": "MonthName_YYYY.csv",
+          "example": "January_2024.csv",
+          "extraction_m": "MonthLookup = [\n  January=1, February=2, March=3, April=4, May=5, June=6,\n  July=7, August=8, September=9, October=10, November=11, December=12\n],\nParts = Text.Split(Text.Start([Name], Text.Length([Name]) - 4), \"_\"),\nFileYear = Number.FromText(Parts{1}),\nFileMonthName = Parts{0},\nFileMonth = Record.Field(MonthLookup, FileMonthName)",
+          "notes": "Requires a month-name lookup record. More brittle if locale changes."
+        },
+        {
+          "pattern": "YYYY_MM_description.csv",
+          "example": "2024_03_sales.csv",
+          "extraction_m": "FileYear = Number.FromText(Text.Start([Name], 4)),\nFileMonth = Number.FromText(Text.Middle([Name], 5, 2))",
+          "notes": "Year and month at fixed positions at start of filename. Very reliable."
+        }
+      ],
+      "best_practice": "Use report_YYYY_MM.csv or YYYY_MM.csv. These patterns are unambiguous, sort correctly alphabetically/chronologically, and are easy to extract with Text.Middle or Text.Split."
+    },
+    "m_query_monthly_with_date_extraction": "// Full M query: SharePoint folder + combine CSVs + extract year/month from filename\n// Assumes filenames like report_2024_01.csv\nlet\n    // ── 1. Connect to SharePoint ──────────────────────────────────────────\n    Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/MySite\", [ApiVersion=15]),\n\n    // ── 2. Filter to target folder ───────────────────────────────────────\n    FilteredFolder = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Shared Documents/Monthly-Reports/\")),\n\n    // ── 3. Keep only .csv files ──────────────────────────────────────────\n    CSVOnly = Table.SelectRows(FilteredFolder, each [Extension] = \".csv\"),\n\n    // ── 4. Capture filename before expanding ─────────────────────────────\n    AddFilename = Table.AddColumn(CSVOnly, \"SourceFile\", each [Name], type text),\n\n    // ── 5. Extract Year from filename (chars 7-10 in \"report_2024_01.csv\")\n    AddYear = Table.AddColumn(AddFilename, \"FileYear\", each Number.FromText(Text.Middle([SourceFile], 7, 4)), Int64.Type),\n\n    // ── 6. Extract Month from filename (chars 12-13)\n    AddMonth = Table.AddColumn(AddYear, \"FileMonth\", each Number.FromText(Text.Middle([SourceFile], 12, 2)), Int64.Type),\n\n    // ── 7. Parse each CSV binary ──────────────────────────────────────────\n    ParseCSV = Table.AddColumn(AddMonth, \"ParsedCSV\",\n        each Csv.Document([Content], [\n            Delimiter = \",\",\n            Columns = null,\n            Encoding = 65001,\n            QuoteStyle = QuoteStyle.None\n        ])\n    ),\n\n    // ── 8. Promote headers in each parsed table ───────────────────────────\n    PromoteHeaders = Table.TransformColumns(ParseCSV, {\n        \"ParsedCSV\", each Table.PromoteHeaders(_, [PromoteAllScalars=true])\n    }),\n\n    // ── 9. Get column names from first file (all files must share schema)\n    SampleColumns = Table.ColumnNames(PromoteHeaders{0}[ParsedCSV]),\n\n    // ── 10. Expand all CSV rows into main table ───────────────────────────\n    Expanded = Table.ExpandTableColumn(PromoteHeaders, \"ParsedCSV\", SampleColumns),\n\n    // ── 11. Build a proper Date column from Year + Month (use 1st of month)\n    AddDateColumn = Table.AddColumn(Expanded, \"MonthDate\", each #date([FileYear], [FileMonth], 1), type date),\n\n    // ── 12. Remove columns no longer needed ───────────────────────────────\n    Cleaned = Table.RemoveColumns(AddDateColumn, {\"Content\", \"Extension\", \"Date accessed\", \"Date modified\", \"Date created\", \"Attributes\", \"Folder Path\"}),\n\n    // ── 13. Set data types ─────────────────────────────────────────────────\n    // Replace col1, col2 with your actual CSV column names\n    TypedTable = Table.TransformColumnTypes(Cleaned, {\n        {\"SourceFile\",  type text},\n        {\"FileYear\",    Int64.Type},\n        {\"FileMonth\",   Int64.Type},\n        {\"MonthDate\",   type date}\n        // add your CSV column types here, e.g. {\"Amount\", Currency.Type}\n    })\nin\n    TypedTable",
+    "date_dimension_table_m": "// Power Query M: Standalone Date Dimension table\n// Create as a separate query named 'DateTable' and disable load if using DAX date table instead\nlet\n    StartDate    = #date(2023, 1, 1),\n    EndDate      = Date.From(DateTime.LocalNow()),\n    DateCount    = Duration.Days(EndDate - StartDate) + 1,\n    DateList     = List.Dates(StartDate, DateCount, #duration(1, 0, 0, 0)),\n    DateTable    = Table.FromList(DateList, Splitter.SplitByNothing(), {\"Date\"}),\n    TypeDate     = Table.TransformColumnTypes(DateTable, {{\"Date\", type date}}),\n    AddYear      = Table.AddColumn(TypeDate,    \"Year\",         each Date.Year([Date]),                  Int64.Type),\n    AddMonthNum  = Table.AddColumn(AddYear,     \"MonthNumber\",  each Date.Month([Date]),                 Int64.Type),\n    AddMonthName = Table.AddColumn(AddMonthNum, \"MonthName\",    each Date.ToText([Date], \"MMMM\"),         type text),\n    AddMonthShort= Table.AddColumn(AddMonthName,\"MonthShort\",   each Date.ToText([Date], \"MMM\"),          type text),\n    AddYearMonth = Table.AddColumn(AddMonthShort,\"YearMonth\",   each Text.From([Year]) & \"-\" & Text.PadStart(Text.From([MonthNumber]), 2, \"0\"),  type text),\n    AddQuarter   = Table.AddColumn(AddYearMonth, \"Quarter\",     each \"Q\" & Text.From(Date.QuarterOfYear([Date])),  type text),\n    AddYearQtr   = Table.AddColumn(AddQuarter,  \"YearQuarter\",  each Text.From([Year]) & \" \" & [Quarter],  type text),\n    AddDayOfWeek = Table.AddColumn(AddYearQtr,  \"DayOfWeek\",    each Date.DayOfWeekName([Date]),          type text),\n    AddIsWeekend = Table.AddColumn(AddDayOfWeek,\"IsWeekend\",    each Date.DayOfWeek([Date]) >= 5,         type logical),\n    AddDayNum    = Table.AddColumn(AddIsWeekend,\"DayNumber\",    each Date.Day([Date]),                   Int64.Type),\n    SortByDate   = Table.Sort(AddDayNum, {{\"Date\", Order.Ascending}})\nin\n    SortByDate",
+    "date_dimension_table_dax": "// Alternatively, create the Date table directly in DAX as a Calculated Table.\n// In Power BI Desktop: Modeling tab > New Table\n\nDate = \nVAR StartDate = DATE(2023, 1, 1)\nVAR EndDate   = TODAY()\nVAR DateList  = CALENDAR(StartDate, EndDate)\nRETURN\nADDCOLUMNS(\n    DateList,\n    \"Year\",         YEAR([Date]),\n    \"MonthNumber\",  MONTH([Date]),\n    \"MonthName\",    FORMAT([Date], \"MMMM\"),\n    \"MonthShort\",   FORMAT([Date], \"MMM\"),\n    \"YearMonth\",    FORMAT([Date], \"YYYY-MM\"),\n    \"Quarter\",      \"Q\" & FORMAT(QUARTER([Date]), \"0\"),\n    \"YearQuarter\",  FORMAT([Date], \"YYYY\") & \" Q\" & FORMAT(QUARTER([Date]), \"0\"),\n    \"DayOfWeek\",    FORMAT([Date], \"DDDD\"),\n    \"IsWeekend\",    IF(WEEKDAY([Date], 2) >= 6, TRUE(), FALSE())\n)\n\n// IMPORTANT: After creating the table, mark it as a Date Table:\n// In Power BI Desktop > select the table > Table Tools > Mark as date table > select the Date column\n// This enables all DAX time intelligence functions to work correctly.",
+    "mark_as_date_table": {
+      "requirement": "For Classic time intelligence DAX functions (TOTALYTD, PREVIOUSMONTH, etc.) to work correctly, the Date table MUST be marked as a Date Table in Power BI Desktop.",
+      "steps": [
+        "1. In the Data view, select the DateTable",
+        "2. Click 'Table Tools' in the ribbon",
+        "3. Click 'Mark as date table'",
+        "4. Select the Date column (must be of type Date, contain unique values, no blanks, no missing dates, span full years)",
+        "5. Click OK"
+      ],
+      "requirements": [
+        "Column must be type Date (not DateTime)",
+        "Must contain unique values (one row per day)",
+        "No blank values",
+        "No missing dates in any range",
+        "Must span full years (Jan 1 through Dec 31 for every year included)"
+      ]
+    },
+    "relationship_setup": {
+      "description": "Link the Date dimension table to the fact table (monthly data) via a many-to-one relationship.",
+      "steps": [
+        "1. In Power BI Desktop, go to Model view",
+        "2. Drag DateTable[Date] to FactTable[MonthDate] (the date column created in M query)",
+        "3. Set relationship direction: Single (DateTable filters FactTable, not the reverse)",
+        "4. Cardinality: Many-to-one (*:1) — FactTable has many rows per month, DateTable has one row per day",
+        "5. For monthly data, you may need to join on a YearMonth text key instead of full date — see note below"
+      ],
+      "monthly_granularity_note": "If your fact table only has one row per month (not per day), add a YearMonth key to both tables and join on that: FactTable[YearMonth] -> DateTable[YearMonth]. This avoids blank rows in time intelligence calculations for days within the month.",
+      "dax_relationship_example": "// In DateTable (calculated table), YearMonth is already a column.\n// In FactTable (from M query), MonthDate = #date(FileYear, FileMonth, 1).\n// Join DateTable[Date] to FactTable[MonthDate] — this works because MonthDate is always the 1st of the month,\n// and DateTable has a row for every day including the 1st."
+    },
+    "dax_time_intelligence": {
+      "prerequisite": "All time intelligence measures require a marked Date table with a continuous Date column.",
+      "measures": {
+        "total_current": "Total Amount = SUM(FactTable[Amount])",
+        "previous_month": "Amount Previous Month =\n    CALCULATE(\n        [Total Amount],\n        PREVIOUSMONTH('DateTable'[Date])\n    )",
+        "mom_change_absolute": "MoM Change =\n    VAR CurrentMonth = [Total Amount]\n    VAR PrevMonth    = [Amount Previous Month]\n    RETURN CurrentMonth - PrevMonth",
+        "mom_change_percent": "MoM Change % =\n    VAR CurrentMonth = [Total Amount]\n    VAR PrevMonth    = [Amount Previous Month]\n    RETURN\n        IF(\n            ISBLANK(PrevMonth) || PrevMonth = 0,\n            BLANK(),\n            DIVIDE(CurrentMonth - PrevMonth, PrevMonth)\n        )",
+        "ytd": "Amount YTD =\n    TOTALYTD([Total Amount], 'DateTable'[Date])",
+        "same_period_last_year": "Amount SPLY =\n    CALCULATE(\n        [Total Amount],\n        SAMEPERIODLASTYEAR('DateTable'[Date])\n    )",
+        "yoy_change_percent": "YoY Change % =\n    VAR Current = [Total Amount]\n    VAR SPLY    = [Amount SPLY]\n    RETURN\n        IF(\n            ISBLANK(SPLY) || SPLY = 0,\n            BLANK(),\n            DIVIDE(Current - SPLY, SPLY)\n        )",
+        "last_3_months_rolling": "Amount Last 3 Months =\n    CALCULATE(\n        [Total Amount],\n        DATESINPERIOD(\n            'DateTable'[Date],\n            LASTDATE('DateTable'[Date]),\n            -3,\n            MONTH\n        )\n    )",
+        "running_total": "Running Total =\n    CALCULATE(\n        [Total Amount],\n        FILTER(\n            ALL('DateTable'),\n            'DateTable'[YearMonth] <= MAX('DateTable'[YearMonth])\n        )\n    )",
+        "current_month_label": "Current Month Label =\n    FORMAT(MAX('DateTable'[Date]), \"MMMM YYYY\")"
+      }
+    },
+    "month_slicer_setup": {
+      "description": "Add a month/year slicer that controls all visuals on the page.",
+      "steps": [
+        "1. Add a Slicer visual to the report page",
+        "2. Set the Field to DateTable[YearMonth] (the text column in YYYY-MM format — it sorts correctly alphabetically)",
+        "3. In the Format pane > Slicer settings > Style: choose 'Dropdown' for compact or 'List' for always-visible",
+        "4. Set Sort order on the YearMonth column to Ascending (it will sort chronologically because of YYYY-MM format)",
+        "5. Optionally use DateTable[MonthName] as the slicer field and set Sort by Column to DateTable[MonthNumber] so months appear in correct order"
+      ],
+      "slicer_with_month_name_sort": "// To display 'January 2024' in the slicer while sorting correctly:\n// 1. Create a MonthYear column in DateTable:\n// MonthYear = FORMAT([Date], \"MMMM YYYY\")\n// 2. Create a sort key:\n// MonthYearSort = YEAR([Date]) * 100 + MONTH([Date])  -- gives 202401, 202402, etc.\n// 3. In Power BI: select MonthYear column > Column Tools > Sort by column > MonthYearSort",
+      "sync_slicers_across_pages": [
+        "1. Select the slicer on page 1",
+        "2. View > Sync slicers panel opens on the right",
+        "3. For each report page, toggle: Sync (slicer selection propagates) and Visible (slicer shown on that page)",
+        "4. Pages with Sync enabled but Visible disabled will respond to slicer selections without showing the slicer control"
+      ],
+      "relative_date_slicer": "For 'Last N months' dynamic filters, use a Relative date slicer: set the slicer field to a date column, then in Format > Slicer settings > Relative date, configure 'Last 3 months' or similar. This automatically adjusts as time passes."
+    },
+    "auto_refresh_new_month": {
+      "description": "Adding a new CSV to the SharePoint folder automatically includes its data on the next scheduled refresh — no Power BI changes needed.",
+      "how_it_works": "The M query runs fresh on every refresh. SharePoint.Files() re-reads the folder listing, picks up the new file, parses it, and appends its rows to the combined table. The new month's data appears in all visuals automatically after refresh completes.",
+      "steps_to_add_new_month": [
+        "1. Create the new monthly CSV file following the naming convention (e.g. report_2024_02.csv)",
+        "2. Upload it to the same SharePoint folder",
+        "3. Trigger a Power BI dataset refresh (manually or wait for scheduled refresh)",
+        "4. The new month's data appears in all visuals automatically"
+      ],
+      "schedule_refresh_config": "In Power BI Service: go to the dataset > Settings > Refresh > Schedule refresh. Configure daily or up to 8 refreshes/day (Pro) or 48/day (Premium). No gateway required for SharePoint Online.",
+      "power_automate_for_monthly_trigger": "Power BI has no native monthly refresh schedule. To trigger refresh when a new file is uploaded to SharePoint: create a Power Automate flow with SharePoint trigger 'When a file is created in a folder', then action 'Refresh a dataset' using the Power BI connector."
+    },
+    "incremental_refresh": {
+      "overview": "Incremental refresh is designed for large datasets with date-filtered sources (SQL, APIs). For SharePoint folder + CSV patterns, it has limited applicability but can work with customisation.",
+      "how_it_works": "Define RangeStart and RangeEnd Power Query parameters (type DateTime). Filter your table by these parameters. Power BI Service creates partitions and only refreshes rows within the refresh window on each cycle.",
+      "sharepoint_folder_applicability": "SharePoint folder sources do not support query folding, so true incremental refresh (pushing filter predicates to the source) does not work. However, you can use RangeStart/RangeEnd to filter WHICH files to load based on their filename-extracted date, reducing data loaded per refresh.",
+      "rangestart_rangeend_file_filter_example": "// Incremental refresh approach for SharePoint folder:\n// Add two parameters: RangeStart (DateTime) and RangeEnd (DateTime)\n// Then filter CSVOnly by the extracted FileYear/FileMonth falling within the range:\n\nFilterByDateRange = Table.SelectRows(CSVOnly, each\n    let\n        // Build a date from the filename\n        yr = Number.FromText(Text.Middle([Name], 7, 4)),\n        mo = Number.FromText(Text.Middle([Name], 12, 2)),\n        fileDate = #date(yr, mo, 1)\n    in\n        fileDate >= Date.From(RangeStart) and fileDate < Date.From(RangeEnd)\n)",
+      "when_to_use": "Use incremental refresh for SharePoint CSVs only if you have many files (24+ months) and refresh time is a problem. For most monthly reports with 12-36 files, standard full refresh is fast enough.",
+      "plan_requirement": "Incremental refresh is available on all Power BI plans (Pro, PPU, Premium). Real-time DirectQuery partition requires Premium/PPU."
+    },
+    "report_design_best_practices": {
+      "page_structure": "Create one Summary page (KPIs + trend chart) and one Detail page (table + filters). Use a consistent month slicer synced across both pages.",
+      "dynamic_title": "// DAX measure for dynamic report title:\nReport Title = \"Monthly Report — \" & SELECTEDVALUE('DateTable'[YearMonth], \"All Months\")",
+      "conditional_formatting": "Use conditional formatting on MoM Change % column in tables: green background for positive, red for negative. In table > Format > Cell elements > Background color > Field value > MoM Change %.",
+      "color_theme": "Define a consistent color theme JSON file and apply it via View > Themes > Browse for themes. This ensures all charts use the same palette."
+    }
+  }
+}

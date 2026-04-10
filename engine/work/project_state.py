@@ -349,7 +349,7 @@ def ingest_input_files(
 ) -> list[str]:
     if not inputs_dir.exists():
         return []
-    inbox_files = [file for file in sorted(inputs_dir.iterdir()) if file.is_file()]
+    inbox_files = [file for file in sorted(inputs_dir.iterdir()) if file.is_file() and not file.is_symlink()]
     if not inbox_files:
         return []
     canonical_dir = projects_dir / project_id / "runtime" / "inputs"

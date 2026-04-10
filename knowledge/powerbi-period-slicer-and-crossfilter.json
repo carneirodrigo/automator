@@ -1,0 +1,130 @@
+{
+  "id": "powerbi-period-slicer-and-crossfilter",
+  "title": "Power BI - Period Slicer, Sync, Bookmarks, and Field Parameters for Security Dashboards",
+  "description": "Production patterns for date slicers (between, relative, dropdown), syncing slicers across pages, default last-12-months behaviour, bookmarks for Monthly/Quarterly/Yearly view switching, and field parameters for dynamic axis switching",
+  "tags": ["power-bi", "slicer", "cross-filter", "bookmarks", "field-parameters", "sync-slicers", "security-reporting", "date-slicer"],
+  "source": "web-research",
+  "references": [
+    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualization-slicers",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-bookmarks",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-field-parameters",
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-sync-slicers"
+  ],
+  "content": {
+    "slicer_types": {
+      "list_slicer": {
+        "description": "Shows all distinct values as a vertical or horizontal list. Users click one or multiple values.",
+        "best_for": "MetricName, year, small number of periods. Not ideal for 24+ months.",
+        "setup": "Add Slicer visual > drag DateTable[MonthYear] to Field > Format pane > Slicer settings > Style = List."
+      },
+      "dropdown_slicer": {
+        "description": "Compact dropdown that shows selected value and expands on click. Best for space-constrained layouts.",
+        "best_for": "Month or quarter selection in a header bar alongside other slicers.",
+        "setup": "Format pane > Slicer settings > Style = Dropdown. Default: collapsed, shows selected value."
+      },
+      "between_date_slider": {
+        "description": "A range slider for selecting a start and end date. Works only on Date-type columns.",
+        "best_for": "Ad-hoc date range selection by analysts.",
+        "setup": "Drag a Date column (DateTable[Date]) to the slicer field. Format pane > Slicer settings > Style = Between. Two date pickers appear.",
+        "note": "When used with a monthly snapshot model, selecting a range like Feb 15 – Apr 15 will include Feb 1 and Apr 1 snapshots (since snapshots are on the 1st). This is usually desired — the analyst sees all snapshots within the approximate range."
+      },
+      "relative_date_slicer": {
+        "description": "Automatically filters to a rolling window relative to today: 'last N days/months/years'. Requires a Date column (not a text label).",
+        "setup": [
+          "1. Add Slicer visual > drag DateTable[Date] to Field",
+          "2. Format pane > Slicer settings > Style = Relative date",
+          "3. Configure: 'Last', enter number, select 'Months' (or Quarters, Years)",
+          "4. Optionally check 'Include today'"
+        ],
+        "last_12_months": "Set to: Last 12 Months. This automatically rolls forward — on March 1, 2026, it shows April 2025 through March 2026. No manual update needed.",
+        "for_monthly_snapshots": "The relative date filter acts on DateTable[Date], which then filters the fact table through the relationship. Monthly snapshots on the 1st of each month within the 12-month window are included."
+      },
+      "tile_button_slicer": {
+        "description": "Each value shows as a button/tile. Good for a small fixed set of options.",
+        "best_for": "Year selection (2023, 2024, 2025, 2026) or metric category buttons.",
+        "setup": "Format pane > Slicer settings > Style = Tile."
+      }
+    },
+    "sync_slicers_across_pages": {
+      "overview": "Sync slicers allows a slicer on one page to control filters on other pages. Users change the month once and all report pages update.",
+      "setup_steps": [
+        "1. Select the slicer on the page where it is physically placed",
+        "2. View ribbon > Sync slicers — panel opens on the right",
+        "3. In the Sync slicers panel, each report page is listed",
+        "4. For each page: toggle 'Sync' (eye icon with sync arrows) to make that page respond to the slicer; toggle 'Visible' (eye icon) to show the slicer control on that page",
+        "5. A page with Sync=ON and Visible=OFF will filter correctly but won't show the slicer UI — use this for detail pages that receive context from a summary page slicer",
+        "6. Slicers on different pages can sync to each other only if they use the same field (same table[column])"
+      ],
+      "group_name": "In the Sync slicers panel, assign the same 'Group name' to slicers that should sync together across pages. Default: Power BI auto-assigns a group when you enable sync.",
+      "slicer_on_every_page_vs_synced": "Option A: Place a visible slicer on every page, all synced. Users can see and change the period on any page. Option B: Place the slicer only on a Summary page (Visible=ON), sync to all other pages (Visible=OFF). Simpler layout on detail pages.",
+      "slicer_field_must_match": "Syncing only works if both slicers filter the same column. If one slicer uses DateTable[MonthYear] and another uses DateTable[Date], they will not sync — change both to the same column.",
+      "reset_slicer_button": "Create a bookmark with the slicer at its default state (last 12 months selected). Add a Button visual, set Action > Bookmark to the reset bookmark. Place on all pages for consistent reset behaviour."
+    },
+    "default_last_12_months": {
+      "method_1_relative_slicer": "Use a Relative Date slicer (Last 12 Months) — it automatically adjusts as months pass. No bookmark needed. Best for most cases.",
+      "method_2_bookmark_default": "Create a bookmark while the date slicer shows 'last 12 months' selected. Mark this bookmark as the 'Default bookmark' (right-click in Bookmarks pane > Set as default). When users open the report, the slicer starts at that state.",
+      "method_3_visual_filter": "Add a visual-level filter on the matrix: DateTable[MonthSort] > Top N, 12, by DateTable[MonthSort] (DESC). This always shows the latest 12 months without requiring a slicer selection. The slicer is then supplementary for custom ranges.",
+      "method_4_report_level_filter": "In Filters pane > Report level filters: DateTable[Date] is in the last 12 months (relative date). This pre-filters the entire report to 12 months. Users cannot override it unless the filter is set to visible."
+    },
+    "bookmarks_for_view_switching": {
+      "overview": "Bookmarks capture the state of all visuals, slicers, and filters on a page (or across pages). Use them to build a Monthly / Quarterly / Yearly view switcher that changes the period grouping on charts without needing multiple separate reports.",
+      "bookmark_definition": "A bookmark saves: which visuals are visible/hidden, slicer selections, filter states, scroll position. It does NOT save visual data — the data always refreshes.",
+      "view_switcher_setup": {
+        "approach": "Create three separate visuals (or groups) — one configured for monthly columns, one for quarterly, one for yearly. Then use bookmarks to hide two and show one.",
+        "steps": [
+          "1. Build 3 matrix visuals on the same page:",
+          "   - Matrix A: Columns = DateTable[MonthYear] (monthly)",
+          "   - Matrix B: Columns = DateTable[QuarterLabel] (quarterly)",
+          "   - Matrix C: Columns = DateTable[YearStr] (yearly)",
+          "   Position them exactly on top of each other (same X/Y/Size)",
+          "2. Open View > Selection pane and View > Bookmarks pane",
+          "3. With Matrix A visible (B and C hidden in Selection pane), create Bookmark 'Monthly View'",
+          "4. Show Matrix B, hide A and C, create Bookmark 'Quarterly View'",
+          "5. Show Matrix C, hide A and B, create Bookmark 'Yearly View'",
+          "6. Create 3 Button visuals: 'Monthly', 'Quarterly', 'Yearly'",
+          "7. For each button: Format pane > Action > Type = Bookmark > Bookmark = the matching bookmark",
+          "8. Users click the buttons to switch views"
+        ],
+        "bookmark_scope": "Set bookmarks to capture only 'Data and display' for the specific visuals (right-click bookmark > Edit > uncheck 'All visuals', then select specific visuals). This prevents the bookmark from resetting unrelated slicer selections."
+      },
+      "tooltip_toggle_pattern": "The same bookmark pattern works for toggling between 'Show count' and 'Show percentage' views of the same data, or switching chart types."
+    },
+    "field_parameters": {
+      "overview": "Field parameters (introduced in Power BI May 2022) let users dynamically swap which field is used on an axis or in a slicer. A single visual can show 'by Month', 'by Quarter', or 'by Year' based on a slicer selection — without bookmarks or hidden visuals.",
+      "enable_preview": "If not visible: File > Options > Preview features > Field parameters (check it) > restart Power BI Desktop.",
+      "create_field_parameter": [
+        "1. Modeling ribbon > New parameter > Fields",
+        "2. Name: 'Period Grouping'",
+        "3. Add fields: DateTable[MonthYear], DateTable[QuarterLabel], DateTable[YearStr]",
+        "4. Click Create — Power BI creates a new table with the parameter and auto-adds a slicer"
+      ],
+      "use_in_visuals": "In the chart visual, drag the parameter measure [Period Grouping] (or the parameter field) to the Axis field well instead of a specific date column. The visual now groups by whatever the slicer selects.",
+      "dax_for_field_parameter": "// Power BI auto-generates this DAX when you create the field parameter:\nPeriod Grouping = {\n    (\"Month\",    NAMEOF('DateTable'[MonthYear]),    0),\n    (\"Quarter\",  NAMEOF('DateTable'[QuarterLabel]), 1),\n    (\"Year\",     NAMEOF('DateTable'[YearStr]),      2)\n}\n// The third element (0,1,2) is the display order in the slicer",
+      "sort_order_in_parameter": "Each entry in the field parameter table includes a sort-order column. If the field being used (MonthYear, QuarterLabel) has Sort by Column set correctly in the DateTable, sorting propagates through the parameter to the visual.",
+      "field_parameter_vs_bookmarks": "Field parameters: dynamic, one slicer controls axis, cleaner UX, supported in Power BI Service. Bookmarks: work in all Power BI versions, more flexible (can hide entire visual groups), but more maintenance. Prefer field parameters when the switch is purely about the period granularity axis.",
+      "field_parameter_for_metric_switching": "Same technique works for metric switching: parameter of measure references ([Sev5 Count], [Sev4 Count], [Alert Count]) lets users pick which metric to chart with a slicer — useful on a trend chart page."
+    },
+    "cross_filter_control": {
+      "default_behaviour": "By default, clicking a data point in any visual cross-filters all other visuals on the page. For security dashboards this is usually desired — clicking a month in a trend chart highlights the same month in the matrix.",
+      "edit_interactions": [
+        "1. Select a source visual",
+        "2. Format ribbon > Edit interactions",
+        "3. Each other visual shows icons: Filter (funnel), Highlight (partial), None (no cross-filter)",
+        "4. Click the icon on the target visual to set the interaction type",
+        "5. Format ribbon > Edit interactions again to exit"
+      ],
+      "filter_vs_highlight": "Filter: completely removes non-matching data from the target visual. Highlight: keeps all data but dims non-matching items. For security dashboards, Filter is usually clearer. Highlight can confuse totals because the visual still shows all data.",
+      "slicer_always_filters": "Slicers always filter — the highlight/none options are not available for slicers as source.",
+      "prevent_slicer_from_filtering_specific_visual": "Select the target visual after clicking Edit interactions on the slicer > set to None. That visual will ignore the slicer. Useful for a 'reference' visual showing all-time data."
+    },
+    "common_mistakes": [
+      "Using a text column like DateTable[MonthYear] in a relative date slicer — relative date requires a Date-type column, not a text label. Use DateTable[Date] for relative date slicers.",
+      "Syncing slicers across pages using different columns (one uses [MonthYear], another uses [Date]) — they cannot sync. Standardise all slicers to the same column.",
+      "Bookmarks capturing all visuals and all data — if a user changes a slicer and then clicks a bookmark, the slicer resets. Scope bookmarks to specific visuals to avoid resetting unrelated filters.",
+      "Field parameters not showing sorted correctly — the sort key must be set on the underlying date column in the DateTable, not on the parameter table itself.",
+      "Forgetting to include the date slicer page in the Sync slicers group when adding new report pages — new pages start unsynchronised.",
+      "Setting 'Last 12 months' relative date filter at report level — analysts cannot then select a custom range. Use a page-level filter or slicer instead so it can be overridden.",
+      "Using the date range slider (between) with a text MonthYear column — slider requires numeric or date type. Use a List or Dropdown slicer for text labels."
+    ]
+  }
+}

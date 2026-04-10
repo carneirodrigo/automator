@@ -1,0 +1,561 @@
+{
+  "id": "logic-apps-actions-core",
+  "title": "Azure Logic Apps - Core Action Types With Complete JSON From Real Examples",
+  "description": "Every core built-in action type seen in the examples: InitializeVariable, SetVariable, AppendToArrayVariable, Compose, Table, Select, Foreach, If (Condition), HTTP, Terminate, and runAfter chaining.",
+  "tags": ["logic-apps", "actions", "variables", "foreach", "condition", "compose", "http", "runafter", "control-flow"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Block-AADUser-Incident.txt",
+    "Teams-notifications-webhook.txt",
+    "Isolate-MDEMachine.txt",
+    "Send-basic-email.txt",
+    "CyberSecurityASM-Notification-Email.txt",
+    "Group-Change-AADUser-Incident-Brute-Force-v2.txt",
+    "Pagerduty-Notification-Email.txt"
+  ],
+  "content": {
+    "runAfter_mechanics": {
+      "description": "runAfter is the dependency declaration for each action. It is a dict of {actionName: [statusList]}. An empty {} means the action runs immediately after the trigger (i.e., it has no prerequisites).",
+      "status_values": ["Succeeded", "Failed", "TimedOut", "Skipped"],
+      "examples": {
+        "runs_after_trigger": {
+          "runAfter": {}
+        },
+        "runs_after_one_action_on_success": {
+          "runAfter": {
+            "Entities_-_Get_Accounts": ["Succeeded"]
+          }
+        },
+        "runs_after_success_or_failure": {
+          "runAfter": {
+            "Watchlists_-_Get_a_watchlist_by_alias": ["Succeeded", "Failed"]
+          }
+        },
+        "runs_after_multiple_actions": {
+          "runAfter": {
+            "Initialize_variable_-_Users": ["Succeeded"],
+            "Initialize_variable_-_Watchlist_alias": ["Succeeded"]
+          }
+        }
+      },
+      "notes": [
+        "Actions with runAfter: {} run in parallel with each other immediately after the trigger",
+        "The action name key in runAfter must exactly match the action name as it appears in the 'actions' dictionary (spaces preserved, but the runtime uses the key name)",
+        "Listing 'Failed' in the status array implements a try/catch pattern: the action runs regardless of whether the previous action failed",
+        "When an action has no runAfter key, it defaults to running after all parallel root-level actions complete (not recommended — always be explicit)"
+      ]
+    },
+
+    "InitializeVariable": {
+      "description": "Declares and optionally sets a variable. Must be called before any SetVariable or AppendToArrayVariable actions that use the same variable name.",
+      "type": "InitializeVariable",
+      "supported_types": ["string", "integer", "float", "boolean", "array", "object"],
+      "examples": {
+        "string_with_value": {
+          "Initialize_variable_-_Watchlist_alias": {
+            "runAfter": {
+              "Initialize_variable_-_Users": ["Succeeded"]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [
+                {
+                  "name": "Watchlist alias",
+                  "type": "string",
+                  "value": "UserRemediation"
+                }
+              ]
+            }
+          }
+        },
+        "array_empty": {
+          "Initialize_variable_-_Users": {
+            "runAfter": {
+              "Entities_-_Get_Accounts": ["Succeeded"]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [
+                {
+                  "name": "accounts",
+                  "type": "array"
+                }
+              ]
+            }
+          }
+        },
+        "boolean_false": {
+          "Initialize_variables": {
+            "runAfter": {
+              "Entities_-_Get_Accounts": ["Succeeded"]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [
+                {
+                  "name": "ModernAuth_Applied",
+                  "type": "boolean",
+                  "value": false
+                }
+              ]
+            }
+          }
+        },
+        "multiple_variables_one_action": {
+          "Initialize_variables": {
+            "runAfter": {
+              "Entities_-_Get_Hosts": ["Succeeded"]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [
+                {
+                  "name": "Server",
+                  "type": "boolean",
+                  "value": false
+                },
+                {
+                  "name": "Stop",
+                  "type": "boolean",
+                  "value": false
+                }
+              ]
+            }
+          }
+        },
+        "string_with_expression_value": {
+          "Initialize_variables": {
+            "runAfter": {
+              "Compose_Incident_link": ["Succeeded"]
+            },
+            "type": "InitializeVariable",
+            "inputs": {
+              "variables": [
+                {
+                  "name": "new_entities",
+                  "type": "string",
+                  "value": "@{replace(body('Create_HTML_table_with_Entities'), 'http', 'hxxp')}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "how_to_reference": "@variables('variableName')"
+    },
+
+    "SetVariable": {
+      "description": "Updates a previously initialized variable to a new value.",
+      "type": "SetVariable",
+      "example": {
+        "Set_variable": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "ModernAuth_Applied",
+            "value": true
+          }
+        }
+      },
+      "notes": [
+        "SetVariable has no 'variables' array wrapper — inputs has 'name' and 'value' directly",
+        "Variable must have been previously initialized with InitializeVariable",
+        "Commonly used inside Condition (If) branches to update a flag"
+      ]
+    },
+
+    "AppendToArrayVariable": {
+      "description": "Appends a value to an array variable. The value can be a scalar, object, or expression.",
+      "type": "AppendToArrayVariable",
+      "examples": {
+        "append_object": {
+          "Append_to_array_variable_user": {
+            "runAfter": {},
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "accounts",
+              "value": {
+                "Name": "@{items('For_each_user_-_add_to_user_array_variable')?['Name']}"
+              }
+            }
+          }
+        },
+        "append_with_multiple_fields": {
+          "Append_to_array_variable_user": {
+            "runAfter": {},
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "accounts",
+              "value": {
+                "Sid": "@{items('For_each_user_-_add_to_user_array_variable')?['Sid']}",
+                "Upn": "@{items('For_each_user_-_add_to_user_array_variable')?['Name']}"
+              }
+            }
+          }
+        },
+        "append_compose_output": {
+          "Append_to_array_variable": {
+            "runAfter": {
+              "Compose": ["Succeeded"]
+            },
+            "type": "AppendToArrayVariable",
+            "inputs": {
+              "name": "EntitiesJSON",
+              "value": "@outputs('Compose')"
+            }
+          }
+        }
+      }
+    },
+
+    "AppendToStringVariable": {
+      "description": "Appends a string value to a string variable. Not shown directly in examples but is a sibling of AppendToArrayVariable.",
+      "type": "AppendToStringVariable",
+      "example": {
+        "Append_to_string": {
+          "type": "AppendToStringVariable",
+          "inputs": {
+            "name": "myString",
+            "value": " appended text"
+          }
+        }
+      }
+    },
+
+    "Compose": {
+      "description": "Evaluates an expression and stores it as an output. Acts like a named alias for a value. Output referenced with @outputs('ActionName').",
+      "type": "Compose",
+      "examples": {
+        "html_link": {
+          "Compose_Incident_link": {
+            "runAfter": {
+              "Create_HTML_table_with_Entities": ["Succeeded"]
+            },
+            "type": "Compose",
+            "inputs": "<a href=\"@{triggerBody()?['object']?['properties']?['incidentUrl']}\">@{triggerBody()?['object']?['properties']?['incidentUrl']}</a>"
+          }
+        },
+        "object_compose": {
+          "Compose": {
+            "type": "Compose",
+            "inputs": {
+              "title": "@{item()?['kind']}",
+              "value": "@{item()?['properties']?['friendlyname']}"
+            }
+          }
+        }
+      },
+      "how_to_reference": "@outputs('Compose_Incident_link') — note 'outputs' not 'body'"
+    },
+
+    "Table": {
+      "description": "Creates a CSV or HTML table from an array. Used to format entities or account arrays for email bodies or watchlist creation.",
+      "type": "Table",
+      "examples": {
+        "html_table": {
+          "Create_HTML_table_with_Entities": {
+            "runAfter": {
+              "Select_Entities": ["Succeeded"]
+            },
+            "type": "Table",
+            "inputs": {
+              "from": "@body('Select_Entities')",
+              "format": "HTML"
+            }
+          }
+        },
+        "csv_table": {
+          "Create_CSV_table_with_users": {
+            "runAfter": {
+              "For_each_user_-_add_to_user_array_variable": ["Succeeded"]
+            },
+            "type": "Table",
+            "inputs": {
+              "format": "CSV",
+              "from": "@variables('accounts')"
+            }
+          }
+        }
+      },
+      "how_to_reference": "@body('Create_HTML_table_with_Entities') or @body('Create_CSV_table_with_users')"
+    },
+
+    "Select": {
+      "description": "Projects an array into a new array of objects with renamed/restructured fields. Does not filter — transforms every element.",
+      "type": "Select",
+      "example": {
+        "Select_Entities": {
+          "runAfter": {},
+          "type": "Select",
+          "inputs": {
+            "from": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+            "select": {
+              "Entity": "@item()?['properties']?['friendlyName']",
+              "Entity Type": "@item()?['kind']"
+            }
+          }
+        }
+      },
+      "how_to_reference": {
+        "body": "@body('Select_Entities') — returns the projected array",
+        "outputs": "@outputs('Select_Entities')['body'] — alternative form, seen in Pagerduty example foreach"
+      },
+      "notes": [
+        "Inside 'select', use @item() (not @items('...')) to reference the current element",
+        "The select object keys become the property names in the output array",
+        "Output can be fed into Table, Foreach, or used directly in email bodies"
+      ]
+    },
+
+    "Foreach": {
+      "description": "Iterates over an array. All actions inside run for each element. Default is parallel execution; can be made sequential with concurrency.repetitions: 1.",
+      "type": "Foreach",
+      "examples": {
+        "iterate_accounts": {
+          "For_each": {
+            "foreach": "@body('Entities_-_Get_Accounts')?['Accounts']",
+            "actions": {
+              "Add_user_to_group": {
+                "runAfter": {},
+                "type": "ApiConnection",
+                "inputs": {}
+              }
+            },
+            "runAfter": {
+              "Entities_-_Get_Accounts": ["Succeeded"]
+            },
+            "type": "Foreach"
+          }
+        },
+        "sequential_foreach": {
+          "For_each_1": {
+            "foreach": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+            "actions": {},
+            "runAfter": {
+              "Initialize_variable": ["Succeeded"]
+            },
+            "type": "Foreach",
+            "runtimeConfiguration": {
+              "concurrency": {
+                "repetitions": 1
+              }
+            }
+          }
+        }
+      },
+      "how_to_reference_current_item": "@items('For_each') or @items('For_each_1') — use the exact foreach action name",
+      "notes": [
+        "The 'foreach' property is an expression pointing to the array to iterate",
+        "Nested foreaches are common: outer over accounts, inner over group memberships",
+        "Sequential execution (concurrency.repetitions: 1) required when inner actions have ordering dependencies",
+        "Actions inside foreach reference the current item with @items('ActionName')?['field']"
+      ]
+    },
+
+    "Condition_If": {
+      "description": "Conditional branching. Has 'actions' (true branch) and 'else.actions' (false branch). Expression uses and/or/not/equals/contains/greater/etc.",
+      "type": "If",
+      "examples": {
+        "simple_equals": {
+          "Check_if_users_in_ModernAuth_Azure_group_already": {
+            "actions": {
+              "Set_variable": {
+                "type": "SetVariable",
+                "inputs": {
+                  "name": "ModernAuth_Applied",
+                  "value": true
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "expression": {
+              "and": [
+                {
+                  "equals": [
+                    "@items('For_each_1')",
+                    "440fe32a-1b16-42b5-be15-c496d1e53e72"
+                  ]
+                }
+              ]
+            },
+            "type": "If"
+          }
+        },
+        "check_status_code": {
+          "Watchlist_alias": {
+            "actions": {
+              "For_each": {
+                "foreach": "@body('Entities_-_Get_Accounts')?['Accounts']",
+                "actions": {},
+                "runAfter": {},
+                "type": "Foreach"
+              }
+            },
+            "runAfter": {
+              "Watchlists_-_Get_a_watchlist_by_alias": ["Succeeded", "Failed"]
+            },
+            "else": {
+              "actions": {}
+            },
+            "expression": {
+              "and": [
+                {
+                  "equals": [
+                    "@outputs('Watchlists_-_Get_a_watchlist_by_alias')['statusCode']",
+                    200
+                  ]
+                }
+              ]
+            },
+            "type": "If"
+          }
+        },
+        "or_condition_with_not": {
+          "Condition_1": {
+            "expression": {
+              "or": [
+                {
+                  "not": {
+                    "contains": [
+                      "@body('Machines_-_Get_single_machine')?['rbacGroupName']",
+                      "Servers"
+                    ]
+                  }
+                },
+                {
+                  "and": [
+                    {
+                      "not": {
+                        "contains": [
+                          "@body('Machines_-_Get_single_machine')?['osPlatform']",
+                          "Server"
+                        ]
+                      }
+                    },
+                    {
+                      "not": {
+                        "endsWith": [
+                          "@body('Machines_-_Get_single_machine')?['computerDnsName']",
+                          ".ods.vuw.ac.nz"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "type": "If",
+            "actions": {},
+            "else": { "actions": {} }
+          }
+        },
+        "contains_condition": {
+          "Condition": {
+            "expression": {
+              "and": [
+                {
+                  "contains": [
+                    "@triggerBody()?['AlertDisplayName']",
+                    "User and group membership reconnaissance (SAMR)"
+                  ]
+                }
+              ]
+            },
+            "type": "If",
+            "actions": {},
+            "else": { "actions": {} }
+          }
+        }
+      },
+      "expression_operators": {
+        "equals": "equals: [leftValue, rightValue]",
+        "not_equals": "not: { equals: [left, right] }",
+        "contains": "contains: [stringOrArray, value]",
+        "not_contains": "not: { contains: [value, substring] }",
+        "greater": "greater: [left, right]",
+        "greaterOrEquals": "greaterOrEquals: [left, right]",
+        "less": "less: [left, right]",
+        "endsWith": "endsWith: [string, suffix]",
+        "startsWith": "startsWith: [string, prefix]",
+        "and": "and: [condition1, condition2, ...]",
+        "or": "or: [condition1, condition2, ...]",
+        "not": "not: { singleCondition }"
+      }
+    },
+
+    "HTTP": {
+      "description": "Generic HTTP action for calling any REST endpoint without a managed connector. Used in Teams-notifications-webhook.txt to post to a Teams webhook URL.",
+      "type": "Http",
+      "example": {
+        "HTTP": {
+          "runAfter": {
+            "For_each_1": ["Succeeded"]
+          },
+          "type": "Http",
+          "inputs": {
+            "uri": "https://vuw.webhook.office.com/webhookb2/9a5991b4-1976-47bb-802e-d5e39d753bf1@cfe63e23-6951-427e-8683-bb84dcf1d20c/IncomingWebhook/5143e529b1984873a08c66bf92da63ca/025ee7f4-6ad8-4c4d-a675-bd1d2e038cb7/V2yFLgV7mPjxtvz4w-5yJloVSboJqvJdHNyKD_KTR_dhg1",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "type": "message",
+              "attachments": []
+            }
+          },
+          "runtimeConfiguration": {
+            "contentTransfer": {
+              "transferMode": "Chunked"
+            }
+          }
+        }
+      },
+      "how_to_reference": "@body('HTTP') for the response body, @outputs('HTTP')['statusCode'] for the status code",
+      "notes": [
+        "runtimeConfiguration.contentTransfer.transferMode: Chunked is used for large payloads (Teams adaptive cards, SharePoint file writes)",
+        "No connection reference needed — HTTP action calls any URL directly",
+        "For authenticated calls, add authentication block inside inputs"
+      ]
+    },
+
+    "ApiConnection": {
+      "description": "Connector-based action. Calls a managed connector endpoint. Has 'host.connection.name', 'method', 'path', and optionally 'body' and 'queries'.",
+      "type": "ApiConnection",
+      "structure": {
+        "ActionName": {
+          "runAfter": {},
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['connectionKeyName']['connectionId']"
+              }
+            },
+            "method": "get|post|put|patch|delete",
+            "path": "/connector/specific/path",
+            "body": {},
+            "queries": {}
+          }
+        }
+      },
+      "notes": [
+        "The 'host.connection.name' expression must match a key in $connections exactly",
+        "method is lowercase: get, post, put, patch, delete",
+        "path is connector-specific — see logic-apps-actions-connectors.json for all paths",
+        "body is optional for GET requests",
+        "queries is optional — used for URL query string parameters"
+      ]
+    },
+
+    "ApiConnectionWebhook": {
+      "description": "Webhook-style connector action. Registers a callback and waits for an event. Used in triggers but can also appear as actions.",
+      "type": "ApiConnectionWebhook",
+      "notes": [
+        "Most commonly seen as the trigger type for Sentinel incident and alert triggers",
+        "Requires callback_url: @{listCallbackUrl()} in the body"
+      ]
+    }
+  }
+}

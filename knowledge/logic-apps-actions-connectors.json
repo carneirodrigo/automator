@@ -1,0 +1,710 @@
+{
+  "id": "logic-apps-actions-connectors",
+  "title": "Azure Logic Apps - Connector Actions With Complete JSON From Real Sentinel Playbooks",
+  "description": "All managed connector actions observed in real examples: Sentinel, Azure AD, Office 365 Outlook, SharePoint Online, Microsoft Defender for Endpoint (wdatp).",
+  "tags": ["logic-apps", "connectors", "sentinel", "azure-ad", "office365", "sharepoint", "wdatp", "defender-endpoint"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Add-UserToWatchlist-SidToUPN.txt",
+    "Block-AADUser-Incident.txt",
+    "CyberSecurityASM-Notification-Email.txt",
+    "From-Sentinel-to-PAD.txt",
+    "Group-Change-AADUser-Incident-Brute-Force-v2.txt",
+    "Group-Change-AADUser-Incident-Modern-auth.txt",
+    "Isolate-MDEMachine.txt",
+    "Send-to-SharePoint.txt",
+    "Send-to-SharePoint-AATP.txt",
+    "Suppress_Tenable_SAMR_alerts.txt",
+    "Watchlist-Management.txt"
+  ],
+  "content": {
+    "sentinel_connector_azuresentinel": {
+      "managed_api_name": "azuresentinel",
+      "connection_reference": "@parameters('$connections')['azuresentinel']['connectionId']",
+
+      "Entities_-_Get_Accounts": {
+        "description": "Extracts Account entities from an incident's relatedEntities. Returns an array under 'Accounts' key.",
+        "json": {
+          "Entities_-_Get_Accounts": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                }
+              },
+              "method": "post",
+              "path": "/entities/account"
+            }
+          }
+        },
+        "output_path": "@body('Entities_-_Get_Accounts')?['Accounts']",
+        "account_entity_fields": {
+          "Name": "@items('For_each')?['Name'] — the username (often UPN or sAMAccountName)",
+          "AadUserId": "@items('For_each')?['AadUserId'] — Azure AD Object ID (GUID)",
+          "NTDomain": "@items('For_each')?['NTDomain'] — domain name or display name",
+          "DnsDomain": "@items('For_each')?['DnsDomain'] — DNS domain",
+          "Sid": "@items('For_each')?['Sid'] — Windows SID"
+        }
+      },
+
+      "Entities_-_Get_Hosts": {
+        "description": "Extracts Host entities from an incident's relatedEntities. Returns an array under 'Hosts' key.",
+        "json": {
+          "Entities_-_Get_Hosts": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+              "path": "/entities/host"
+            }
+          }
+        },
+        "output_path": "@body('Entities_-_Get_Hosts')?['Hosts']",
+        "host_entity_fields": {
+          "OMSAgentID": "@items('For_each')?['OMSAgentID'] — used to look up the machine in MDE"
+        }
+      },
+
+      "Watchlists_-_Get_a_watchlist_by_alias": {
+        "description": "Gets a watchlist by its alias. Returns 200 if found, 404 if not. Use @outputs('...')[statusCode] to check existence.",
+        "json": {
+          "Watchlists_-_Get_a_watchlist_by_alias": {
+            "runAfter": {
+              "Initialize_variable_-_Watchlist_alias": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                }
+              },
+              "method": "get",
+              "path": "/Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent(variables('Watchlist alias'))}"
+            }
+          }
+        },
+        "how_to_check_if_exists": "@outputs('Watchlists_-_Get_a_watchlist_by_alias')['statusCode'] equals 200",
+        "notes": ["Run runAfter with both Succeeded and Failed to handle the 404 case gracefully"]
+      },
+
+      "Watchlists_-_Add_a_new_watchlist_item": {
+        "description": "Adds or updates a single item in an existing watchlist. Method is PUT. Body contains the watchlist item fields.",
+        "json": {
+          "Watchlists_-_Add_a_new_watchlist_item": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "body": {
+                "Name": "@{items('For_each')?['Name']}"
+              },
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                }
+              },
+              "method": "put",
+              "path": "/Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent(variables('Watchlist alias'))}/watchlistItem"
+            }
+          }
+        },
+        "body_example_with_multiple_fields": {
+          "AccountDisplayName": "@{items('For_each')?['NTDomain']}",
+          "Sid": "@{items('For_each')?['Sid']}",
+          "Upn": "@{items('For_each')?['Name']}"
+        }
+      },
+
+      "Watchlists_-_Create_a_new_watchlist_with_data": {
+        "description": "Creates a brand-new watchlist from CSV data. Used when the watchlist doesn't exist yet.",
+        "json": {
+          "Watchlists_-_Create_a_new_watchlist_with_data": {
+            "runAfter": {
+              "Create_CSV_table_with_users": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "body": {
+                "description": "users to watch",
+                "displayName": "@{variables('Watchlist alias')}",
+                "itemsSearchKey": "Name",
+                "rawContent": "@{body('Create_CSV_table_with_users')}",
+                "sourceType": "Local"
+              },
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                }
+              },
+              "method": "put",
+              "path": "/Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent(variables('Watchlist alias'))}"
+            }
+          }
+        },
+        "required_body_fields": {
+          "displayName": "Human-readable name of the watchlist",
+          "itemsSearchKey": "The CSV column name used as the primary key for deduplication",
+          "rawContent": "CSV string content of the watchlist",
+          "sourceType": "Always 'Local' for content provided inline"
+        }
+      },
+
+      "Watchlists_-_Delete_a_watchlist_item": {
+        "description": "Deletes a specific watchlist item by its key (typically AadUserId or UPN).",
+        "json": {
+          "Watchlists_-_Delete_a_watchlist_item": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                }
+              },
+              "method": "delete",
+              "path": "/Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent('UserRemediation')}/watchlistItem/@{encodeURIComponent(items('For_each')?['AadUserId'])}"
+            }
+          }
+        }
+      },
+
+      "Alert_-_Get_incident": {
+        "description": "When triggered by an alert (not incident), retrieves the associated incident. Used to get the incident ARM ID for subsequent operations.",
+        "json": {
+          "Alert_-_Get_incident": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel_1']['connectionId']"
+                }
+              },
+              "method": "get",
+              "path": "/Incidents/subscriptions/@{encodeURIComponent(triggerBody()?['WorkspaceSubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['WorkspaceResourceGroup'])}/workspaces/@{encodeURIComponent(triggerBody()?['WorkspaceId'])}/alerts/@{encodeURIComponent(triggerBody()?['SystemAlertId'])}"
+            }
+          }
+        },
+        "output_path": "@body('Alert_-_Get_incident')?['id'] — returns the ARM resource ID of the incident"
+      },
+
+      "Remove_alert_from_incident": {
+        "description": "Removes (dissociates) an alert from an incident. Used for alert suppression playbooks.",
+        "json": {
+          "Remove_alert_from_incident": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuresentinel_1']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "incidentArmId": "@body('Alert_-_Get_incident')?['id']",
+                "relatedResourceId": "@triggerBody()?['SystemAlertId']"
+              },
+              "path": "/Incidents/Relation/Delete"
+            }
+          }
+        }
+      },
+
+      "workspace_path_template": {
+        "description": "The path segment used in all Sentinel watchlist and workspace-scoped operations",
+        "template": "/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}",
+        "notes": [
+          "All three parts must be URL-encoded with encodeURIComponent()",
+          "SubscriptionId and ResourceGroupName come from workspaceInfo, workspaceId is a direct property",
+          "For alert-triggered playbooks the workspace path uses WorkspaceSubscriptionId, WorkspaceResourceGroup, WorkspaceId (direct from triggerBody)"
+        ]
+      }
+    },
+
+    "azuread_connector": {
+      "managed_api_name": "azuread",
+      "connection_reference": "@parameters('$connections')['azuread']['connectionId']",
+
+      "Get_user": {
+        "description": "Retrieves an Azure AD user by their Object ID (GUID). Returns the user's full profile.",
+        "json": {
+          "Get_user": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuread']['connectionId']"
+                }
+              },
+              "method": "get",
+              "path": "/v1.0/users/@{encodeURIComponent(item()?['AadUserId'])}"
+            }
+          }
+        },
+        "output_fields": {
+          "id": "@body('Get_user')?['id']",
+          "mail": "@body('Get_user')?['mail']",
+          "givenName": "@body('Get_user')?['givenName']"
+        }
+      },
+
+      "Get_groups_of_a_user_V2": {
+        "description": "Gets the security group GUIDs that the user is a member of.",
+        "json": {
+          "Get_groups_of_a_user_(V2)": {
+            "runAfter": {
+              "Get_user": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuread']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "securityEnabledOnly": true
+              },
+              "path": "/v2/v1.0/users/@{encodeURIComponent(body('Get_user')?['id'])}/getMemberGroups"
+            }
+          }
+        },
+        "output_path": "@body('Get_groups_of_a_user_(V2)')?['value'] — array of group GUIDs as strings"
+      },
+
+      "Add_user_to_group": {
+        "description": "Adds an Azure AD user to a security group. Uses @odata.id with the user's Object ID.",
+        "json": {
+          "Add_user_to_group": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "body": {
+                "@@odata.id": "@items('For_each')?['AadUserId']"
+              },
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuread']['connectionId']"
+                }
+              },
+              "method": "post",
+              "path": "/v1.0/groups/@{encodeURIComponent('440fe32a-1b16-42b5-be15-c496d1e53e72')}/members/$ref"
+            }
+          }
+        },
+        "notes": [
+          "The group GUID is hardcoded in the path with encodeURIComponent",
+          "Body uses '@@odata.id' (double @@ in JSON to escape the @ character)",
+          "The value is just the user's AadUserId GUID — NOT a full URL"
+        ]
+      },
+
+      "Update_user_disable": {
+        "description": "Disables an Azure AD user account by setting accountEnabled to false.",
+        "json": {
+          "Update_user_-_disable_user": {
+            "runAfter": {
+              "Send_an_email_(V2)": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "body": {
+                "accountEnabled": false
+              },
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuread']['connectionId']"
+                }
+              },
+              "method": "patch",
+              "path": "/v1.0/users/@{encodeURIComponent(items('For_each')?['AadUserId'])}"
+            }
+          }
+        }
+      },
+
+      "Refresh_tokens_revoke": {
+        "description": "Revokes all refresh tokens for a user, forcing them to re-authenticate. Effectively signs out all sessions.",
+        "json": {
+          "Refresh_tokens": {
+            "runAfter": {
+              "Update_user_-_disable_user": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuread']['connectionId']"
+                }
+              },
+              "method": "post",
+              "path": "/v1.0/users/@{encodeURIComponent(items('For_each')?['AadUserId'])}/revokeSignInSessions"
+            }
+          }
+        }
+      }
+    },
+
+    "office365_connector": {
+      "managed_api_name": "office365",
+      "connection_reference": "@parameters('$connections')['office365']['connectionId']",
+
+      "Send_an_email_V2": {
+        "description": "Sends an email via Office 365 Outlook. The most commonly used action in all examples.",
+        "json": {
+          "Send_an_email_(V2)": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "body": {
+                "To": "its-security@example.com",
+                "Subject": "Security Incident - @{triggerBody()?['object']?['properties']?['title']}",
+                "Body": "<p>HTML email body here with @{triggerBody()?['object']?['properties']?['description']}</p>",
+                "Importance": "Normal"
+              },
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['office365']['connectionId']"
+                }
+              },
+              "method": "post",
+              "path": "/v2/Mail"
+            }
+          }
+        },
+        "body_fields": {
+          "To": "Required. Semicolon-separated email addresses for multiple recipients",
+          "Subject": "Required. Email subject line",
+          "Body": "Required. HTML or plain text email body",
+          "Importance": "Optional. Normal | High | Low",
+          "From": "Optional. Override the sender address",
+          "ReplyTo": "Optional. Set a reply-to address",
+          "CC": "Optional. CC recipients",
+          "BCC": "Optional. BCC recipients"
+        },
+        "real_world_body_examples": {
+          "notification_to_security_team": "<p><strong>New incident created in Azure Sentinel. Incident details:<br>\nUser should have been disabled.</strong><br>\n<strong><br>\nIncident title:<br>\n</strong>@{triggerBody()?['object']?['properties']?['title']}<strong><br>\n<br>\nDescription:<br>\n</strong>@{triggerBody()?['object']?['properties']?['description']}<strong><br>\n<br>\nEntities:<br>\n</strong>@{items('For_each')?['Name']}<strong><br>\n<br>\nIncident link:<br>\n</strong>@{triggerBody()?['object']?['properties']?['incidentUrl']}</p>",
+          "full_incident_details": "<p><span style=\"font-size: 16px\"><strong>New incident created in Azure Sentinel. Incident details:</strong></span><br>\n<br>\n<span style=\"font-size: 14px\"><strong>Incident title:<br>\n</strong></span>@{triggerBody()?['object']?['properties']?['title']}<br>\n<br>\n<span style=\"font-size: 14px\"><strong>Incident ID:<br>\n</strong></span>@{triggerBody()?['object']?['properties']?['incidentNumber']}<br>\n<br>\n<span style=\"font-size: 14px\"><strong>Severity:<br>\n</strong></span>@{triggerBody()?['object']?['properties']?['severity']}<br>\n<br>\n<span style=\"font-size: 14px\"><strong>Entities:<br>\n</strong></span>@{body('Create_HTML_table_with_Entities')}<br>\n<br>\n<span style=\"font-size: 14px\"><strong>Incident link:<br>\n</strong></span>@{outputs('Compose_Incident_link')}</p>"
+        }
+      }
+    },
+
+    "sharepointonline_connector": {
+      "managed_api_name": "sharepointonline",
+      "connection_reference": "@parameters('$connections')['sharepointonline_1']['connectionId']",
+
+      "Create_file": {
+        "description": "Creates a file in a SharePoint document library. Used to write log files into a SharePoint folder.",
+        "json": {
+          "Create_file": {
+            "runAfter": {},
+            "type": "ApiConnection",
+            "inputs": {
+              "body": "SIEMRecogniser=SentinelIncidentAndRemediation FlowType=UserExtraction Action=BlockUser AlertDateTime=@{triggerBody()?['object']?['properties']?['createdTimeUtc']} AlertTitle=@{triggerBody()?['object']?['properties']?['title']} UPN=@{items('For_each')?['Name']}",
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['sharepointonline_1']['connectionId']"
+                }
+              },
+              "method": "post",
+              "path": "/datasets/@{encodeURIComponent(encodeURIComponent('https://vuw.sharepoint.com/sites/its_architectureandsecurity'))}/files",
+              "queries": {
+                "folderPath": "/Security/Security Tools/SIEM/flow_integration",
+                "name": "user_alert_@{items('For_each')?['AadUserId']}_@{triggerBody()?['object']?['properties']?['incidentNumber']}_@{triggerBody()?['object']?['properties']?['createdTimeUtc']}.log",
+                "queryParametersSingleEncoded": true
+              }
+            },
+            "runtimeConfiguration": {
+              "contentTransfer": {
+                "transferMode": "Chunked"
+              }
+            }
+          }
+        },
+        "path_format": "/datasets/@{encodeURIComponent(encodeURIComponent('{siteUrl}'))}/files",
+        "notes": [
+          "The site URL is double-encoded: encodeURIComponent(encodeURIComponent('https://...'))",
+          "queryParametersSingleEncoded: true ensures the folder path and file name are properly encoded",
+          "runtimeConfiguration.contentTransfer.transferMode: Chunked is best practice for file writes",
+          "File name is typically constructed from dynamic values using @{...} expressions"
+        ]
+      }
+    },
+
+    "wdatp_connector": {
+      "managed_api_name": "wdatp",
+      "description": "Microsoft Defender for Endpoint (formerly Windows Defender ATP) connector",
+      "connection_reference": "@parameters('$connections')['wdatp']['connectionId']",
+
+      "Machines_-_Get_single_machine": {
+        "description": "Gets a machine record from MDE by its machine ID or OMS Agent ID.",
+        "json": {
+          "Machines_-_Get_single_machine": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['wdatp']['connectionId']"
+                }
+              },
+              "method": "get",
+              "path": "/api/machines/@{encodeURIComponent(items('For_each')?['OMSAgentID'])}"
+            }
+          }
+        },
+        "output_fields": {
+          "id": "@body('Machines_-_Get_single_machine')?['id'] — MDE machine GUID",
+          "computerDnsName": "@body('Machines_-_Get_single_machine')?['computerDnsName']",
+          "osPlatform": "@body('Machines_-_Get_single_machine')?['osPlatform']",
+          "rbacGroupName": "@body('Machines_-_Get_single_machine')?['rbacGroupName']"
+        }
+      },
+
+      "Actions_-_Isolate_machine": {
+        "description": "Isolates (network-isolates) a machine in MDE. IsolationType can be Selective or Full.",
+        "json": {
+          "Actions_-_Isolate_machine": {
+            "runAfter": {
+              "Actions_-_Restrict_app_execution": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['wdatp']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "Comment": "Automated action based on the alert",
+                "IsolationType": "Selective"
+              },
+              "path": "/api/machines/@{encodeURIComponent(body('Machines_-_Get_single_machine')?['id'])}/isolate"
+            }
+          }
+        }
+      },
+
+      "Actions_-_Restrict_app_execution": {
+        "description": "Restricts application execution on the machine (code execution restriction policy).",
+        "json": {
+          "Actions_-_Restrict_app_execution": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['wdatp']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "Comment": "Automated action based on the alert"
+              },
+              "path": "/api/machines/@{encodeURIComponent(body('Machines_-_Get_single_machine')?['id'])}/restrictCodeExecution"
+            }
+          }
+        }
+      },
+
+      "Actions_-_Collect_investigation_package": {
+        "description": "Collects a forensic investigation package from the machine.",
+        "json": {
+          "Actions_-_Collect_investigation_package": {
+            "runAfter": {
+              "Actions_-_Isolate_machine": ["Succeeded"]
+            },
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['wdatp']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "Comment": "Automated action based on the alert"
+              },
+              "path": "/api/machines/@{encodeURIComponent(body('Machines_-_Get_single_machine')?['id'])}/collectInvestigationPackage"
+            }
+          }
+        }
+      },
+
+      "Actions_-_Start_automated_investigation": {
+        "description": "Starts an automated investigation on the machine.",
+        "json": {
+          "Actions_-_Start_automated_investigation_on_a_machine": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['wdatp']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "Comment": "Automated action based on the alert"
+              },
+              "path": "/api/machines/@{encodeURIComponent(body('Machines_-_Get_single_machine')?['id'])}/startInvestigation"
+            }
+          }
+        }
+      },
+
+      "Actions_-_Run_antivirus_scan": {
+        "description": "Runs an antivirus scan on the machine. ScanType is Full or Quick.",
+        "json": {
+          "Actions_-_Run_antivirus_scan": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['wdatp']['connectionId']"
+                }
+              },
+              "method": "post",
+              "body": {
+                "Comment": "Automated action based on the alert",
+                "ScanType": "Full"
+              },
+              "path": "/api/machines/@{encodeURIComponent(body('Machines_-_Get_single_machine')?['id'])}/runAntiVirusScan"
+            }
+          }
+        }
+      },
+
+      "wdatp_action_paths_summary": {
+        "get_machine": "/api/machines/{machineId}",
+        "isolate": "/api/machines/{machineId}/isolate",
+        "restrict_code_execution": "/api/machines/{machineId}/restrictCodeExecution",
+        "collect_investigation_package": "/api/machines/{machineId}/collectInvestigationPackage",
+        "start_investigation": "/api/machines/{machineId}/startInvestigation",
+        "run_antivirus_scan": "/api/machines/{machineId}/runAntiVirusScan"
+      }
+    },
+
+    "teams_webhook_http": {
+      "description": "Teams notifications are sent via HTTP action to an Incoming Webhook URL (not via a Teams connector). The payload is an Adaptive Card wrapped in the Teams message schema.",
+      "json": {
+        "HTTP": {
+          "runAfter": {
+            "For_each_1": ["Succeeded"]
+          },
+          "type": "Http",
+          "inputs": {
+            "uri": "https://{tenant}.webhook.office.com/webhookb2/{webhook-path}",
+            "method": "POST",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "type": "message",
+              "attachments": [
+                {
+                  "contentType": "application/vnd.microsoft.card.adaptive",
+                  "contentUrl": null,
+                  "content": {
+                    "type": "AdaptiveCard",
+                    "body": [
+                      {
+                        "type": "TextBlock",
+                        "size": "Medium",
+                        "weight": "Bolder",
+                        "text": "@{triggerBody()?['object']?['properties']?['title']}"
+                      },
+                      {
+                        "type": "ColumnSet",
+                        "columns": [
+                          {
+                            "type": "Column",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "Incident: @{triggerBody()?['object']?['properties']?['incidentNumber']}",
+                                "wrap": true
+                              }
+                            ],
+                            "width": "auto"
+                          },
+                          {
+                            "type": "Column",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "spacing": "None",
+                                "text": "Created @{triggerBody()?['object']?['properties']?['createdTimeUtc']}",
+                                "isSubtle": true,
+                                "wrap": true
+                              }
+                            ],
+                            "width": "stretch"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "FactSet",
+                        "facts": "@json(concat('[', join(variables('EntitiesJSON'), ','), ']'))"
+                      }
+                    ],
+                    "actions": [
+                      {
+                        "type": "Action.OpenUrl",
+                        "title": "Sentinel Incident",
+                        "url": "@{triggerBody()?['object']?['properties']?['incidentUrl']}"
+                      }
+                    ],
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "version": "1.5"
+                  }
+                }
+              ]
+            }
+          },
+          "runtimeConfiguration": {
+            "contentTransfer": {
+              "transferMode": "Chunked"
+            }
+          }
+        }
+      },
+      "entities_json_pattern": {
+        "description": "Pattern for building the FactSet from incident entities. Entities are accumulated into an array variable, then serialized into the card.",
+        "setup": {
+          "initialize": {
+            "name": "EntitiesJSON",
+            "type": "array",
+            "value": []
+          },
+          "foreach_body": {
+            "Compose": {
+              "type": "Compose",
+              "inputs": {
+                "title": "@{item()?['kind']}",
+                "value": "@{item()?['properties']?['friendlyname']}"
+              }
+            },
+            "Append_to_array_variable": {
+              "runAfter": { "Compose": ["Succeeded"] },
+              "type": "AppendToArrayVariable",
+              "inputs": {
+                "name": "EntitiesJSON",
+                "value": "@outputs('Compose')"
+              }
+            }
+          },
+          "factset_expression": "@json(concat('[', join(variables('EntitiesJSON'), ','), ']'))"
+        }
+      }
+    }
+  }
+}

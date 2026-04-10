@@ -1,0 +1,262 @@
+{
+  "id": "sentinel-rest-api-direct-http-patterns",
+  "title": "Microsoft Sentinel REST API - Direct ARM HTTP Calls From Logic Apps",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Logic Apps calling the Sentinel REST API directly via HTTP action using MSI instead of the managed connector",
+    "Pulling incidents, alerts, watchlists, hunting queries, analytics rules, and bookmark data from Sentinel via ARM REST",
+    "Security automation teams needing endpoints not exposed by the azuresentinel managed connector"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-06-01T00:00:00Z",
+  "base_url": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}/providers/Microsoft.SecurityInsights",
+  "api_version": "2023-11-01",
+  "confirmed_facts": [
+    {
+      "fact": "All Sentinel REST API endpoints are ARM-scoped. The base path is https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{workspace}/providers/Microsoft.SecurityInsights/{resource}. The management.azure.com audience is used for MSI authentication.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Sentinel REST API reference — api-version 2023-11-01"
+    },
+    {
+      "fact": "The MSI authentication block for any ARM REST call (including Sentinel) is: { \"type\": \"ManagedServiceIdentity\", \"audience\": \"https://management.azure.com/\" }. The trailing slash is required — omitting it causes a 401.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps HTTP action MSI auth documentation + production pattern cross-reference"
+    },
+    {
+      "fact": "List incidents: GET .../incidents?api-version=2023-11-01. Supports $filter, $orderby, $top (max 1000 per page), and $skipToken for pagination. The nextLink property in the response carries the continuation URL for the next page.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Sentinel REST API — Incidents - List"
+    },
+    {
+      "fact": "Get a single incident: GET .../incidents/{incidentId}. The incidentId is a GUID (not the human-readable incident number). The incident number maps to properties.incidentNumber in the response.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Sentinel REST API — Incidents - Get"
+    },
+    {
+      "fact": "List alerts for an incident: POST .../incidents/{incidentId}/alerts?api-version=2023-11-01 with an empty body. Returns an alertList object with a value array. Each alert has systemAlertId, alertDisplayName, severity, status, and productName.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Sentinel REST API — Incident Alerts - List"
+    },
+    {
+      "fact": "List watchlist items: GET .../watchlists/{watchlistAlias}/watchlistItems?api-version=2023-11-01. The alias is the watchlist's short name, not the display name. Returns a paged collection with nextLink. Each item has properties.itemsKeyValue (object with column values).",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Sentinel REST API — Watchlist Items - List"
+    },
+    {
+      "fact": "List analytics rules: GET .../alertRules?api-version=2023-11-01. Returns all rule types (Scheduled, NRT, Fusion, MicrosoftSecurityIncidentCreation, etc.) in a single collection. Each rule has kind and properties; scheduled rules include query (KQL string), queryPeriod, triggerThreshold, and severity.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Sentinel REST API — Alert Rules - List"
+    },
+    {
+      "fact": "Run a saved hunting query: saved queries are listed via GET .../savedSearches?api-version=2020-08-01 on the Log Analytics workspace (not the SecurityInsights provider). To actually execute a saved query, use the Azure Monitor Logs connector or the Log Analytics Query API — the Sentinel REST API lists the query text but does not run it.",
+      "verified_date": "2026-04-03",
+      "source": "Sentinel REST API vs Log Analytics API surface distinction"
+    },
+    {
+      "fact": "Required RBAC role for read-only Sentinel REST API calls from a Logic App's MSI: Microsoft Sentinel Reader on the Log Analytics workspace (or the resource group). Microsoft Sentinel Responder is needed for write operations (update incident, add comment).",
+      "verified_date": "2026-04-03",
+      "source": "Sentinel RBAC documentation"
+    },
+    {
+      "fact": "The Sentinel REST API uses standard ARM pagination. When body('HTTP_ListIncidents')?['nextLink'] is non-null, make another GET request to that URL (it already contains api-version). Continue until nextLink is absent. Logic Apps Until loop is the correct control structure for this.",
+      "verified_date": "2026-04-03",
+      "source": "ARM REST API pagination conventions"
+    },
+    {
+      "fact": "When to use REST vs managed connector: Use the managed connector (azuresentinel) for incident-triggered playbooks, entity extraction, and incident updates — it handles the webhook callback and MSI connection setup. Use direct REST for scheduled data pulls (list all incidents, bulk export), for endpoints not in the connector (analytics rules, hunting queries, bookmarks), and for cross-workspace queries.",
+      "verified_date": "2026-04-03",
+      "source": "Capability comparison: azuresentinel connector vs direct ARM REST"
+    },
+    {
+      "fact": "The api-version query parameter is mandatory on every Sentinel REST call. Omitting it returns a 400 with 'MissingApiVersionParameter'. Use 2023-11-01 for GA coverage of incidents, alerts, watchlists, and analytics rules.",
+      "verified_date": "2026-04-03",
+      "source": "ARM API version enforcement"
+    },
+    {
+      "fact": "Incident filter expressions use OData syntax. Filter by severity: $filter=properties/severity eq 'High'. Filter by status: $filter=properties/status eq 'Active'. Combine: $filter=properties/severity eq 'High' and properties/status eq 'Active'. All filter fields are under the properties/ prefix.",
+      "verified_date": "2026-04-03",
+      "source": "Sentinel REST API — Incidents - List filter examples"
+    },
+    {
+      "fact": "The workspace name for the Sentinel base URL is the Log Analytics workspace name (the short name), not the workspace ID (GUID). Do not confuse them — using the GUID in the URL path produces a 404.",
+      "verified_date": "2026-04-03",
+      "source": "Common integration mistake in Sentinel automation"
+    }
+  ],
+  "key_endpoints": {
+    "list_incidents": "GET https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/incidents?api-version=2023-11-01&$filter=properties/status eq 'Active'&$orderby=properties/createdTimeUtc desc&$top=100",
+    "get_incident": "GET https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/incidents/{incidentId}?api-version=2023-11-01",
+    "list_incident_alerts": "POST https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/incidents/{incidentId}/alerts?api-version=2023-11-01",
+    "list_incident_entities": "POST https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/incidents/{incidentId}/entities?api-version=2023-11-01",
+    "update_incident": "PUT https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/incidents/{incidentId}?api-version=2023-11-01",
+    "list_watchlist_items": "GET https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/watchlists/{watchlistAlias}/watchlistItems?api-version=2023-11-01",
+    "list_alert_rules": "GET https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/alertRules?api-version=2023-11-01",
+    "list_bookmarks": "GET https://management.azure.com/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{ws}/providers/Microsoft.SecurityInsights/bookmarks?api-version=2023-11-01"
+  },
+  "logic_app_action_patterns": {
+    "list_incidents_http_action": {
+      "description": "List active High/Medium Sentinel incidents via direct ARM REST call with MSI auth",
+      "HTTP_List_Sentinel_Incidents": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/resourceGroups/@{parameters('resourceGroupName')}/providers/Microsoft.OperationalInsights/workspaces/@{parameters('workspaceName')}/providers/Microsoft.SecurityInsights/incidents",
+          "queries": {
+            "api-version": "2023-11-01",
+            "$filter": "properties/status eq 'Active' and (properties/severity eq 'High' or properties/severity eq 'Medium')",
+            "$orderby": "properties/createdTimeUtc desc",
+            "$top": "100"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        }
+      },
+      "response_access": {
+        "incidents_array": "@body('HTTP_List_Sentinel_Incidents')?['value']",
+        "next_page_link": "@body('HTTP_List_Sentinel_Incidents')?['nextLink']",
+        "incident_id_in_loop": "@items('For_each_incident')?['name']",
+        "incident_number": "@items('For_each_incident')?['properties']?['incidentNumber']",
+        "incident_title": "@items('For_each_incident')?['properties']?['title']",
+        "incident_severity": "@items('For_each_incident')?['properties']?['severity']",
+        "incident_status": "@items('For_each_incident')?['properties']?['status']",
+        "incident_created": "@items('For_each_incident')?['properties']?['createdTimeUtc']"
+      }
+    },
+    "list_incident_alerts_action": {
+      "description": "Get all alerts linked to a specific Sentinel incident",
+      "HTTP_List_Incident_Alerts": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/resourceGroups/@{parameters('resourceGroupName')}/providers/Microsoft.OperationalInsights/workspaces/@{parameters('workspaceName')}/providers/Microsoft.SecurityInsights/incidents/@{items('For_each_incident')?['name']}/alerts",
+          "queries": {
+            "api-version": "2023-11-01"
+          },
+          "body": {},
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        }
+      },
+      "response_access": {
+        "alerts_array": "@body('HTTP_List_Incident_Alerts')?['value']",
+        "alert_name": "@items('For_each_alert')?['properties']?['alertDisplayName']",
+        "alert_severity": "@items('For_each_alert')?['properties']?['severity']",
+        "alert_product": "@items('For_each_alert')?['properties']?['productName']"
+      }
+    },
+    "pagination_until_pattern": {
+      "description": "Use Until loop to page through all incidents when result set exceeds $top",
+      "Initialize_nextLink": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [{"name": "nextLink", "type": "string", "value": ""}]
+        }
+      },
+      "Initialize_allIncidents": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [{"name": "allIncidents", "type": "array", "value": []}]
+        }
+      },
+      "Until_no_nextLink": {
+        "type": "Until",
+        "expression": {
+          "and": [{"equals": ["@variables('nextLink')", ""]}]
+        },
+        "limit": {"count": 50, "timeout": "PT1H"},
+        "actions": {
+          "HTTP_Get_Incidents_Page": {
+            "type": "Http",
+            "inputs": {
+              "method": "GET",
+              "uri": "@{if(equals(variables('nextLink'), ''), concat('https://management.azure.com/subscriptions/', parameters('subscriptionId'), '/resourceGroups/', parameters('resourceGroupName'), '/providers/Microsoft.OperationalInsights/workspaces/', parameters('workspaceName'), '/providers/Microsoft.SecurityInsights/incidents?api-version=2023-11-01&$top=1000'), variables('nextLink'))}",
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "audience": "https://management.azure.com/"
+              }
+            }
+          },
+          "Set_nextLink": {
+            "type": "SetVariable",
+            "runAfter": {"HTTP_Get_Incidents_Page": ["Succeeded"]},
+            "inputs": {
+              "name": "nextLink",
+              "value": "@{coalesce(body('HTTP_Get_Incidents_Page')?['nextLink'], '')}"
+            }
+          },
+          "Union_allIncidents": {
+            "type": "SetVariable",
+            "runAfter": {"Set_nextLink": ["Succeeded"]},
+            "inputs": {
+              "name": "allIncidents",
+              "value": "@union(variables('allIncidents'), body('HTTP_Get_Incidents_Page')?['value'])"
+            }
+          }
+        }
+      },
+      "note": "union() merges two arrays. coalesce(nextLink, '') converts null nextLink to empty string which satisfies the Until exit condition."
+    }
+  },
+  "connector_vs_rest_decision": {
+    "use_managed_connector_when": [
+      "Workflow is triggered by a Sentinel incident (incident-creation webhook requires azuresentinel connector trigger)",
+      "Extracting entities (hosts, accounts, IPs) from an incident — connector's /entities/{type} actions are simpler",
+      "Updating incidents or adding comments in a playbook context — connector handles MSI connection management",
+      "Team is unfamiliar with ARM API patterns and connector actions cover the needed operations"
+    ],
+    "use_direct_rest_when": [
+      "Scheduled export of all incidents or bulk reporting not triggered by an individual incident",
+      "Accessing analytics rules, bookmarks, or hunting query definitions — not in the connector",
+      "Cross-workspace Sentinel queries requiring flexible URL construction",
+      "Need for fine-grained OData $filter on incident properties (connector filter options are limited)",
+      "Automation must work without a configured managed connection resource (e.g., ARM-template-only deploy)"
+    ]
+  },
+  "implementation_notes": [
+    "The MSI audience for management.azure.com must include the trailing slash: 'https://management.azure.com/' — not 'https://management.azure.com'. Logic Apps is strict about this.",
+    "All Sentinel REST endpoints require api-version as a query parameter. Put it in the 'queries' block of the HTTP action rather than appending to the URI string — this avoids double-encoding issues.",
+    "The Logic App's MSI needs Microsoft Sentinel Reader role on the workspace for read operations. Assign at the Log Analytics workspace scope, not just the resource group, to be explicit.",
+    "Incident IDs in the REST API are GUIDs (the 'name' property of the ARM resource, e.g. '3da89fe7-...'). The human-readable incident number (e.g., 4521) is in properties.incidentNumber. Use the GUID in URL paths.",
+    "For the list_incident_alerts endpoint, the HTTP method is POST with an empty body — not GET. This is an ARM action endpoint, not a resource list endpoint.",
+    "Pagination via nextLink: the nextLink URL already contains the api-version parameter. Do not append api-version again or you will get a 400.",
+    "OData filter fields in Sentinel use the 'properties/' prefix: $filter=properties/severity eq 'High'. Using the field name without the prefix (severity eq 'High') returns a 400 OData error.",
+    "For bulk monthly reporting, collect incidents with a createdTimeUtc filter: $filter=properties/createdTimeUtc ge 2025-03-01T00:00:00Z and properties/createdTimeUtc lt 2025-04-01T00:00:00Z.",
+    "The workspace name in the URL is the short string name (e.g., 'my-sentinel-workspace'), not the workspace GUID. The GUID is used in some connector paths but not in ARM REST paths."
+  ],
+  "common_failures": [
+    "MSI audience missing trailing slash ('https://management.azure.com' instead of 'https://management.azure.com/') — returns 401 Unauthorized.",
+    "Missing api-version query parameter — returns 400 MissingApiVersionParameter.",
+    "Using workspace GUID instead of workspace name in the URL path — returns 404.",
+    "OData filter without 'properties/' prefix (e.g., $filter=severity eq 'High') — returns 400 invalid filter.",
+    "Calling list_incident_alerts with GET instead of POST — returns 405 Method Not Allowed.",
+    "Not handling nextLink pagination — silently truncates at $top limit (max 1000); large tenants lose incidents.",
+    "Using the incident number (integer) instead of the incident GUID in the URL path for get/update operations — returns 404.",
+    "Logic App MSI assigned Contributor on subscription instead of Sentinel Reader on the workspace — works but grants excessive permissions; security review will flag this."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/securityinsights/stable/incidents/list",
+    "https://learn.microsoft.com/en-us/rest/api/securityinsights/stable/incidents/get",
+    "https://learn.microsoft.com/en-us/rest/api/securityinsights/stable/incident-alerts/list",
+    "https://learn.microsoft.com/en-us/rest/api/securityinsights/stable/watchlist-items/list",
+    "https://learn.microsoft.com/en-us/rest/api/securityinsights/stable/alert-rules/list",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers#http-action"
+  ],
+  "last_verified": "2026-04-03T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-sentinel-incident-playbook",
+    "azure-logic-apps-sentinel-watchlist-and-incident-update",
+    "logic-apps-msi-arm-http-auth-pattern",
+    "azure-logic-apps-connectors-blob-servicebus-loganalytics"
+  ],
+  "source_projects": ["manual-research"]
+}

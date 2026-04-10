@@ -99,7 +99,6 @@ The project-structure section above is the canonical file inventory. For runtime
 - `ingest_input_files()` (`engine/work/project_state.py`) — Moves files from `inputs/` inbox to `projects/<project-id>/runtime/inputs/`, scans text files for secrets, writes an `inputs_manifest.json`.
 - `MAX_CAPABILITY_ROUNDS` (`engine/work/orchestration_state.py`) — Cap on capability request/response cycles per agent stage.
 - `MAX_FILE_READ_SIZE` (`engine/work/orchestration_state.py`) — Hard cap on file size that agents may read through capabilities.
-- `_append_skills_catalog_context()` — Appends the compact Agent Skills catalog to the knowledge context for `research` only.
 - `_build_skills_context()` — Injects downstream skill bodies selected for the current role into the agent prompt.
 - `_cap_fetch_skill()` — Capability handler that downloads a skill from the catalog and returns its content for research evaluation.
 

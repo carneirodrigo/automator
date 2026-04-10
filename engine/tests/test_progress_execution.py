@@ -61,7 +61,7 @@ class _FakePopen:
         }
         yield json.dumps({"type": "result", "result": json.dumps(payload)})
 
-    def wait(self):
+    def wait(self, timeout=None):
         pass
 
     def kill(self):
@@ -97,7 +97,7 @@ class _FakeCodexToolPopen:
         }
         yield json.dumps({"type": "result", "result": json.dumps(payload)})
 
-    def wait(self):
+    def wait(self, timeout=None):
         pass
 
     def kill(self):
@@ -131,7 +131,7 @@ class _FakeCodexSessionPopen:
             },
         })
 
-    def wait(self):
+    def wait(self, timeout=None):
         pass
 
     def kill(self):
@@ -378,7 +378,7 @@ class TestExecutionProgress(unittest.TestCase):
         )
 
         followup_task = mock_run_agent.call_args_list[1].args[1]
-        self.assertIn("Runtime Capability Results (round 1", followup_task)
+        self.assertIn("Runtime Capability Results (1 round(s) so far)", followup_task)
         self.assertIn("missing file", followup_task)
 
     @patch("engine.work.api_execution.heartbeat_message", return_value="worker: still running (0m 30s)")

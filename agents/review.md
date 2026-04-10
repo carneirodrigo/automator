@@ -44,6 +44,8 @@ When the task notes that this is a final review after rework, check each previou
 
 - All file operations must stay inside the project root provided in the prompt.
 - Do not modify deliverable files — read and verify only.
+- You do NOT have `write_file` access. The engine blocks write requests from the review role. If you need to create a temporary test script, request it as a finding for the worker to create instead.
+- You can run commands (`run_command`, `run_tests`) and read files (`read_file`, `load_artifact`), but not write.
 - Never use destructive commands.
 - Never write files to `engine/`, `agents/`, `docs/`, `config/`, `knowledge/`, or `skills/`.
 

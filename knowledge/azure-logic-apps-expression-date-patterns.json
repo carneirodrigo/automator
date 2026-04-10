@@ -1,0 +1,50 @@
+{
+  "id": "azure-logic-apps-expression-date-patterns",
+  "title": "Azure Logic Apps - Expression Date And Time Patterns: Month/Year Extraction, Quarter Calculation",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps that extract numeric month or year from the current timestamp",
+    "Logic Apps that calculate the previous quarter and its year for report labelling",
+    "Logic Apps using NZ timezone offset (+12 hours from UTC)",
+    "Logic Apps injecting date values into KQL queries via datetime() expressions"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-04-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "formatDateTime(timestamp, 'M') is unreliable in Logic Apps. It may return a locale-dependent string rather than a numeric month value, causing int() to throw 'The value cannot be converted to the target type.' Use 'yyyy-MM-dd' format and split on '-' instead: int(split(formatDateTime(addToTime(utcNow(), 12, 'Hour'), 'yyyy-MM-dd'), '-')[1]) gives a clean numeric month; split(..., '-')[0] gives the year string. This approach is locale-independent.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — month extraction via 'M' failed at runtime; split on 'yyyy-MM-dd' confirmed working"
+    },
+    {
+      "fact": "Previous quarter and year calculation (NZ-aware, UTC+12): Calc_Quarter expression: @if(equals(div(sub(int(split(formatDateTime(addToTime(utcNow(), 12, 'Hour'), 'yyyy-MM-dd'), '-')[1]), 1), 3), 0), 'Q4', concat('Q', string(div(sub(int(split(formatDateTime(addToTime(utcNow(), 12, 'Hour'), 'yyyy-MM-dd'), '-')[1]), 1), 3)))). Calc_Year expression: @if(equals(div(sub(int(split(formatDateTime(addToTime(utcNow(), 12, 'Hour'), 'yyyy-MM-dd'), '-')[1]), 1), 3), 0), string(sub(int(split(formatDateTime(addToTime(utcNow(), 12, 'Hour'), 'yyyy-MM-dd'), '-')[0]), 1)), split(formatDateTime(addToTime(utcNow(), 12, 'Hour'), 'yyyy-MM-dd'), '-')[0]). Logic: div(sub(month, 1), 3) = 0 for months 1-3 → previous quarter is Q4, year rolls back by 1. For months 4-12 it gives 1, 2, 3 → Q1, Q2, Q3 in the same year. Verified: April 2026 → Q1 2026, January 2027 → Q4 2026.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — quarterly report labelling confirmed working across quarter and year boundaries"
+    },
+    {
+      "fact": "In Logic Apps expressions injected into KQL queries, datetime() does NOT need quotes around the interpolated date value. Correct: datetime(@{outputs('Calc_Date')}). Wrong: datetime('@{outputs('Calc_Date')}') — the inner single quotes conflict with the Logic Apps expression parser and cause parse errors at runtime.",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — KQL datetime() injection confirmed; quoted form caused parse errors"
+    }
+  ],
+  "implementation_notes": [
+    "Always use 'yyyy-MM-dd' as the intermediate format when you need numeric date parts (month, year, day). Never rely on single-letter format specifiers like 'M', 'y', or 'd' in Logic Apps expressions — their output is locale-dependent.",
+    "The addToTime(utcNow(), 12, 'Hour') pattern shifts UTC to NZ business time (UTC+12). Adjust the offset for other timezones as needed.",
+    "The div(sub(month, 1), 3) pattern maps months to previous-quarter numbers: January (1) → 0 (Q4 prior year), February-March (2-3) → 0 (Q4 prior year), April-June (4-6) → 1 (Q1), July-September (7-9) → 2 (Q2), October-December (10-12) → 3 (Q3).",
+    "When injecting calculated date outputs into KQL, use @{outputs('ActionName')} interpolation without surrounding quotes inside the datetime() function call."
+  ],
+  "common_failures": [
+    "Using formatDateTime(timestamp, 'M') for numeric month — returns locale string, int() conversion fails at runtime.",
+    "Using single quotes inside datetime() in KQL injection — causes Logic Apps expression parser errors.",
+    "Forgetting the -1 offset in the year rollback for Q4: when month is 1-3 the year must decrement by 1, not stay the same.",
+    "Not accounting for timezone offset when calculating quarter — a run at 11pm UTC on 31 March is still Q1 in NZ (next day, April 1)."
+  ],
+  "last_verified": "2026-04-03T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-control-flow-code-patterns",
+    "azure-logic-apps-production-patterns",
+    "azure-logic-apps-http-and-data-patterns"
+  ],
+  "source_projects": ["manual-analysis"]
+}

@@ -95,6 +95,9 @@ def _cmd_project(args: argparse.Namespace) -> int:
     if action in ("continue", "fork") and not project_id:
         raise SystemExit(f"--project {action} requires --id <project-id>")
 
+    if action in ("new", "fork") and not task:
+        raise SystemExit(f"--project {action} requires --task <description>")
+
     request = _compose_project_request(action, task, project_id)
     return _run_engine(request, args, force_debug=capture_mode)
 
@@ -580,8 +583,25 @@ def build_legacy_parser() -> argparse.ArgumentParser:
     return parser
 
 
+_NEW_STYLE_FLAGS = {"--project", "--config", "--skill", "--knowledge", "--agent"}
+
+
 def _has_legacy_mode(argv: list[str]) -> bool:
-    return bool(set(argv) & _LEGACY_FLAGS)
+    argv_set = set(argv)
+    legacy_found = argv_set & _LEGACY_FLAGS
+    if not legacy_found:
+        return False
+    # If new-style flags are also present, the user likely meant the new CLI
+    # but accidentally used a bare backend flag (e.g. --claude instead of --cli claude).
+    new_found = argv_set & _NEW_STYLE_FLAGS
+    if new_found:
+        hint = next(iter(legacy_found))
+        bare = hint.lstrip("-")
+        raise SystemExit(
+            f"Error: '{hint}' is a legacy flag. Use '--cli {bare}' instead.\n"
+            f"Example: ./automator --cli {bare} {next(iter(new_found))} ..."
+        )
+    return True
 
 
 def _run_legacy(argv: list[str]) -> int:

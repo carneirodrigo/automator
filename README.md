@@ -140,7 +140,7 @@ The engine orchestrates the pipeline directly. Agents do the work. The engine ha
 
 **Standard:** `worker → review → complete`
 
-**With research:** `research → worker → review → complete`
+**With research:** `worker(needs_research) → research → worker(with findings) → review → complete`
 
 **With rework:** `worker → review (fail) → worker rework → review → complete`
 

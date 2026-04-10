@@ -1,0 +1,264 @@
+{
+  "id": "logic-apps-connections",
+  "title": "Azure Logic Apps - Connection Object Structure And Managed API Reference",
+  "description": "How connections work in Logic Apps: $connections parameter structure, connectionId format, managed API paths, authentication types, and how to reference connections in actions.",
+  "tags": ["logic-apps", "connections", "managed-api", "connectors", "authentication", "msi", "arm-template"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Add-UserToWatchlist-SidToUPN.txt",
+    "Block-AADUser-Incident.txt",
+    "From-Sentinel-to-PAD.txt",
+    "Group-Change-AADUser-Incident-Brute-Force-v2.txt",
+    "Isolate-MDEMachine.txt",
+    "Send-to-SharePoint.txt"
+  ],
+  "content": {
+    "connections_overview": {
+      "description": "Connections are Azure resources that store credentials and endpoint information for managed connectors. In a Logic App workflow, connections are referenced by a key name in the $connections parameter. The actual connection resource (with credentials) lives in Azure as a Microsoft.Web/connections resource.",
+      "two_layer_design": {
+        "layer_1_definition": "Inside definition.parameters: declares $connections as an Object parameter with defaultValue {}. This makes $connections available as a runtime parameter inside the workflow.",
+        "layer_2_values": "Inside the outer parameters object (sibling to definition): provides the actual connection values at runtime. This is where the connectionId, id, and connectionName are specified."
+      }
+    },
+
+    "connection_object_structure": {
+      "description": "Each entry in $connections.value is keyed by the connection reference name used in workflow expressions.",
+      "schema": {
+        "{connectionKeyName}": {
+          "id": "The managed API resource ID — points to the managed API definition in Azure",
+          "connectionId": "The connection instance resource ID — points to the actual Microsoft.Web/connections resource",
+          "connectionName": "The display name of the connection resource",
+          "connectionProperties": "Optional. Contains authentication settings like ManagedServiceIdentity."
+        }
+      },
+      "id_format": "/subscriptions/{subscriptionId}/providers/Microsoft.Web/locations/{region}/managedApis/{apiName}",
+      "connectionId_format": "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Web/connections/{connectionResourceName}",
+      "notes": [
+        "The connectionKeyName is arbitrary — you choose it when adding the connection in the designer. It must match exactly what you use in @parameters('$connections')['keyName'] expressions.",
+        "The id field references the managed API template (same for everyone in the same region)",
+        "The connectionId references the specific connection resource in your subscription (unique per connection)"
+      ]
+    },
+
+    "real_world_connection_examples": {
+      "sentinel_service_account": {
+        "key_used_in_expressions": "azuresentinel",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/azuresentinel",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/azuresentinel-3",
+          "connectionName": "azuresentinel-3",
+          "connectionProperties": {}
+        },
+        "expression_in_action": "@parameters('$connections')['azuresentinel']['connectionId']"
+      },
+      "sentinel_msi_trigger": {
+        "key_used_in_expressions": "azuresentinel (or microsoftsentinel for MSI-specific playbooks)",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/azuresentinel",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/azuresentinel-Send-to-SharePoint",
+          "connectionName": "azuresentinel-Send-to-SharePoint",
+          "connectionProperties": {
+            "authentication": {
+              "type": "ManagedServiceIdentity"
+            }
+          }
+        }
+      },
+      "sentinel_msi_named": {
+        "key_used_in_expressions": "microsoftsentinel",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/Azuresentinel",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/MicrosoftSentinel-Add-UserToWatchlist-SidToUPN",
+          "connectionName": "MicrosoftSentinel-Add-UserToWatchlist-SidToUPN",
+          "connectionProperties": {
+            "authentication": {
+              "type": "ManagedServiceIdentity"
+            }
+          }
+        }
+      },
+      "azure_ad": {
+        "key_used_in_expressions": "azuread",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/azuread",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/azuread-1",
+          "connectionName": "azuread-1",
+          "connectionProperties": {}
+        }
+      },
+      "office365_outlook": {
+        "key_used_in_expressions": "office365",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/office365",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/office365-3",
+          "connectionName": "office365-3",
+          "connectionProperties": {}
+        }
+      },
+      "sharepoint_online": {
+        "key_used_in_expressions": "sharepointonline_1",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/sharepointonline",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/sharepointonline-1",
+          "connectionName": "sharepointonline-1",
+          "connectionProperties": {}
+        }
+      },
+      "defender_for_endpoint": {
+        "key_used_in_expressions": "wdatp",
+        "full_object": {
+          "id": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/providers/Microsoft.Web/locations/australiaeast/managedApis/wdatp",
+          "connectionId": "/subscriptions/c717ad89-fc98-4757-8057-4cc4c934534e/resourceGroups/Default-Storage-AustraliaEast/providers/Microsoft.Web/connections/wdatp",
+          "connectionName": "wdatp",
+          "connectionProperties": {}
+        }
+      }
+    },
+
+    "managed_api_name_reference": {
+      "description": "The apiName segment in the managed API 'id' path. This is the canonical name for each connector's managed API.",
+      "table": {
+        "azuresentinel": {
+          "display_name": "Microsoft Sentinel (legacy connector name)",
+          "full_id_example": "/subscriptions/{sub}/providers/Microsoft.Web/locations/{region}/managedApis/azuresentinel",
+          "notes": "Most common. Used in both trigger and action connections."
+        },
+        "Azuresentinel": {
+          "display_name": "Microsoft Sentinel (MSI variant)",
+          "notes": "Capital A variant seen in MSI-authenticated connections (microsoftsentinel key)"
+        },
+        "azuread": {
+          "display_name": "Azure Active Directory / Microsoft Entra ID",
+          "full_id_example": "/subscriptions/{sub}/providers/Microsoft.Web/locations/{region}/managedApis/azuread"
+        },
+        "office365": {
+          "display_name": "Office 365 Outlook",
+          "full_id_example": "/subscriptions/{sub}/providers/Microsoft.Web/locations/{region}/managedApis/office365"
+        },
+        "sharepointonline": {
+          "display_name": "SharePoint Online",
+          "full_id_example": "/subscriptions/{sub}/providers/Microsoft.Web/locations/{region}/managedApis/sharepointonline"
+        },
+        "wdatp": {
+          "display_name": "Microsoft Defender for Endpoint (Windows Defender ATP)",
+          "full_id_example": "/subscriptions/{sub}/providers/Microsoft.Web/locations/{region}/managedApis/wdatp"
+        }
+      }
+    },
+
+    "authentication_types": {
+      "service_account_oauth": {
+        "description": "A user account (service account) authorized the connection via OAuth. The connection stores a refresh token.",
+        "connectionProperties": {},
+        "notes": [
+          "No connectionProperties needed — empty object {}",
+          "The connection was authorized by a user clicking 'Authorize' in the portal",
+          "If the service account password changes, the connection breaks and must be re-authorized"
+        ]
+      },
+      "managed_service_identity": {
+        "description": "The Logic App's system-assigned managed identity is used to authenticate the connection. No stored credentials.",
+        "connectionProperties": {
+          "authentication": {
+            "type": "ManagedServiceIdentity"
+          }
+        },
+        "prerequisites": [
+          "Logic App must have system-assigned managed identity enabled (identity.type = SystemAssigned)",
+          "The managed identity must have the required role on the Sentinel workspace (Microsoft Sentinel Responder or similar)",
+          "The connection resource must be created with MSI authentication type"
+        ],
+        "benefits": [
+          "No credentials to rotate or expire",
+          "Works well in CI/CD and automated deployments",
+          "Audit trail shows the Logic App's managed identity, not a user account"
+        ]
+      }
+    },
+
+    "how_to_reference_in_actions": {
+      "trigger": {
+        "pattern": "\"name\": \"@parameters('$connections')['{keyName}']['connectionId']\"",
+        "full_example": {
+          "host": {
+            "connection": {
+              "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+            }
+          }
+        }
+      },
+      "action": {
+        "pattern": "Same as trigger — host.connection.name points to the connectionId via $connections",
+        "full_example": {
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {}
+          }
+        }
+      }
+    },
+
+    "multiple_connections_same_api_patterns": {
+      "description": "It is common to use multiple connections to the same managed API in one workflow. Each gets a unique key name.",
+      "observed_patterns": {
+        "trigger_vs_action": {
+          "description": "Trigger uses one Sentinel connection (often MSI for webhook registration), actions use another (service account for API calls)",
+          "example": {
+            "azuresentinel": "Trigger connection (MSI or service account for /incident-creation webhook)",
+            "azuresentinel_1": "Action connection (used for Entities API, Watchlist API calls)"
+          }
+        },
+        "suffix_numbering": {
+          "description": "When a second connection to the same API is needed, suffix _1, _2 etc. are appended to the key name",
+          "examples": [
+            "azuresentinel vs azuresentinel_1",
+            "azuread vs azuread_1",
+            "office365 vs office365_1",
+            "azuresentinel vs azuresentinel-1 (hyphen variant)"
+          ]
+        },
+        "descriptive_naming": {
+          "description": "Some playbooks use descriptive names instead of numeric suffixes",
+          "examples": [
+            "microsoftsentinel for MSI trigger connection",
+            "azuresentinel-Send-to-SharePoint for MSI connection in SharePoint playbook"
+          ]
+        }
+      }
+    },
+
+    "arm_template_connection_parameters": {
+      "description": "When deploying via ARM template, connections are injected as parameters. The $connections value is provided as a parameter to the Logic App resource.",
+      "arm_template_pattern": {
+        "resources_section": {
+          "properties": {
+            "parameters": {
+              "$connections": {
+                "value": {
+                  "azuresentinel": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azuresentinel')]",
+                    "connectionId": "[resourceId('Microsoft.Web/connections', 'azuresentinel-connection-name')]",
+                    "connectionName": "azuresentinel-connection-name",
+                    "connectionProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "notes": [
+        "In parameterized ARM deployments, use resourceId() and subscription() functions instead of hardcoded GUIDs",
+        "The Microsoft.Web/connections resource must be deployed before the Logic App resource (use dependsOn)",
+        "Connection resources require their own ARM resource blocks with the API type and auth parameters"
+      ]
+    }
+  }
+}

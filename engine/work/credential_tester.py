@@ -344,31 +344,15 @@ class CredentialTester:
 
         try:
             req = urllib.request.Request(endpoint, headers=headers or {})
+            # urlopen raises HTTPError for 4xx/5xx, so the with block
+            # only executes on success (2xx after redirect handling).
             with urllib.request.urlopen(req, timeout=self.timeout) as response:
-                if response.status in (200, 401, 403):
-                    if response.status == 200:
-                        return CredentialTestResult(
-                            valid=True,
-                            credential_type=credential_type,
-                            message="HTTP request successful (200 OK)",
-                            metadata={"status_code": 200},
-                        )
-                    else:
-                        return CredentialTestResult(
-                            valid=False,
-                            credential_type=credential_type,
-                            message=f"Authentication failed (HTTP {response.status})",
-                            error_detail="Credentials were rejected by the server",
-                            metadata={"status_code": response.status},
-                        )
-                else:
-                    return CredentialTestResult(
-                        valid=False,
-                        credential_type=credential_type,
-                        message=f"Unexpected HTTP status: {response.status}",
-                        error_detail=f"Expected 200/401/403, got {response.status}",
-                        metadata={"status_code": response.status},
-                    )
+                return CredentialTestResult(
+                    valid=True,
+                    credential_type=credential_type,
+                    message="HTTP request successful (200 OK)",
+                    metadata={"status_code": response.status},
+                )
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):
                 return CredentialTestResult(

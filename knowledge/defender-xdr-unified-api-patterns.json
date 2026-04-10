@@ -1,0 +1,268 @@
+{
+  "id": "defender-xdr-unified-api-patterns",
+  "title": "Microsoft Defender XDR Unified API - Advanced Hunting, Incidents, and Alerts From Logic Apps",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Logic Apps querying Microsoft Defender XDR (unified portal) for incidents, alerts, and advanced hunting",
+    "Cross-product security automation spanning MDE, MDO, MDI, Defender for Cloud Apps under one API surface",
+    "Workflows requiring the unified api.security.microsoft.com endpoint rather than product-specific APIs"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-06-01T00:00:00Z",
+  "base_url": "https://api.security.microsoft.com",
+  "auth": {
+    "type": "OAuth2 client credentials or MSI via Graph",
+    "audience_for_direct_api": "https://security.microsoft.com",
+    "audience_for_graph_advanced_hunting": "https://graph.microsoft.com",
+    "note": "The api.security.microsoft.com endpoints accept a Bearer token obtained with audience 'https://security.microsoft.com'. Alternatively, advanced hunting is available via MS Graph POST /security/runHuntingQuery — preferred for MSI-based Logic Apps since Graph supports MSI directly."
+  },
+  "confirmed_facts": [
+    {
+      "fact": "The Microsoft Defender XDR API base URL is https://api.security.microsoft.com. This is distinct from the MDE securitycenter API (api.securitycenter.microsoft.com). The XDR API covers cross-product incidents, alerts, and advanced hunting spanning MDE, MDI, MDO, and Defender for Cloud Apps.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Defender XDR API documentation"
+    },
+    {
+      "fact": "Advanced hunting via the XDR API: POST https://api.security.microsoft.com/api/advancedqueries/run with body { Query: '<KQL>' }. Auth audience: 'https://security.microsoft.com'. Permission required: AdvancedHunting.Read.All (application). Returns the same Stats/Schema/Results schema as the MDE Advanced Hunting API.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API — Advanced Hunting endpoint"
+    },
+    {
+      "fact": "Advanced hunting via MS Graph (alternative, MSI-compatible): POST https://graph.microsoft.com/v1.0/security/runHuntingQuery with body { query: '<KQL>' }. Auth audience: 'https://graph.microsoft.com'. Permission: ThreatHunting.Read.All (application). Returns { schema: [...], results: [...] }. Note lowercase field names vs the securitycenter API's PascalCase Results.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Graph runHuntingQuery documentation — confirmed lowercase 'results' field"
+    },
+    {
+      "fact": "The XDR API and the Graph runHuntingQuery endpoint query the same Defender data lake. The Graph route is preferred in Logic Apps using MSI because MSI natively supports the Graph audience. The XDR direct API requires a client credentials token (OAuth2 flow with client_id + client_secret or certificate).",
+      "verified_date": "2026-04-03",
+      "source": "Auth model comparison: MSI supports Graph; XDR direct API requires app registration token"
+    },
+    {
+      "fact": "List XDR incidents: GET https://api.security.microsoft.com/api/incidents. Supports $filter, $top (max 100 per page), and $skip for offset pagination (no nextLink cursor — uses numeric $skip). Incidents span all Defender products. Each incident has incidentId (integer), incidentName, severity, status, and an alerts array.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API — Incidents - List"
+    },
+    {
+      "fact": "XDR incident filter examples: GET /api/incidents?$filter=status+eq+'Active'&$top=100. Date filter: $filter=lastUpdateTime+ge+2025-03-01. Severity filter: $filter=severity+eq+'High'. Unlike ARM APIs, the XDR API does not require a 'properties/' prefix in filter expressions.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API — Incidents - List filter syntax"
+    },
+    {
+      "fact": "XDR incidents include all correlated alerts from all Defender products. The alerts array on an incident object contains alertId, title, serviceSource (microsoftDefenderForEndpoint, microsoftDefenderForIdentity, microsoftDefenderForOffice365, etc.), and detectionSource.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR Incident resource schema"
+    },
+    {
+      "fact": "List XDR alerts: GET https://api.security.microsoft.com/api/alerts. Supports $filter (same no-prefix syntax). Alerts have alertId, title, severity, status, serviceSource, category, and evidence array. The evidence array contains affected entities (devices, users, mailboxes) with their details.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API — Alerts - List"
+    },
+    {
+      "fact": "How XDR API differs from the MDE API: The MDE securitycenter API (api.securitycenter.microsoft.com) only covers Defender for Endpoint data. The XDR API (api.security.microsoft.com) covers all Defender products. The advanced hunting tables available via XDR include cross-product tables like AlertInfo, AlertEvidence, IdentityInfo, and CloudAppEvents that are not available in MDE-only hunting.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR vs MDE API surface comparison"
+    },
+    {
+      "fact": "XDR API rate limits: advanced hunting is limited to 45 calls per minute and a 10-minute runtime per query. The result set limit is 100,000 rows or 124 MB. For bulk monthly pulls, split queries into time-bounded windows (e.g., week-by-week) to stay within limits.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API advanced hunting quota documentation"
+    },
+    {
+      "fact": "Required app permissions for XDR API: Incident.Read.All and Alert.Read.All for incidents/alerts. AdvancedHunting.Read.All for advanced hunting. These are WindowsDefenderATP application permissions in Entra ID — different from MS Graph permissions despite covering XDR data.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API permission requirements"
+    },
+    {
+      "fact": "The Graph runHuntingQuery endpoint uses ThreatHunting.Read.All (Microsoft Graph application permission), not WindowsDefenderATP permissions. An MSI-based Logic App can be granted ThreatHunting.Read.All via PowerShell without creating an app registration.",
+      "verified_date": "2026-04-03",
+      "source": "MS Graph runHuntingQuery permission model"
+    },
+    {
+      "fact": "XDR API incident IDs are integers (not GUIDs): incidentId: 4521. Get a single incident: GET /api/incidents/4521. Update incident status: PATCH /api/incidents/4521 with body { status: 'Resolved', assignedTo: 'soc@contoso.com', classification: 'TruePositive', determination: 'Malware' }.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR API — Incidents resource model"
+    },
+    {
+      "fact": "The Graph runHuntingQuery response uses lowercase field names: { 'schema': [...], 'results': [...] }. The MDE securitycenter API uses PascalCase: { 'Schema': [...], 'Results': [...] }. This difference will cause null reference errors if you reuse a ParseJson schema from one API with the other.",
+      "verified_date": "2026-04-03",
+      "source": "API response schema comparison — confirmed field name casing difference"
+    },
+    {
+      "fact": "XDR advanced hunting KQL tables available that MDE-only API does not expose: AlertInfo (alert metadata), AlertEvidence (alert entities), IdentityInfo (user identity enrichment), IdentityLogonEvents (AD authentication), CloudAppEvents (MCAS), EmailEvents, EmailAttachmentInfo, EmailPostDeliveryEvents, UrlClickEvents.",
+      "verified_date": "2026-04-03",
+      "source": "Defender XDR advanced hunting table reference"
+    }
+  ],
+  "key_endpoints": {
+    "xdr_list_incidents": "GET https://api.security.microsoft.com/api/incidents?$filter=status+eq+'Active'&$top=100",
+    "xdr_get_incident": "GET https://api.security.microsoft.com/api/incidents/{incidentId}",
+    "xdr_list_alerts": "GET https://api.security.microsoft.com/api/alerts?$filter=severity+eq+'High'",
+    "xdr_advanced_hunting": "POST https://api.security.microsoft.com/api/advancedqueries/run",
+    "graph_advanced_hunting": "POST https://graph.microsoft.com/v1.0/security/runHuntingQuery",
+    "graph_incidents": "GET https://graph.microsoft.com/v1.0/security/incidents",
+    "graph_alerts_v2": "GET https://graph.microsoft.com/v1.0/security/alerts_v2"
+  },
+  "logic_app_action_patterns": {
+    "advanced_hunting_via_graph_msi": {
+      "description": "Advanced hunting via MS Graph using MSI — preferred pattern for Logic Apps, no app registration needed",
+      "HTTP_XDR_Advanced_Hunting": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://graph.microsoft.com/v1.0/security/runHuntingQuery",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "query": "AlertInfo\n| where Timestamp > ago(30d)\n| where Severity in ('High', 'Medium')\n| join kind=inner AlertEvidence on AlertId\n| summarize AlertCount = count() by Category, ServiceSource\n| order by AlertCount desc"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://graph.microsoft.com"
+          }
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        }
+      },
+      "response_access": {
+        "results_array": "@body('HTTP_XDR_Advanced_Hunting')?['results']",
+        "schema_array": "@body('HTTP_XDR_Advanced_Hunting')?['schema']",
+        "note": "Field names are lowercase 'results' and 'schema' — not PascalCase as in the securitycenter API"
+      }
+    },
+    "advanced_hunting_via_xdr_api_with_token": {
+      "description": "Advanced hunting via XDR direct API — requires OAuth2 client credentials token fetch first",
+      "step_1_get_token": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://login.microsoftonline.com/@{parameters('tenantId')}/oauth2/v2.0/token",
+          "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+          "body": "grant_type=client_credentials&client_id=@{parameters('clientId')}&client_secret=@{body('Get_secret')?['value']}&scope=https%3A%2F%2Fsecurity.microsoft.com%2F.default"
+        }
+      },
+      "step_2_run_query": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://api.security.microsoft.com/api/advancedqueries/run",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "@{concat('Bearer ', body('HTTP_Get_Token')?['access_token'])}"
+          },
+          "body": {
+            "Query": "DeviceInfo\n| where Timestamp > ago(1d)\n| summarize count() by OSPlatform"
+          }
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        }
+      },
+      "response_access": {
+        "results_array": "@body('HTTP_XDR_Run_Query')?['Results']",
+        "note": "PascalCase 'Results' (not 'results') when using the direct XDR API"
+      }
+    },
+    "list_xdr_incidents_via_graph": {
+      "description": "List XDR incidents via MS Graph using MSI — note Graph uses different schema than direct XDR API",
+      "HTTP_List_XDR_Incidents": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://graph.microsoft.com/v1.0/security/incidents",
+          "queries": {
+            "$filter": "status ne 'resolved'",
+            "$top": "100",
+            "$orderby": "createdDateTime desc"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://graph.microsoft.com"
+          }
+        }
+      },
+      "response_access": {
+        "incidents_array": "@body('HTTP_List_XDR_Incidents')?['value']",
+        "next_link": "@body('HTTP_List_XDR_Incidents')?['@odata.nextLink']",
+        "incident_id": "@items('For_each')?['id']",
+        "incident_display_name": "@items('For_each')?['displayName']",
+        "incident_severity": "@items('For_each')?['severity']",
+        "incident_status": "@items('For_each')?['status']",
+        "incident_assigned_to": "@items('For_each')?['assignedTo']",
+        "note": "Graph incidents use @odata.nextLink for pagination, not nextLink. Field names follow Graph camelCase conventions."
+      }
+    }
+  },
+  "api_surface_comparison": {
+    "mde_securitycenter_api": {
+      "base_url": "https://api.securitycenter.microsoft.com",
+      "scope": "MDE only (devices, vulnerabilities, alerts, investigations, machine actions)",
+      "auth_audience": "https://api.securitycenter.microsoft.com",
+      "hunting_results_key": "Results (PascalCase)",
+      "best_for": "MDE-specific automation, device management, TVM, AV scans"
+    },
+    "xdr_direct_api": {
+      "base_url": "https://api.security.microsoft.com",
+      "scope": "All Defender products (MDE + MDI + MDO + MCAS + unified incidents)",
+      "auth_audience": "https://security.microsoft.com",
+      "hunting_results_key": "Results (PascalCase)",
+      "best_for": "Cross-product hunting, unified incident management with XDR-native app registrations"
+    },
+    "graph_security_api": {
+      "base_url": "https://graph.microsoft.com/v1.0/security",
+      "scope": "All Defender products + additional Microsoft 365 security signals",
+      "auth_audience": "https://graph.microsoft.com",
+      "hunting_results_key": "results (lowercase)",
+      "best_for": "MSI-based Logic Apps (no app registration), unified alerts_v2, runHuntingQuery, Secure Score"
+    }
+  },
+  "cross_product_kql_patterns": {
+    "alert_summary_all_products": "AlertInfo\n| where Timestamp > ago(30d)\n| summarize AlertCount = count() by ServiceSource, Severity\n| order by AlertCount desc",
+    "identity_lateral_movement": "IdentityLogonEvents\n| where Timestamp > ago(7d)\n| where LogonType == 'Network'\n| where ActionType == 'LogonFailed'\n| summarize FailedLogons = count() by AccountUpn, DeviceName\n| where FailedLogons > 10\n| order by FailedLogons desc",
+    "cloud_app_suspicious_activity": "CloudAppEvents\n| where Timestamp > ago(7d)\n| where ActionType in ('FileUploaded', 'MassDownload', 'FileDeleted')\n| summarize count() by AccountDisplayName, Application\n| order by count_ desc",
+    "email_threats_summary": "EmailEvents\n| where Timestamp > ago(30d)\n| where ThreatTypes != ''\n| summarize ThreatCount = count() by ThreatTypes\n| order by ThreatCount desc",
+    "note": "These tables are only available via the XDR or Graph runHuntingQuery endpoints — not via the MDE-only securitycenter API"
+  },
+  "implementation_notes": [
+    "For new Logic Apps integrations, use the Graph runHuntingQuery endpoint (POST /v1.0/security/runHuntingQuery) over the XDR direct API. It supports MSI without an app registration and has the same data access.",
+    "The Graph runHuntingQuery uses lowercase field names in the response: 'results' and 'schema'. The XDR direct API and MDE securitycenter API use PascalCase 'Results' and 'Schema'. This is a source of runtime null errors when reusing ParseJson schemas.",
+    "MSI for Graph requires ThreatHunting.Read.All application permission. Grant it via PowerShell: New-MgServicePrincipalAppRoleAssignment on the Logic App's managed identity service principal. The permission is not assignable through the Azure portal GUI.",
+    "Graph incidents use @odata.nextLink (with @ prefix), not nextLink. Check body('action')?['@odata.nextLink'] for pagination continuation.",
+    "XDR incident IDs are integers; Graph incident IDs are GUIDs. Do not mix them across API surfaces.",
+    "Advanced hunting via the XDR API has a 10-minute timeout per query. For monthly bulk pulls, split into daily or weekly windows using Timestamp > ago(7d) and offset the start date per iteration.",
+    "The serviceSource field on alerts_v2 values: 'microsoftDefenderForEndpoint', 'microsoftDefenderForIdentity', 'microsoftDefenderForOffice365', 'microsoftDefenderForCloudApps', 'microsoft365Defender'. Use these as $filter values to segregate by product in a single alerts pull.",
+    "If the team already has OAuth2 client credentials configured for the MDE securitycenter API, the same app registration can be granted Incident.Read.All and AdvancedHunting.Read.All for the XDR API — different permissions but same tenant app registration.",
+    "Rate limiting on advanced hunting (45 calls/minute) is per tenant. In multi-workflow environments, coordinate query scheduling to avoid hitting the limit."
+  ],
+  "common_failures": [
+    "Using PascalCase 'Results' to access Graph runHuntingQuery response — returns null; Graph uses lowercase 'results'.",
+    "Using the MDE audience (https://api.securitycenter.microsoft.com) for the XDR direct API — returns 401; XDR requires 'https://security.microsoft.com'.",
+    "MSI not granted ThreatHunting.Read.All — Graph runHuntingQuery returns 403 Forbidden.",
+    "Reusing MDE ParseJson schema with Graph runHuntingQuery response — schema mismatch causes null values for all fields.",
+    "Querying cross-product tables (AlertInfo, IdentityLogonEvents, etc.) via the MDE securitycenter endpoint — returns error 'Table not found'; these tables only exist at XDR/Graph scope.",
+    "Pagination using 'nextLink' instead of '@odata.nextLink' for Graph incidents — pagination silently stops after first page.",
+    "Not chunking large hunting queries into time windows — query times out at 10 minutes for queries spanning 30+ days on active tenants."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/microsoft-365/security/defender/api-advanced-hunting",
+    "https://learn.microsoft.com/en-us/microsoft-365/security/defender/api-incident",
+    "https://learn.microsoft.com/en-us/graph/api/security-security-runhuntingquery",
+    "https://learn.microsoft.com/en-us/microsoft-365/security/defender/advanced-hunting-schema-tables",
+    "https://learn.microsoft.com/en-us/graph/api/resources/security-incident"
+  ],
+  "last_verified": "2026-04-03T00:00:00Z",
+  "related_entries": [
+    "mde-advanced-hunting-api",
+    "ms-graph-security-hunting-posture-and-ti",
+    "ms-graph-defender-identity-office365",
+    "ms-graph-security-alerts-incidents",
+    "logic-apps-msi-arm-http-auth-pattern"
+  ],
+  "source_projects": ["manual-research"]
+}

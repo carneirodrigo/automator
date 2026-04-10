@@ -8,7 +8,7 @@ These packages are recommended to be installed inside a repo-local `.venv`.
 
 ### Core Runtime Dependencies
 
-- **tiktoken>=0.5.0**: Improved token estimation (falls back to `len/4` if absent).
+- **tiktoken>=0.5.0**: Improved token estimation (falls back to `len/3` heuristic if absent).
 - **requests>=2.28.0**: Common dependency for generated delivery scripts (Microsoft Graph API, etc.).
 - **pyyaml>=6.0**: YAML frontmatter parsing for Agent Skills (falls back to regex parser if absent).
 
@@ -49,9 +49,9 @@ At least one is required as the engine spawns it via subprocess.
 #### Usage
 
 ```bash
-./automator project new --claude --name demo "..."
-./automator project new --gemini --name demo "..."
-./automator project check-runtime
+./automator --cli claude --project new --task "..."
+./automator --cli gemini --project new --task "..."
+./automator --cli claude --check-runtime
 ```
 
 > **Runtime Requirement:** If Automator runs under an outer sandboxed launcher, that outer runtime must allow outbound network access for spawned backend CLIs.

@@ -117,16 +117,17 @@ def reset_cache() -> None:
 def load_backend_config(config_dir: Path | None = None) -> dict[str, Any]:
     """Load config/backends.json. Returns empty defaults if missing."""
     global _cached_backends_config
+    import copy  # noqa: PLC0415
     with _cache_lock:
         if _cached_backends_config is not None and config_dir is None:
-            return _cached_backends_config
+            return copy.deepcopy(_cached_backends_config)
 
         path = (config_dir or _get_config_dir()) / "backends.json"
         if not path.exists():
             result: dict[str, Any] = {"version": 2, "mode": "cli"}
             if config_dir is None:
                 _cached_backends_config = result
-            return result
+            return copy.deepcopy(result)
 
         try:
             with path.open("r", encoding="utf-8") as f:
@@ -136,33 +137,34 @@ def load_backend_config(config_dir: Path | None = None) -> dict[str, Any]:
             result = {"version": 2, "mode": "cli"}
             if config_dir is None:
                 _cached_backends_config = result
-            return result
+            return copy.deepcopy(result)
 
         if not isinstance(data, dict):
             logger.warning("backends.json is not a JSON object. Using defaults.")
             result = {"version": 2, "mode": "cli"}
             if config_dir is None:
                 _cached_backends_config = result
-            return result
+            return copy.deepcopy(result)
 
         if config_dir is None:
             _cached_backends_config = data
-        return data
+        return copy.deepcopy(data)
 
 
 def load_api_secrets(config_dir: Path | None = None) -> dict[str, Any]:
     """Load config/secrets.json. Returns empty dict if missing."""
+    import copy  # noqa: PLC0415
     global _cached_secrets_config
     with _cache_lock:
         if _cached_secrets_config is not None and config_dir is None:
-            return _cached_secrets_config
+            return copy.deepcopy(_cached_secrets_config)
 
         path = (config_dir or _get_config_dir()) / "secrets.json"
         if not path.exists():
             result: dict[str, Any] = {}
             if config_dir is None:
                 _cached_secrets_config = result
-            return result
+            return copy.deepcopy(result)
 
         try:
             with path.open("r", encoding="utf-8") as f:
@@ -172,18 +174,18 @@ def load_api_secrets(config_dir: Path | None = None) -> dict[str, Any]:
             result = {}
             if config_dir is None:
                 _cached_secrets_config = result
-            return result
+            return copy.deepcopy(result)
 
         if not isinstance(data, dict):
             logger.warning("secrets.json is not a JSON object. Using empty secrets.")
             result = {}
             if config_dir is None:
                 _cached_secrets_config = result
-            return result
+            return copy.deepcopy(result)
 
         if config_dir is None:
             _cached_secrets_config = data
-        return data
+        return copy.deepcopy(data)
 
 
 # ---------------------------------------------------------------------------

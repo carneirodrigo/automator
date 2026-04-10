@@ -136,7 +136,7 @@ This workflow lets any current supervising LLM handle repair work without requir
 ## Audit Expectations
 
 When auditing this repository, focus on:
-1. Integrity of the pipeline stage ordering (research → worker → review) and the single rework cycle cap.
+1. Integrity of the pipeline stage ordering (worker → [optional: research → worker] → review) and the single rework cycle cap.
 2. Compliance with the "no local agent runners" rule — the host must not substitute its own reasoning for a failed spawned agent.
 3. Visibility of agent execution and token usage in the timeline, including compact stage-start updates, sparse slow-run heartbeats, observable capability actions, and concise completion or next-stage messages.
 

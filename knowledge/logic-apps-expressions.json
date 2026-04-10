@@ -1,0 +1,279 @@
+{
+  "id": "logic-apps-expressions",
+  "title": "Azure Logic Apps - Expression Language Reference With Verbatim Examples From Real Playbooks",
+  "description": "Complete expression language reference for Logic Apps workflows: triggerBody, body, items, variables, outputs, parameters, string functions, and null-safe navigation — all sourced from real Sentinel playbook examples.",
+  "tags": ["logic-apps", "expressions", "workflow-language", "triggerBody", "body", "items", "variables", "outputs"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Add-UserToWatchlist-SidToUPN.txt",
+    "Block-AADUser-Incident.txt",
+    "CyberSecurityASM-Notification-Email.txt",
+    "Groups-Change-AADUser-Incident-Brute-Force-v2.txt",
+    "Isolate-MDEMachine.txt",
+    "Teams-notifications-webhook.txt",
+    "Send-basic-email.txt",
+    "Pagerduty-Notification-Email.txt",
+    "Suppress_Tenable_SAMR_alerts.txt"
+  ],
+  "content": {
+    "expression_syntax_basics": {
+      "inline_in_string": "@{expression} — embeds result as a string inside a larger string value. Used inside string values that combine static text and dynamic parts.",
+      "standalone": "@expression — when the entire field value is an expression (not embedded in a string). Used when the field expects an object or non-string type.",
+      "examples": {
+        "inline": "\"Subject\": \"Security Incident - @{triggerBody()?['object']?['properties']?['title']}\"",
+        "standalone": "\"body\": \"@triggerBody()?['object']?['properties']?['relatedEntities']\"",
+        "notes": [
+          "Use @{...} when the expression is part of a larger string (the {} causes string coercion)",
+          "Use @... (without {}) when the field value IS the expression result (returns original type)",
+          "In body fields that are objects, use standalone @expression syntax",
+          "In string fields that mix static text and dynamic values, use @{expression} syntax"
+        ]
+      }
+    },
+
+    "triggerBody": {
+      "description": "Accesses the full payload from the workflow trigger. For Sentinel incident triggers, this is the entire incident object.",
+      "verbatim_expressions_from_examples": {
+        "incident_trigger_fields": {
+          "title": "@triggerBody()?['object']?['properties']?['title']",
+          "description": "@triggerBody()?['object']?['properties']?['description']",
+          "incidentNumber": "@triggerBody()?['object']?['properties']?['incidentNumber']",
+          "incidentUrl": "@triggerBody()?['object']?['properties']?['incidentUrl']",
+          "severity": "@triggerBody()?['object']?['properties']?['severity']",
+          "createdTimeUtc": "@triggerBody()?['object']?['properties']?['createdTimeUtc']",
+          "relatedEntities": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+          "alertProductNames": "@triggerBody()?['object']?['properties']?['additionalData']?['alertProductNames']",
+          "tactics": "@triggerBody()?['object']?['properties']?['additionalData']?['tactics']"
+        },
+        "workspace_info": {
+          "SubscriptionId": "@triggerBody()?['workspaceInfo']?['SubscriptionId']",
+          "ResourceGroupName": "@triggerBody()?['workspaceInfo']?['ResourceGroupName']",
+          "workspaceId": "@triggerBody()?['workspaceId']"
+        },
+        "alert_trigger_fields": {
+          "AlertDisplayName": "@triggerBody()?['AlertDisplayName']",
+          "SystemAlertId": "@triggerBody()?['SystemAlertId']",
+          "StartTimeUtc": "@triggerBody()?['StartTimeUtc']",
+          "WorkspaceSubscriptionId": "@triggerBody()?['WorkspaceSubscriptionId']",
+          "WorkspaceResourceGroup": "@triggerBody()?['WorkspaceResourceGroup']",
+          "WorkspaceId": "@triggerBody()?['WorkspaceId']"
+        }
+      }
+    },
+
+    "body": {
+      "description": "Accesses the body of a previously executed action by name. The action name is the exact key used in the 'actions' dictionary (spaces preserved).",
+      "syntax": "@body('ActionName')",
+      "null_safe_syntax": "@body('ActionName')?['field']",
+      "verbatim_examples": {
+        "get_accounts_body": "@body('Entities_-_Get_Accounts')?['Accounts']",
+        "get_hosts_body": "@body('Entities_-_Get_Hosts')?['Hosts']",
+        "get_groups_value": "@body('Get_groups_of_a_user_(V2)')?['value']",
+        "get_user_id": "@body('Get_user')?['id']",
+        "get_user_mail": "@body('Get_user')?['mail']",
+        "get_user_givenName": "@body('Get_user')?['givenName']",
+        "machine_id": "@body('Machines_-_Get_single_machine')?['id']",
+        "machine_computerDnsName": "@body('Machines_-_Get_single_machine')?['computerDnsName']",
+        "machine_osPlatform": "@body('Machines_-_Get_single_machine')?['osPlatform']",
+        "machine_rbacGroupName": "@body('Machines_-_Get_single_machine')?['rbacGroupName']",
+        "alert_incident_id": "@body('Alert_-_Get_incident')?['id']",
+        "select_entities_body": "@body('Select_Entities')",
+        "html_table_body": "@body('Create_HTML_table_with_Entities')",
+        "csv_table_body": "@body('Create_CSV_table_with_users')"
+      },
+      "notes": [
+        "Action names with parentheses are valid: body('Get_groups_of_a_user_(V2)')",
+        "Action names with spaces are valid in expressions",
+        "?['field'] is null-safe: returns null if the parent is null, rather than throwing an error",
+        "body() returns the HTTP response body or the action output body depending on action type"
+      ]
+    },
+
+    "outputs": {
+      "description": "Accesses the full outputs object of an action (includes statusCode, headers, body). More complete than body() which only returns the response body.",
+      "syntax": "@outputs('ActionName')",
+      "verbatim_examples": {
+        "status_code_check": "@outputs('Watchlists_-_Get_a_watchlist_by_alias')['statusCode']",
+        "compose_output": "@outputs('Compose_Incident_link')",
+        "select_body": "@outputs('Select_Entities')['body']"
+      },
+      "notes": [
+        "outputs()['statusCode'] is the standard way to check HTTP response codes from ApiConnection actions",
+        "For Compose actions, @outputs('ComposeName') returns the Compose value (not @body)",
+        "outputs()['body'] is equivalent to body() for most action types",
+        "statusCode is at the top level of outputs, not nested under headers or body"
+      ]
+    },
+
+    "items": {
+      "description": "Inside a Foreach loop, @items('ForeachActionName') returns the current iteration element. The action name must exactly match the Foreach action name.",
+      "syntax": "@items('ForeachActionName')",
+      "null_safe": "@items('ForeachActionName')?['field']",
+      "verbatim_examples": {
+        "account_name": "@items('For_each')?['Name']",
+        "account_aad_user_id": "@items('For_each')?['AadUserId']",
+        "account_nt_domain": "@items('For_each')?['NTDomain']",
+        "account_dns_domain": "@items('For_each')?['DnsDomain']",
+        "account_sid": "@items('For_each')?['Sid']",
+        "nested_foreach": "@items('For_each_user_-_add_to_user_array_variable')?['Name']",
+        "group_guid": "@items('For_each_1') — when iterating group GUIDs directly (no field access needed)",
+        "entity_kind": "@item()?['kind'] — @item() (no name) is used inside Select action's 'select' block",
+        "entity_friendly_name": "@item()?['properties']?['friendlyName']"
+      },
+      "notes": [
+        "@items('ForeachName') with the foreach action name — used inside actions within the foreach",
+        "@item() without a name is only valid inside a Select action's 'select' object",
+        "The foreach action name is case-sensitive and space-sensitive in expressions",
+        "Nested foreaches: inner foreach uses items() with the inner foreach action name"
+      ]
+    },
+
+    "variables": {
+      "description": "Reads the current value of a workflow variable. Variable must be initialized before first use.",
+      "syntax": "@variables('variableName')",
+      "verbatim_examples": {
+        "watchlist_alias": "@variables('Watchlist alias')",
+        "accounts_array": "@variables('accounts')",
+        "entities_json": "@variables('EntitiesJSON')",
+        "modern_auth_flag": "@variables('ModernAuth_Applied')",
+        "new_entities_string": "@variables('new_entities')"
+      },
+      "in_path_expression": "Watchlists/.../@{encodeURIComponent(variables('Watchlist alias'))}"
+    },
+
+    "parameters": {
+      "description": "Accesses workflow parameters. Primarily used to get connection IDs from the $connections parameter.",
+      "syntax": "@parameters('$connections')",
+      "connection_access": "@parameters('$connections')['connectionKey']['connectionId']",
+      "verbatim_examples": {
+        "sentinel_connection": "@parameters('$connections')['azuresentinel']['connectionId']",
+        "azuread_connection": "@parameters('$connections')['azuread']['connectionId']",
+        "office365_connection": "@parameters('$connections')['office365']['connectionId']",
+        "sharepoint_connection": "@parameters('$connections')['sharepointonline_1']['connectionId']",
+        "wdatp_connection": "@parameters('$connections')['wdatp']['connectionId']"
+      }
+    },
+
+    "built_in_functions": {
+      "string_functions": {
+        "concat": {
+          "syntax": "@concat(value1, value2, ...)",
+          "example": "@json(concat('[', join(variables('EntitiesJSON'), ','), ']'))"
+        },
+        "join": {
+          "syntax": "@join(array, delimiter)",
+          "examples": [
+            "@join(triggerBody()?['object']?['properties']?['additionalData']?['alertProductNames'], '<br />')",
+            "@join(triggerBody()?['object']?['properties']?['additionalData']?['tactics'], '<br />')",
+            "@join(variables('EntitiesJSON'), ',')"
+          ]
+        },
+        "replace": {
+          "syntax": "@replace(string, old, new)",
+          "example": "@{replace(body('Create_HTML_table_with_Entities'), 'http', 'hxxp')}"
+        },
+        "encodeURIComponent": {
+          "syntax": "@{encodeURIComponent(value)}",
+          "examples": [
+            "@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}",
+            "@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}",
+            "@{encodeURIComponent(triggerBody()?['workspaceId'])}",
+            "@{encodeURIComponent(variables('Watchlist alias'))}",
+            "@{encodeURIComponent(items('For_each')?['AadUserId'])}",
+            "@{encodeURIComponent('440fe32a-1b16-42b5-be15-c496d1e53e72')}",
+            "@{encodeURIComponent(encodeURIComponent('https://vuw.sharepoint.com/sites/...'))} — double encode for SharePoint connector paths"
+          ]
+        },
+        "string": {
+          "syntax": "@string(value)",
+          "notes": "Converts value to string. Less common than @{value} inline embedding."
+        },
+        "length": {
+          "syntax": "@length(stringOrArray)",
+          "example": "@length(triggerBody()?['AlertDisplayName'])"
+        },
+        "split": {
+          "syntax": "@split(string, delimiter)"
+        },
+        "first": {
+          "syntax": "@first(array)"
+        },
+        "last": {
+          "syntax": "@last(array)"
+        }
+      },
+      "type_conversion": {
+        "int": "@int(value) — convert to integer",
+        "bool": "@bool(value) — convert to boolean",
+        "json": "@json(string) — parse JSON string to object",
+        "string": "@string(value) — convert to string"
+      },
+      "date_functions": {
+        "utcNow": "@utcNow() — current UTC timestamp as string",
+        "addHours": "@addHours(timestamp, hours)",
+        "formatDateTime": "@formatDateTime(timestamp, format)",
+        "dayOfWeek": {
+          "syntax": "@dayOfWeek(timestamp)",
+          "example": "@dayOfWeek(triggerBody()?['StartTimeUtc'])",
+          "notes": "Returns 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday"
+        }
+      },
+      "logic_functions": {
+        "if": "@if(condition, trueValue, falseValue)",
+        "coalesce": "@coalesce(value1, value2, ...) — returns first non-null value",
+        "empty": "@empty(value) — returns true if null, empty string, or empty array",
+        "not": "@not(value) — boolean negation",
+        "equals": "@equals(value1, value2)",
+        "greater": "@greater(value1, value2)",
+        "contains": "@contains(stringOrArray, value)"
+      },
+      "array_functions": {
+        "json_concat_join": {
+          "description": "Pattern for building a JSON array from string representations in a variable",
+          "expression": "@json(concat('[', join(variables('EntitiesJSON'), ','), ']'))",
+          "use_case": "Build a FactSet array for Teams Adaptive Cards from accumulated Compose outputs"
+        }
+      },
+      "other": {
+        "listCallbackUrl": {
+          "syntax": "@{listCallbackUrl()}",
+          "use": "Only used in trigger bodies to register the webhook callback URL with Sentinel"
+        }
+      }
+    },
+
+    "null_safe_navigation": {
+      "description": "The ?['field'] operator returns null if the parent is null rather than throwing an error. Use it everywhere when navigating JSON from external sources.",
+      "pattern": "value?['field1']?['field2']?['field3']",
+      "verbatim_examples": [
+        "@triggerBody()?['object']?['properties']?['relatedEntities']",
+        "@triggerBody()?['object']?['properties']?['additionalData']?['alertProductNames']",
+        "@body('Entities_-_Get_Accounts')?['Accounts']",
+        "@body('Machines_-_Get_single_machine')?['rbacGroupName']",
+        "@items('For_each')?['AadUserId']",
+        "@item()?['properties']?['friendlyName']",
+        "@item()?['kind']"
+      ],
+      "notes": [
+        "Always use ?['field'] not ['field'] when accessing properties from external data",
+        "Chaining ?['a']?['b']?['c'] is safe — if any level is null, the whole chain returns null",
+        "Without ?, a null parent throws an error and fails the action"
+      ]
+    },
+
+    "expression_in_path_segments": {
+      "description": "Expressions embedded in connector action paths for dynamic routing",
+      "examples": [
+        "/v1.0/users/@{encodeURIComponent(items('For_each')?['AadUserId'])}",
+        "/v1.0/groups/@{encodeURIComponent('440fe32a-1b16-42b5-be15-c496d1e53e72')}/members/$ref",
+        "/v2/v1.0/users/@{encodeURIComponent(body('Get_user')?['id'])}/getMemberGroups",
+        "/api/machines/@{encodeURIComponent(items('For_each')?['OMSAgentID'])}",
+        "/api/machines/@{encodeURIComponent(body('Machines_-_Get_single_machine')?['id'])}/isolate",
+        "/Watchlists/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/watchlists/@{encodeURIComponent(variables('Watchlist alias'))}/watchlistItem",
+        "/Incidents/subscriptions/@{encodeURIComponent(triggerBody()?['WorkspaceSubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['WorkspaceResourceGroup'])}/workspaces/@{encodeURIComponent(triggerBody()?['WorkspaceId'])}/alerts/@{encodeURIComponent(triggerBody()?['SystemAlertId'])}",
+        "/datasets/@{encodeURIComponent(encodeURIComponent('https://vuw.sharepoint.com/sites/its_architectureandsecurity'))}/files"
+      ]
+    }
+  }
+}

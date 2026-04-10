@@ -316,7 +316,7 @@ def _stream_process(
         try:
             proc.stdin.write(stdin_input)
             proc.stdin.close()
-        except BrokenPipeError:
+        except (BrokenPipeError, OSError):
             pass  # stdin was closed by the subprocess before we finished writing; non-fatal
 
     collected: list[str] = []
@@ -337,6 +337,13 @@ def _stream_process(
                 break
             continue
 
+        # Check timeout even when output is flowing — a chatty process must
+        # not bypass the timeout simply by producing continuous output.
+        if (datetime.now(timezone.utc) - start_time).total_seconds() >= spawn_timeout_seconds:
+            proc.kill()
+            timed_out = True
+            break
+
         if kind == "done":
             break
 
@@ -347,8 +354,26 @@ def _stream_process(
         last_heartbeat_at = datetime.now(timezone.utc)
         _parse_event_progress(role, data, emit_progress)
 
-    proc.wait()
-    stderr = proc.stderr.read() if proc.stderr else ""
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        timed_out = True
+    stderr = ""
+    if proc.stderr:
+        # Use a thread to avoid hanging if child processes inherited stderr fd.
+        stderr_q: queue.Queue[str] = queue.Queue()
+        def _read_stderr() -> None:
+            try:
+                stderr_q.put(proc.stderr.read() if proc.stderr else "")
+            except Exception:
+                stderr_q.put("")
+        t = threading.Thread(target=_read_stderr, daemon=True)
+        t.start()
+        t.join(timeout=5)
+        if not stderr_q.empty():
+            stderr = stderr_q.get_nowait()
     return "\n".join(collected), stderr, timed_out
 
 
@@ -559,22 +584,50 @@ def run_agent_with_capabilities(
         session=session,
     )
     capability_round = 0
+    all_round_results: list[str] = []
     while res["status"] == "capability_requested" and capability_round < max_capability_rounds:
-        capability_round += 1
         cap_requests = res.get("capability_requests", [])
+        if not cap_requests:
+            # Agent returned capability_requested with no actual requests — treat as success
+            res["status"] = "success"
+            break
+        capability_round += 1
         cap_results = []
         for cap_req in cap_requests:
             req_warnings = validate_capability_request(cap_req)
             for warning in req_warnings:
                 emit_progress(f"[engine] Capability request warning: {warning}")
+            if "capability" not in cap_req:
+                cap_results.append({
+                    "capability": "unknown",
+                    "status": "failed",
+                    "result": None,
+                    "issues": ["Malformed capability request: missing 'capability' field"],
+                })
+                continue
             emit_progress(capability_message(role, str(cap_req.get("capability", "?"))))
             cap_result = execute_capability(cap_req)
             cap_results.append(cap_result)
         cap_results_str = serialize_for_prompt(cap_results)
+        all_round_results.append(f"Round {capability_round} results:\n{cap_results_str}")
+        cumulative_results = "\n\n".join(all_round_results)
+        # Cap cumulative results to prevent unbounded prompt growth across rounds.
+        _MAX_CUMULATIVE_CHARS = 200_000
+        if len(cumulative_results) > _MAX_CUMULATIVE_CHARS:
+            # Keep only the latest rounds that fit within the budget.
+            kept: list[str] = []
+            total = 0
+            for entry in reversed(all_round_results):
+                if total + len(entry) > _MAX_CUMULATIVE_CHARS and kept:
+                    break
+                kept.append(entry)
+                total += len(entry)
+            kept.reverse()
+            cumulative_results = "\n\n".join(kept)
         augmented_task = (
             f"{task}\n\n"
-            f"Runtime Capability Results (round {capability_round}, from prior request):\n{cap_results_str}\n\n"
-            f"Use these results to complete your task. Do NOT request these capabilities again."
+            f"Runtime Capability Results ({capability_round} round(s) so far):\n{cumulative_results}\n\n"
+            f"Use these results to complete your task. Do NOT re-request capabilities whose results you already have."
         )
         res = run_agent(
             role,

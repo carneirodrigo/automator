@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from engine.work.repo_paths import REPO_ROOT, SKILLS_CATALOG_PATH, SKILLS_DIR
+from engine.work.repo_paths import REPO_ROOT, SKILLS_DIR
 from engine.work.toon_adapter import serialize_for_prompt
 
 _RESULT_SHAPES_MARKER = "## Result Shapes"
@@ -278,29 +278,6 @@ def _build_stage_summary(inputs: list[str]) -> list[str]:
         return [f"\nPrior Stages: {' -> '.join(parts)}"]
     return []
 
-
-def _append_skills_catalog_context(context: list[str]) -> None:
-    if not SKILLS_CATALOG_PATH.exists():
-        return
-    try:
-        catalog = _load_json(SKILLS_CATALOG_PATH)
-        skills = catalog.get("skills", [])
-        if not skills:
-            return
-        compact = [{"id": skill["id"], "desc": skill.get("description", ""), "roles": skill.get("roles", [])} for skill in skills]
-        catalog_json = serialize_for_prompt(compact)
-        if len(catalog_json) > 15_000:
-            catalog_json = catalog_json[:15_000] + "\n... [TRUNCATED]"
-        context.extend([
-            "\nAgent Skills Catalog (vendor skills available for download — Anthropic, OpenAI, Google, Microsoft):",
-            catalog_json,
-            "If a skill looks relevant to the project, use `fetch_skill` capability to read its content and evaluate it.",
-            "Only fetch skills whose description clearly matches the project scope — do not fetch speculatively.",
-            "If after reading a skill it proves relevant, note its ID so you can reference it in your output.",
-            "If not useful, discard it — do not mention it in your output.",
-        ])
-    except (json.JSONDecodeError, OSError):
-        pass
 
 
 def _parse_iso_datetime(value: str) -> dt.datetime | None:
@@ -604,44 +581,50 @@ def _default_role_skill_ids(role: str, manifest: dict[str, Any], inputs: list[st
 
 
 def _build_skills_context(role: str, inputs: list[str], *, estimate_tokens: Any) -> list[str]:
-    from engine.work.skill_loader import fetch_skill as loader_fetch_skill
-    from engine.work.skill_loader import is_skill_stale, load_skill_body, load_skills_manifest
+    try:
+        from engine.work.skill_loader import fetch_skill as loader_fetch_skill
+        from engine.work.skill_loader import is_skill_stale, load_skill_body, load_skills_manifest
 
-    manifest = load_skills_manifest()
-    manifest_by_id = {entry.get("id", ""): entry for entry in manifest.get("skills", [])}
-    combined_skill_ids: list[str] = []
-    for skill_id in _default_role_skill_ids(role, manifest, inputs or []):
-        if skill_id and skill_id not in combined_skill_ids:
-            combined_skill_ids.append(skill_id)
+        manifest = load_skills_manifest()
+        manifest_by_id = {entry.get("id", ""): entry for entry in manifest.get("skills", [])}
+        combined_skill_ids: list[str] = []
+        for skill_id in _default_role_skill_ids(role, manifest, inputs or []):
+            if skill_id and skill_id not in combined_skill_ids:
+                combined_skill_ids.append(skill_id)
 
-    if not combined_skill_ids:
-        return []
+        if not combined_skill_ids:
+            return []
 
-    sections: list[str] = []
-    total_tokens = 0
-    max_skill_tokens = 8000
+        sections: list[str] = []
+        total_tokens = 0
+        max_skill_tokens = 8000
 
-    for skill_id in combined_skill_ids:
-        entry = manifest_by_id.get(skill_id)
-        if not entry:
-            continue
-        skill_path = SKILLS_DIR / entry.get("path", "")
-        if not skill_path.exists():
-            continue
-        if is_skill_stale(entry):
-            loader_fetch_skill(entry["id"])
-        body = load_skill_body(skill_path)
-        if not body:
-            continue
-        est = estimate_tokens(body)
-        if total_tokens + est > max_skill_tokens:
-            break
-        total_tokens += est
-        skill_name = entry.get("name", entry.get("id", "unknown"))
-        sections.append(f"\n### Agent Skill: {skill_name}\n{body}")
+        for skill_id in combined_skill_ids:
+            entry = manifest_by_id.get(skill_id)
+            if not entry:
+                continue
+            skill_path = SKILLS_DIR / entry.get("path", "")
+            if not skill_path.exists():
+                continue
+            if is_skill_stale(entry):
+                try:
+                    loader_fetch_skill(entry["id"])
+                except Exception:
+                    pass  # Stale refresh failure is non-fatal; use cached version
+            body = load_skill_body(skill_path)
+            if not body:
+                continue
+            est = estimate_tokens(body)
+            if total_tokens + est > max_skill_tokens:
+                break
+            total_tokens += est
+            skill_name = entry.get("name", entry.get("id", "unknown"))
+            sections.append(f"\n### Agent Skill: {skill_name}\n{body}")
 
-    if not sections:
-        return []
-    return ["\nMatched Agent Skills (curated vendor instructions relevant to this task):", *sections]
+        if not sections:
+            return []
+        return ["\nMatched Agent Skills (curated vendor instructions relevant to this task):", *sections]
+    except Exception:
+        return []  # Skills context is non-critical; never crash prompt assembly
 
 

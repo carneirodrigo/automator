@@ -1,0 +1,270 @@
+{
+  "id": "logic-apps-msi-arm-http-auth-pattern",
+  "title": "Logic Apps Managed Identity HTTP Auth Pattern - ARM REST APIs, Graph, and Security APIs",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": [
+    "Logic Apps using system-assigned Managed Identity to call Azure ARM REST APIs (Sentinel, MDFC, Resource Graph, Azure Monitor)",
+    "MSI HTTP actions calling Microsoft Graph API without an app registration",
+    "Any Logic Apps workflow requiring token-free Bearer auth against Microsoft APIs"
+  ],
+  "verification_status": "production-verified",
+  "fresh_until": "2027-06-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The HTTP action's authentication block for Managed Identity is: { \"type\": \"ManagedServiceIdentity\", \"audience\": \"<resource-uri>\" }. This replaces a manual token fetch + Authorization header. Logic Apps automatically obtains and refreshes the access token for the target audience.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps HTTP action MSI documentation + production cross-reference (azure-logic-apps-graph-http-msi-and-keyvault)"
+    },
+    {
+      "fact": "The audience value must exactly match what the target API expects, including the trailing slash where required. Azure ARM APIs require 'https://management.azure.com/' (with trailing slash). Microsoft Graph requires 'https://graph.microsoft.com' (no trailing slash). Mismatched audience returns 401.",
+      "verified_date": "2026-04-03",
+      "source": "Production experience — ARM requires trailing slash; Graph does not"
+    },
+    {
+      "fact": "MSI authentication in the HTTP action is only available in Consumption (multi-tenant) and Standard (single-tenant) Logic Apps. It is not available in the ISE (Integration Service Environment) HTTP connector; ISE uses a different authentication model.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps tier authentication documentation"
+    },
+    {
+      "fact": "For system-assigned MSI to work, the Logic App must have 'System assigned' identity enabled in Settings > Identity. This generates an object ID (service principal) in Entra ID. Role assignments and app permission grants target this object ID.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps Managed Identity setup documentation"
+    },
+    {
+      "fact": "The identity object ID visible in Settings > Identity is not the same as the Logic App's resource ID. When granting permissions via PowerShell or Graph API, use the object ID (not the Logic App's resource ID).",
+      "verified_date": "2026-04-03",
+      "source": "Entra ID service principal model for managed identities"
+    },
+    {
+      "fact": "ARM RBAC roles are assigned via Azure portal or ARM API to grant ARM-scope access. Graph application permissions (e.g., ThreatHunting.Read.All, User.Read.All) require a PowerShell or Graph API grant — they cannot be assigned via the Azure portal's IAM blade.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Graph permission model — application permissions require admin consent via PowerShell or Graph API"
+    },
+    {
+      "fact": "The PowerShell pattern to grant an MSI a Graph application permission: first get the service principal ID of the target app (e.g., Microsoft Graph), then get the app role ID for the permission, then call New-MgServicePrincipalAppRoleAssignment. This is required for Graph permissions that are not Azure RBAC roles.",
+      "verified_date": "2026-04-03",
+      "source": "Microsoft Graph MSI permission grant documentation"
+    },
+    {
+      "fact": "User-assigned MSI uses the same authentication block but adds a 'credential' field: { \"type\": \"ManagedServiceIdentity\", \"audience\": \"<uri>\", \"credential\": \"<user-assigned-msi-resource-id>\" }. System-assigned MSI omits the 'credential' field entirely.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps user-assigned MSI HTTP action documentation"
+    },
+    {
+      "fact": "Token caching: Logic Apps caches the MSI token for the audience and reuses it across multiple HTTP actions in the same run. The token is refreshed automatically before expiry. There is no action needed in the workflow to manage token lifecycle.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps runtime MSI token management documentation"
+    },
+    {
+      "fact": "MSI cannot be used with the HTTP action to call APIs that require delegated (user-context) permissions. MSI always obtains an application context token. APIs requiring a signed-in user (e.g., SharePoint Online some operations via user context) cannot use MSI.",
+      "verified_date": "2026-04-03",
+      "source": "OAuth2 application vs delegated permission model"
+    }
+  ],
+  "audience_reference": {
+    "azure_arm_apis": {
+      "audience": "https://management.azure.com/",
+      "trailing_slash": true,
+      "covers": ["Sentinel REST API", "Defender for Cloud REST API", "Azure Resource Manager", "Azure Monitor REST API", "Key Vault ARM operations", "Azure Policy", "Cost Management"],
+      "required_rbac": "Varies by API — minimum: Reader for read operations; specific roles for security APIs (Security Reader for MDFC, Sentinel Reader for Sentinel)"
+    },
+    "microsoft_graph": {
+      "audience": "https://graph.microsoft.com",
+      "trailing_slash": false,
+      "covers": ["Microsoft Graph API (all /v1.0 and /beta endpoints)", "Graph Security API", "runHuntingQuery", "alerts_v2", "Secure Score", "SharePoint via Graph", "Teams via Graph"],
+      "required_permissions": "Application permissions granted via admin consent — not Azure RBAC"
+    },
+    "log_analytics_api": {
+      "audience": "https://api.loganalytics.io",
+      "trailing_slash": false,
+      "covers": ["Log Analytics Query REST API (direct, not connector)"],
+      "required_rbac": "Log Analytics Reader on the workspace"
+    },
+    "mde_securitycenter": {
+      "audience": "https://api.securitycenter.microsoft.com",
+      "trailing_slash": false,
+      "covers": ["MDE device, vulnerability, alert, and action APIs"],
+      "required_permissions": "WindowsDefenderATP application permissions in Entra ID"
+    },
+    "xdr_security": {
+      "audience": "https://security.microsoft.com",
+      "trailing_slash": false,
+      "covers": ["Defender XDR direct API (api.security.microsoft.com)"],
+      "required_permissions": "WindowsDefenderATP or Microsoft Threat Protection application permissions"
+    },
+    "azure_storage": {
+      "audience": "https://storage.azure.com/",
+      "trailing_slash": true,
+      "covers": ["Azure Blob Storage, Queue Storage, Table Storage REST APIs"],
+      "required_rbac": "Storage Blob Data Reader (or higher) on the storage account"
+    }
+  },
+  "http_action_json_patterns": {
+    "arm_rest_api_call": {
+      "description": "Generic ARM REST API call with MSI — used for Sentinel, MDFC, Resource Graph, etc.",
+      "HTTP_ARM_Call": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/providers/Microsoft.Security/alerts",
+          "queries": {
+            "api-version": "2022-01-01"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        }
+      }
+    },
+    "graph_api_call": {
+      "description": "Microsoft Graph API call with MSI — used for users, security alerts, runHuntingQuery, etc.",
+      "HTTP_Graph_Call": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://graph.microsoft.com/v1.0/security/alerts_v2",
+          "queries": {
+            "$filter": "severity eq 'high'",
+            "$top": "100"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://graph.microsoft.com"
+          }
+        }
+      }
+    },
+    "graph_post_with_body": {
+      "description": "Graph POST with MSI (e.g., runHuntingQuery)",
+      "HTTP_Graph_Post": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://graph.microsoft.com/v1.0/security/runHuntingQuery",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "query": "DeviceInfo | summarize count() by OSPlatform"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://graph.microsoft.com"
+          }
+        }
+      }
+    },
+    "log_analytics_direct": {
+      "description": "Log Analytics Query API direct call with MSI — bypasses connector limits",
+      "HTTP_LA_Query": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://api.loganalytics.io/v1/workspaces/@{parameters('workspaceId')}/query",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "query": "SecurityAlert | where TimeGenerated > ago(1d) | take 1000",
+            "timespan": "P1D"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://api.loganalytics.io"
+          }
+        }
+      }
+    },
+    "user_assigned_msi": {
+      "description": "User-assigned managed identity — specify the MSI resource ID in the 'credential' field",
+      "HTTP_With_User_MSI": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/providers/Microsoft.Security/secureScores/ascScore",
+          "queries": {
+            "api-version": "2020-01-01"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/",
+            "credential": "/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identityName}"
+          }
+        }
+      }
+    }
+  },
+  "permission_grant_patterns": {
+    "arm_rbac_role_assignment": {
+      "description": "Grant an ARM RBAC role to the Logic App's MSI via Azure CLI",
+      "command": "az role assignment create --assignee <msi-object-id> --role 'Security Reader' --scope /subscriptions/{subscriptionId}",
+      "note": "Use the object ID from the Logic App's Identity blade, not the resource ID. Common roles: 'Security Reader' for MDFC/Sentinel reads, 'Microsoft Sentinel Reader', 'Log Analytics Reader'."
+    },
+    "graph_permission_grant_powershell": {
+      "description": "Grant a Graph application permission to an MSI via PowerShell (required for Graph permissions — not doable via portal)",
+      "steps": [
+        "Connect-MgGraph -Scopes 'AppRoleAssignment.ReadWrite.All','Application.Read.All'",
+        "$msiObjectId = '<logic-app-msi-object-id>'",
+        "$graphSp = Get-MgServicePrincipal -Filter \"displayName eq 'Microsoft Graph'\"",
+        "$roleId = ($graphSp.AppRoles | Where-Object { $_.Value -eq 'ThreatHunting.Read.All' }).Id",
+        "New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $msiObjectId -PrincipalId $msiObjectId -ResourceId $graphSp.Id -AppRoleId $roleId"
+      ],
+      "note": "Replace 'ThreatHunting.Read.All' with the required permission value. Common values: 'SecurityAlert.Read.All', 'IdentityRiskEvent.Read.All', 'User.Read.All', 'ThreatHunting.Read.All'."
+    },
+    "wdatp_permission_grant_powershell": {
+      "description": "Grant WindowsDefenderATP application permission to an MSI (for MDE API or XDR API calls)",
+      "steps": [
+        "Connect-MgGraph -Scopes 'AppRoleAssignment.ReadWrite.All','Application.Read.All'",
+        "$msiObjectId = '<logic-app-msi-object-id>'",
+        "$wdatpSp = Get-MgServicePrincipal -Filter \"displayName eq 'WindowsDefenderATP'\"",
+        "$roleId = ($wdatpSp.AppRoles | Where-Object { $_.Value -eq 'AdvancedQuery.Read.All' }).Id",
+        "New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $msiObjectId -PrincipalId $msiObjectId -ResourceId $wdatpSp.Id -AppRoleId $roleId"
+      ]
+    }
+  },
+  "implementation_notes": [
+    "System-assigned MSI is the default and simplest option. Enable it in Settings > Identity > System assigned > On. The object ID displayed is what you use for role assignments and permission grants.",
+    "User-assigned MSI is preferred when multiple Logic Apps need the same permissions, or when you need to pre-create the identity before deploying the Logic App (important for ARM template deployments).",
+    "The audience must exactly match the API's expected value. A trailing slash mismatch is the most common cause of 401 errors with MSI. ARM requires the slash; Graph does not.",
+    "Azure RBAC roles (Security Reader, Sentinel Reader, Log Analytics Reader) are assigned via the portal IAM blade or CLI and take effect in seconds. Graph application permissions require PowerShell/Graph API and may take up to 5 minutes to propagate.",
+    "Never hardcode client_id or client_secret in a Logic Apps workflow definition when MSI can substitute. MSI credentials are never in the workflow JSON and cannot leak through run history or ARM template exports.",
+    "When a Logic App calls multiple APIs with different audiences in the same run, Logic Apps fetches separate tokens per audience. All are cached and auto-refreshed. No extra workflow logic is needed.",
+    "To verify MSI connectivity before building the workflow, use the Azure portal's Logic App designer Run button with a simple HTTP GET to the target API and check the response. This is faster than deploying and debugging via full run.",
+    "ContentTransfer.transferMode: 'Chunked' should be set on any HTTP action that may return a large response body (>10 MB). Without it, Logic Apps may truncate the response or fail with a payload too large error.",
+    "For APIs that return paginated results (ARM APIs with nextLink, Graph with @odata.nextLink), use an Until loop. Initialize a variable for the next page URL, set it from the response, and exit the loop when it is empty.",
+    "MSI cannot authenticate to third-party APIs (Qualys, BitSight) — these require client credential tokens retrieved from Key Vault. MSI is only for Microsoft APIs that accept Entra ID tokens."
+  ],
+  "common_failures": [
+    "ARM audience missing trailing slash ('https://management.azure.com' instead of 'https://management.azure.com/') — returns 401.",
+    "Graph audience with trailing slash ('https://graph.microsoft.com/') — returns 401 or token validation error.",
+    "Logic App identity not enabled (system-assigned off) — HTTP action returns 'Managed Identity is not enabled on this resource'.",
+    "ARM RBAC role assigned but Graph permission not granted (or vice versa) — the specific API returns 403 while others work.",
+    "Graph permission granted but not to the correct service principal (granted to app registration instead of the MSI) — returns 403.",
+    "Permission propagation delay — permissions granted via PowerShell may not take effect for up to 5 minutes; testing immediately after grant returns 403.",
+    "Using MSI for an API that requires delegated permissions (user context) — always fails with 403 since MSI is application context only.",
+    "Not setting runtimeConfiguration.contentTransfer.transferMode: 'Chunked' on large response HTTP actions — large payloads silently truncated or action fails."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/create-managed-service-identity",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers#http-action",
+    "https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-assign-app-role-managed-identity-powershell",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-securing-a-logic-app"
+  ],
+  "last_verified": "2026-04-03T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-graph-http-msi-and-keyvault",
+    "sentinel-rest-api-direct-http-patterns",
+    "defender-for-cloud-rest-api-patterns",
+    "defender-xdr-unified-api-patterns",
+    "azure-monitor-logs-connector-advanced-patterns",
+    "azure-logic-apps-security-and-identity"
+  ],
+  "source_projects": ["manual-research"]
+}

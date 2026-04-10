@@ -1,0 +1,305 @@
+{
+  "id": "azure-monitor-logs-connector-advanced-patterns",
+  "title": "Azure Monitor Logs Connector - Advanced Patterns: Multi-Workspace, Pagination, Large Results, and Timeouts",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "workflow",
+  "applies_to": [
+    "Logic Apps running KQL queries against multiple Log Analytics workspaces in a single workflow",
+    "Workflows handling large Azure Monitor Logs result sets that exceed connector limits",
+    "Security reporting playbooks combining Sentinel, MDE, and custom log data from different workspaces",
+    "Patterns for pagination, timeout avoidance, and downstream processing of query results"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-06-01T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "The Azure Monitor Logs managed connector (azuremonitorlogs) has a hard 110-second execution timeout per query action. If the KQL query takes longer than 110 seconds to return results, the action fails with a timeout error — not a Logic Apps workflow timeout. Reduce result set size with | take, | summarize, or a tighter TimeGenerated filter.",
+      "verified_date": "2026-04-03",
+      "source": "Azure Monitor Logs connector limits documentation"
+    },
+    {
+      "fact": "The connector returns a maximum of 500,000 rows per query action. If a query would return more, it truncates silently — there is no error, no warning, and no continuation token. The only way to detect truncation is to compare actual row count with the limit (500,000). Always add row count awareness to high-volume queries.",
+      "verified_date": "2026-04-03",
+      "source": "Azure Monitor Logs connector limits documentation"
+    },
+    {
+      "fact": "The Azure Monitor Logs connector has no native pagination — there is no nextLink, continuation token, or skip parameter. For datasets too large for one query, pagination must be implemented manually using time-window decomposition: run separate queries for each time slice (e.g., day by day) and union the results.",
+      "verified_date": "2026-04-03",
+      "source": "Connector design limitation — confirmed absent in connector schema"
+    },
+    {
+      "fact": "Cross-workspace KQL queries are supported natively using the workspace() function in KQL: workspace('WorkspaceNameOrId').TableName | where ... This executes across multiple workspaces in a single query action. The connector's workspace configuration sets the primary workspace; secondary workspaces are referenced in the KQL via the workspace() function.",
+      "verified_date": "2026-04-03",
+      "source": "Azure Monitor Logs connector cross-workspace query documentation"
+    },
+    {
+      "fact": "The workspace() function in KQL accepts four forms: workspace('WorkspaceName'), workspace('WorkspaceId' [GUID]), workspace('/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.OperationalInsights/workspaces/{name}'), and workspace('qualifiedName'). The GUID form is most reliable across tenants.",
+      "verified_date": "2026-04-03",
+      "source": "KQL workspace() function reference"
+    },
+    {
+      "fact": "The query action's subscriptions, resourcegroups, resourcetype, and resourcename body fields tell the connector which workspace to run the primary query against. For cross-workspace queries, these fields still need to point to a valid primary workspace — the workspace() function references in KQL are additional, not replacements.",
+      "verified_date": "2026-04-03",
+      "source": "Azure Monitor Logs connector POST /queryData body schema"
+    },
+    {
+      "fact": "To query multiple workspaces in separate actions (not via KQL workspace() function), run parallel HTTP actions against the Log Analytics Query API directly: POST https://api.loganalytics.io/v1/workspaces/{workspaceId}/query with body { query: '<KQL>', timespan: 'P30D' }. Auth audience: 'https://api.loganalytics.io'. This supports pagination via prefer: wait=600,include-statistics=true,include-render=true header and returns a tables[].rows structure.",
+      "verified_date": "2026-04-03",
+      "source": "Log Analytics REST API — Query endpoint"
+    },
+    {
+      "fact": "The Log Analytics REST API (api.loganalytics.io) returns results in a different format from the connector: { tables: [{ name: 'PrimaryResult', columns: [{name, type}], rows: [[...]] }] }. Rows are arrays (not objects). To process them in Logic Apps, either use a Select action to map column indices to names, or use an Azure Function for row-to-object conversion.",
+      "verified_date": "2026-04-03",
+      "source": "Log Analytics REST API response schema"
+    },
+    {
+      "fact": "The connector response body at @body('action')?['value'] is an array where each element is a flat JSON object with column names as keys. This is the connector's normalized format, different from the raw REST API response. The connector does this normalization automatically.",
+      "verified_date": "2026-04-03",
+      "source": "Azure Monitor Logs connector behavior — response normalization"
+    },
+    {
+      "fact": "For large security datasets (e.g., 30 days of SecurityAlert), implement time-window pagination: initialize a startTime variable, run the query in a Do-Until loop incrementing by one day per iteration, append results to an array variable, and exit when startTime reaches endTime. Each iteration processes one day's data within the 110-second timeout and 500,000 row limit.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps pagination workaround pattern for Azure Monitor Logs"
+    },
+    {
+      "fact": "The addDays() function in Logic Apps expressions shifts a date: addDays(variables('currentDate'), 1). Use formatDateTime(addDays(...), 'yyyy-MM-ddTHH:mm:ssZ') to produce ISO 8601 strings suitable for KQL TimeGenerated filters.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps expression functions — addDays and formatDateTime"
+    },
+    {
+      "fact": "Downstream processing of large result arrays: use a Compose action to capture the full array, then pass body('Compose_Results') to subsequent actions (Select, Filter Array, Create CSV Table). Do not reference the connector action body multiple times in different branches — the body is re-read from run history each time and adds latency on large payloads.",
+      "verified_date": "2026-04-03",
+      "source": "Logic Apps performance pattern for large action outputs"
+    },
+    {
+      "fact": "The connector's 'timerange' field has no effect when set to 'Set in query' — the KQL query's own time filters apply. When set to a preset like 'Last 7 days', it appends a TimeGenerated restriction to the query. These can conflict: if your KQL has a TimeGenerated filter AND timerange is set to 'Last 7 days', the more restrictive of the two wins.",
+      "verified_date": "2026-04-03",
+      "source": "Azure Monitor Logs connector timerange behavior documentation"
+    },
+    {
+      "fact": "Sentinel workspace data (SecurityAlert, SecurityIncident, OfficeActivity, etc.) lives in the Log Analytics workspace behind Sentinel. The same Azure Monitor Logs connector action can query these tables. No special Sentinel connector is needed for KQL-based data extraction from the Sentinel workspace.",
+      "verified_date": "2026-04-03",
+      "source": "Sentinel data model — tables stored in Log Analytics workspace"
+    }
+  ],
+  "action_patterns": {
+    "basic_kql_query": {
+      "description": "Standard Azure Monitor Logs connector query action",
+      "Run_KQL_Query": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"}
+          },
+          "method": "post",
+          "path": "/queryData",
+          "body": {
+            "query": "SecurityAlert\n| where TimeGenerated > ago(24h)\n| where AlertSeverity in ('High', 'Medium')\n| project TimeGenerated, AlertName, AlertSeverity, CompromisedEntity, Description\n| order by TimeGenerated desc\n| take 5000",
+            "subscriptions": ["@parameters('subscriptionId')"],
+            "resourcegroups": ["@parameters('resourceGroupName')"],
+            "resourcetype": "Log Analytics Workspace",
+            "resourcename": "@parameters('workspaceName')",
+            "timerange": "Set in query"
+          }
+        }
+      },
+      "output_access": {
+        "results_array": "@body('Run_KQL_Query')?['value']",
+        "first_row_field": "@body('Run_KQL_Query')?['value'][0]?['AlertName']",
+        "row_count": "@length(body('Run_KQL_Query')?['value'])"
+      }
+    },
+    "cross_workspace_kql": {
+      "description": "Query the primary workspace while pulling data from a secondary workspace via KQL workspace() function",
+      "Run_Cross_Workspace_Query": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {"name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"}
+          },
+          "method": "post",
+          "path": "/queryData",
+          "body": {
+            "query": "let sentinelAlerts = SecurityAlert\n| where TimeGenerated > ago(7d)\n| project TimeGenerated, AlertName, AlertSeverity, CompromisedEntity;\nlet mdeAlerts = workspace('@{parameters('secondaryWorkspaceId')}').SecurityAlert\n| where TimeGenerated > ago(7d)\n| project TimeGenerated, AlertName, AlertSeverity, CompromisedEntity;\nunion sentinelAlerts, mdeAlerts\n| summarize Count = count() by AlertName, AlertSeverity\n| order by Count desc",
+            "subscriptions": ["@parameters('subscriptionId')"],
+            "resourcegroups": ["@parameters('resourceGroupName')"],
+            "resourcetype": "Log Analytics Workspace",
+            "resourcename": "@parameters('primaryWorkspaceName')",
+            "timerange": "Set in query"
+          }
+        }
+      },
+      "note": "The workspace() function in KQL uses the secondary workspace GUID or name. The connector action's body fields (subscriptions, resourcegroups, resourcename) point to the primary workspace only."
+    },
+    "time_window_pagination_pattern": {
+      "description": "Paginate over 30 days of data by running one query per day — workaround for connector's lack of native pagination",
+      "Initialize_Variables": {
+        "Initialize_currentDate": {
+          "type": "InitializeVariable",
+          "inputs": {"variables": [{"name": "currentDate", "type": "string", "value": "@{formatDateTime(addDays(utcNow(), -30), 'yyyy-MM-dd')}"}]}
+        },
+        "Initialize_endDate": {
+          "type": "InitializeVariable",
+          "inputs": {"variables": [{"name": "endDate", "type": "string", "value": "@{formatDateTime(utcNow(), 'yyyy-MM-dd')}"}]}
+        },
+        "Initialize_allResults": {
+          "type": "InitializeVariable",
+          "inputs": {"variables": [{"name": "allResults", "type": "array", "value": []}]}
+        }
+      },
+      "Until_loop": {
+        "type": "Until",
+        "expression": {
+          "and": [{"greaterOrEquals": ["@variables('currentDate')", "@variables('endDate')"]}]
+        },
+        "limit": {"count": 35, "timeout": "PT2H"},
+        "actions": {
+          "Run_Day_Query": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {"connection": {"name": "@parameters('$connections')['azuremonitorlogs']['connectionId']"}},
+              "method": "post",
+              "path": "/queryData",
+              "body": {
+                "query": "SecurityAlert\n| where TimeGenerated >= todatetime('@{variables('currentDate')}')\n| where TimeGenerated < todatetime('@{formatDateTime(addDays(variables('currentDate'), 1), 'yyyy-MM-ddTHH:mm:ssZ')}')\n| project TimeGenerated, AlertName, AlertSeverity, CompromisedEntity",
+                "subscriptions": ["@parameters('subscriptionId')"],
+                "resourcegroups": ["@parameters('resourceGroupName')"],
+                "resourcetype": "Log Analytics Workspace",
+                "resourcename": "@parameters('workspaceName')",
+                "timerange": "Set in query"
+              }
+            }
+          },
+          "Append_Day_Results": {
+            "type": "SetVariable",
+            "runAfter": {"Run_Day_Query": ["Succeeded"]},
+            "inputs": {
+              "name": "allResults",
+              "value": "@union(variables('allResults'), body('Run_Day_Query')?['value'])"
+            }
+          },
+          "Advance_currentDate": {
+            "type": "SetVariable",
+            "runAfter": {"Append_Day_Results": ["Succeeded"]},
+            "inputs": {
+              "name": "currentDate",
+              "value": "@{formatDateTime(addDays(variables('currentDate'), 1), 'yyyy-MM-ddTHH:mm:ssZ')}"
+            }
+          }
+        }
+      }
+    },
+    "compose_for_downstream": {
+      "description": "Capture large result array in Compose to avoid re-reading run history on each reference",
+      "Compose_Results": {
+        "type": "Compose",
+        "runAfter": {"Run_KQL_Query": ["Succeeded"]},
+        "inputs": "@body('Run_KQL_Query')?['value']"
+      },
+      "note": "Reference @outputs('Compose_Results') downstream instead of @body('Run_KQL_Query')?['value']. For arrays > 50,000 rows, this avoids repeated deserialization of the large action output from run history."
+    },
+    "direct_log_analytics_api": {
+      "description": "Call the Log Analytics REST API directly via HTTP action for multi-workspace fan-out — bypasses connector limits",
+      "HTTP_Query_Workspace_Direct": {
+        "type": "Http",
+        "inputs": {
+          "method": "POST",
+          "uri": "https://api.loganalytics.io/v1/workspaces/@{parameters('workspaceId')}/query",
+          "headers": {
+            "Content-Type": "application/json",
+            "Prefer": "wait=120"
+          },
+          "body": {
+            "query": "SecurityAlert | where TimeGenerated > ago(1d) | summarize count() by AlertSeverity",
+            "timespan": "P1D"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://api.loganalytics.io"
+          }
+        }
+      },
+      "response_structure": {
+        "tables_array": "@body('HTTP_Query_Workspace_Direct')?['tables']",
+        "columns": "@body('HTTP_Query_Workspace_Direct')?['tables'][0]?['columns']",
+        "rows": "@body('HTTP_Query_Workspace_Direct')?['tables'][0]?['rows']",
+        "note": "Rows are arrays of values, not objects. Column names are in the 'columns' array at the same index. Use Select action to map column index to name."
+      }
+    }
+  },
+  "multi_workspace_fan_out_pattern": {
+    "description": "Query multiple workspaces in parallel using the Log Analytics REST API — each workspace gets its own HTTP action",
+    "Initialize_workspaceIds": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [{
+          "name": "workspaceIds",
+          "type": "array",
+          "value": ["@parameters('workspace1Id')", "@parameters('workspace2Id')", "@parameters('workspace3Id')"]
+        }]
+      }
+    },
+    "For_each_workspace": {
+      "type": "Foreach",
+      "foreach": "@variables('workspaceIds')",
+      "runtimeConfiguration": {
+        "concurrency": {"repetitions": 5}
+      },
+      "actions": {
+        "HTTP_Query_Workspace": {
+          "type": "Http",
+          "inputs": {
+            "method": "POST",
+            "uri": "https://api.loganalytics.io/v1/workspaces/@{items('For_each_workspace')}/query",
+            "headers": {"Content-Type": "application/json"},
+            "body": {
+              "query": "SecurityAlert | where TimeGenerated > ago(24h) | summarize Count = count() by AlertSeverity",
+              "timespan": "P1D"
+            },
+            "authentication": {
+              "type": "ManagedServiceIdentity",
+              "audience": "https://api.loganalytics.io"
+            }
+          }
+        }
+      },
+      "note": "Set concurrency.repetitions to control parallel execution (max 50). Results are per-workspace and must be aggregated after the loop."
+    }
+  },
+  "implementation_notes": [
+    "The connector's 110-second timeout is per action, not per workflow. If your KQL is slow, aggregate first in KQL (summarize before project) and use | take to cap rows. Never let Logic Apps process 500,000 raw rows from a connector action.",
+    "The connector has no pagination. For monthly data (30 days), use time-window decomposition with an Until loop. Set the loop limit to 35 iterations (31 days + buffer) and PT2H timeout.",
+    "Cross-workspace KQL via the workspace() function is the cleanest approach when workspaces are in the same tenant. The connector manages auth for the primary workspace; the workspace() references inherit auth from the same query execution context.",
+    "For multi-tenant scenarios or workspaces in different subscriptions/tenants, use the Log Analytics REST API (api.loganalytics.io) directly via HTTP action with MSI, not the connector. MSI on that audience gives Log Analytics Reader access.",
+    "The Log Analytics REST API returns rows as arrays (not objects). To process in Logic Apps without an Azure Function, create a Select action that maps each row's values to named properties using indices: item()?[0] for column 0, item()?[1] for column 1, etc. Name the columns from the columns array.",
+    "Compose the result array immediately after the connector action. For arrays with thousands of rows, referencing body('connector_action')?['value'] in multiple places causes Logic Apps to deserialize the large payload from run history on each reference. Compose stores it once in the run context.",
+    "The 'timerange' field should always be 'Set in query' for production playbooks. Preset values ('Last 7 days') are coarse and can conflict with KQL TimeGenerated filters, producing unexpected result windows.",
+    "For Sentinel tables (SecurityAlert, SecurityIncident, ThreatIntelligenceIndicator), use the Azure Monitor Logs connector against the Sentinel Log Analytics workspace — no special connector needed. The connector queries any Log Analytics workspace regardless of whether Sentinel is enabled on it.",
+    "To detect the 500,000 row truncation: after the connector action, check @equals(length(body('action')?['value']), 500000). If true, the dataset was truncated — add a more restrictive time filter or split the query."
+  ],
+  "common_failures": [
+    "Query timing out at 110 seconds — KQL is too broad. Add | take 50000 and tighten the TimeGenerated filter.",
+    "Result set silently truncated at 500,000 rows — no error, no warning. Add length check after the action to detect truncation.",
+    "Missing TimeGenerated filter when timerange is 'Set in query' — returns all historical data, always times out.",
+    "timerange preset ('Last 7 days') conflicting with a KQL TimeGenerated filter — the shorter of the two windows is used, causing unexpected empty results.",
+    "Using workspace() function with workspace display name instead of GUID on workspaces with spaces in the name — produces a KQL parse error. Use workspace GUID for reliability.",
+    "Log Analytics REST API rows are arrays, not objects — accessing row['ColumnName'] returns null. Use row[0], row[1] by column index.",
+    "Referencing body('connector_action')?['value'] in many branches for a large result set — slow run history reads. Use Compose to cache the array.",
+    "Not setting concurrency on the fan-out foreach loop — Logic Apps defaults to sequential (1 at a time) per-workspace queries, making a 10-workspace pull take 10x longer than necessary."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/connectors/azuremonitorlogs/",
+    "https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/overview",
+    "https://learn.microsoft.com/en-us/azure/data-explorer/kusto/query/workspace-expression",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-actions-triggers#foreach-action"
+  ],
+  "last_verified": "2026-04-03T00:00:00Z",
+  "related_entries": [
+    "azure-logic-apps-connectors-blob-servicebus-loganalytics",
+    "sentinel-rest-api-direct-http-patterns",
+    "logic-apps-msi-arm-http-auth-pattern",
+    "azure-logic-apps-control-flow-and-state"
+  ],
+  "source_projects": ["manual-research"]
+}

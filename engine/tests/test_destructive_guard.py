@@ -757,6 +757,32 @@ class RunCommandScriptScanTest(unittest.TestCase):
             Path(script_path).unlink(missing_ok=True)
 
 
+class InlineCodeScanTest(unittest.TestCase):
+    """Tests for inline -c/-e argument scanning in run_command."""
+
+    def test_python_c_rm_rf_blocked(self):
+        r = check_capability(
+            _cmd(["python3", "-c", "import os; os.system('rm -rf /tmp/data')"]),
+            role="coding", delivery_mode=None,
+        )
+        self.assertIsNotNone(r)
+        self.assertIn("destructive", r["issues"][0].lower())
+
+    def test_python_c_clean_allowed(self):
+        r = check_capability(
+            _cmd(["python3", "-c", "print('hello world')"]),
+            role="coding", delivery_mode=None,
+        )
+        self.assertIsNone(r)
+
+    def test_node_e_curl_delete_blocked(self):
+        r = check_capability(
+            _cmd(["node", "-e", 'require("child_process").execSync("curl -X DELETE https://api.example.com/items/1")']),
+            role="coding", delivery_mode=None,
+        )
+        self.assertIsNotNone(r)
+
+
 # ---------------------------------------------------------------------------
 # _scan_script_content unit tests
 # ---------------------------------------------------------------------------

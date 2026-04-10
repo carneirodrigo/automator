@@ -36,15 +36,8 @@ Every request must include `capability`, `arguments`, and `reason`.
 | `run_command` | `{"command": ["python3", "script.py"], "cwd": "/path", "timeout": 30}` | Execute a shell command |
 | `load_artifact` | `{"artifact_path": "/absolute/path/artifact.json"}` | Load a previously persisted artifact |
 | `persist_artifact` | `{"runtime_dir": "/path/runtime", "agent": "role-name", "data": {...}}` | Save an artifact |
-| `load_task_state` | `{"runtime_dir": "/path/runtime"}` | Load current task state |
-| `save_task_state` | `{"runtime_dir": "/path/runtime", "state": {...}}` | Update task state |
-| `load_memory` | `{"runtime_dir": "/path/runtime"}` | Load all project memory entries |
-| `save_memory` | `{"runtime_dir": "/path/runtime", "key": "entry-name", "data": {...}}` | Persist a memory entry |
+| `save_memory` | `{"runtime_dir": "/path/runtime", "key": "topic-slug", "data": {...}}` | Persist a key-value memory entry in the project runtime (worker and research only) |
 | `test_credentials` | `{"credential_type": "azure_ad", "service": "graph", "credentials": {...}}` | Validate credentials |
-| `list_projects` | `{}` | List all registered projects |
-| `resolve_project` | `{"project_id": "my-project"}` | Look up a specific project |
-| `init_project` | `{"project_id": "my-project", "project_name": "My Project", "project_root": "projects/my-project/delivery"}` | Initialize a new project |
-| `validate_schema` | `{"schema_name": "capability_request", "data": {...}}` | Validate against schema |
 | `load_secrets` | `{"project_id": "my-project", "keys": ["azure_tenant_id"]}` | Retrieve stored secrets for a project (`keys` filter is optional) |
 | `save_secret` | `{"project_id": "my-project", "key": "azure_tenant_id", "value": "...", "type": "azure", "label": "Tenant ID"}` | Store a secret in the project vault |
 | `http_request_with_secret_binding` | `{"project_id": "my-project", "method": "GET", "url": "...", "headers": {"Authorization": "Bearer {{secret:graph_token}}"}}` | Execute a secret-bound HTTPS request without hardcoding credentials |
@@ -108,8 +101,8 @@ Each role is restricted to a specific set of capabilities. Requesting a capabili
 
 | Role | Allowed capabilities |
 |---|---|
-| `worker` | `write_file`, `run_command`, `run_tests`, `http_request_with_secret_binding`, `test_credentials`, all platform caps (`validate_logic_app_workflow`, `deploy_logic_app_definition`, `create_sharepoint_list_schema`, `create_powerbi_import_bundle`, `powerbi_import_artifact`, `powerbi_trigger_refresh`, `powerbi_check_refresh_status`), all read/git/secrets caps — deployment guarded by `delivery_mode: build_and_deploy` + operator prompt |
-| `research` | `http_request_with_secret_binding`, `test_credentials`, `persist_artifact`, all read/secrets caps — no `write_file`, `run_command`, or deployment |
+| `worker` | `write_file`, `run_command`, `run_tests`, `save_memory`, `http_request_with_secret_binding`, `test_credentials`, all platform caps (`validate_logic_app_workflow`, `deploy_logic_app_definition`, `create_sharepoint_list_schema`, `create_powerbi_import_bundle`, `powerbi_import_artifact`, `powerbi_trigger_refresh`, `powerbi_check_refresh_status`), all read/git/secrets caps — deployment guarded by `delivery_mode: build_and_deploy` + operator prompt |
+| `research` | `http_request_with_secret_binding`, `test_credentials`, `persist_artifact`, `save_memory`, all read/secrets caps — no `write_file`, `run_command`, or deployment |
 | `review` | `run_command`, `run_tests`, `persist_artifact`, all read/git/secrets caps — no `write_file` or deployment |
 
 ### Engine-created path tracking and write protection

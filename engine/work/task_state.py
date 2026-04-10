@@ -34,4 +34,5 @@ class TaskState(TypedDict, total=False):
     completed_steps: list[CompletedStep]
     pruned_environmental_steps: list[Any]
     artifacts: list[str]
+    rework_loop_count: int
     pending_resolution: Optional[PendingResolution]

@@ -1,0 +1,256 @@
+{
+  "id": "defender-for-cloud-rest-api-patterns",
+  "title": "Microsoft Defender for Cloud REST API - Security Posture and Alerts From Logic Apps",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "endpoint",
+  "applies_to": [
+    "Logic Apps pulling Defender for Cloud security recommendations, alerts, secure score, and assessments",
+    "Monthly security posture reporting workflows aggregating MDFC data across subscriptions",
+    "Security teams extracting MDFC data without a dedicated managed connector"
+  ],
+  "verification_status": "current",
+  "fresh_until": "2027-06-01T00:00:00Z",
+  "base_url_patterns": {
+    "subscription_scope": "https://management.azure.com/subscriptions/{subscriptionId}/providers/Microsoft.Security/{resource}?api-version={ver}",
+    "resource_scope": "https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{rg}/providers/{provider}/{resourceType}/{resourceName}/providers/Microsoft.Security/{resource}?api-version={ver}",
+    "management_group_scope": "https://management.azure.com/providers/Microsoft.Management/managementGroups/{mgId}/providers/Microsoft.Security/{resource}?api-version={ver}"
+  },
+  "api_versions": {
+    "alerts": "2022-01-01",
+    "recommendations": "2020-01-01",
+    "secure_score": "2020-01-01",
+    "assessments": "2020-01-01",
+    "secure_score_controls": "2020-01-01"
+  },
+  "confirmed_facts": [
+    {
+      "fact": "Defender for Cloud has no dedicated Logic Apps managed connector. All MDFC data must be pulled via the HTTP action using MSI auth with audience 'https://management.azure.com/'. This is the same ARM audience used for Sentinel REST calls.",
+      "verified_date": "2026-04-03",
+      "source": "Azure connector catalog — no Microsoft.Security connector exists; MDFC API is ARM-scoped"
+    },
+    {
+      "fact": "List security alerts: GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/alerts?api-version=2022-01-01. Returns all active alerts. Filter by severity: $filter=properties/severity eq 'High'. Filter by status: $filter=properties/status eq 'Active'.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Alerts - List"
+    },
+    {
+      "fact": "List security recommendations: GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/recommendations?api-version=2020-01-01. Returns all active recommendations. Each item has properties.displayName, properties.status.code (Healthy, Unhealthy, NotApplicable), properties.severity, and properties.remediationDescription.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Recommendations - List"
+    },
+    {
+      "fact": "Get subscription secure score: GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/secureScores/ascScore?api-version=2020-01-01. Returns properties.score.current (points earned) and properties.score.max (maximum possible). The percentage is current/max * 100.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Secure Scores - Get"
+    },
+    {
+      "fact": "List all secure score controls: GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/secureScoreControls?api-version=2020-01-01. Each control has properties.displayName, properties.score.current, properties.score.max, properties.healthyResourceCount, properties.unhealthyResourceCount.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Secure Score Controls - List"
+    },
+    {
+      "fact": "List assessments (resource-level health checks): GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/assessments?api-version=2020-01-01. Returns all assessments across all resources. Each item has properties.status.code and properties.resourceDetails.id (the affected resource ARM ID). Unhealthy assessment = failed check.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Assessments - List"
+    },
+    {
+      "fact": "Assessments can also be queried at resource scope: GET https://management.azure.com/{resourceId}/providers/Microsoft.Security/assessments?api-version=2020-01-01. Substitute a full resource ARM ID (e.g., /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/virtualMachines/{vmName}) to scope results to one resource.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Assessments - List (resource scope)"
+    },
+    {
+      "fact": "Secure score at management group scope: GET https://management.azure.com/providers/Microsoft.Management/managementGroups/{mgId}/providers/Microsoft.Security/secureScores/ascScore?api-version=2020-01-01. Requires Security Reader at the management group level. This is the correct endpoint for multi-subscription posture reporting.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Secure Scores - Get (management group scope)"
+    },
+    {
+      "fact": "All MDFC REST calls paginate using nextLink. The Alerts list in particular can be large on active subscriptions — always implement pagination. The nextLink URL is ready to use as-is and already contains the api-version.",
+      "verified_date": "2026-04-03",
+      "source": "ARM pagination conventions applied to MDFC API"
+    },
+    {
+      "fact": "Required RBAC role for read-only MDFC data pulls: Security Reader on the subscription (built-in role). This grants access to all Microsoft.Security/* read operations. Owner, Contributor, and Security Admin all also include read access. Reader (general) does NOT grant access to Microsoft.Security resources.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC RBAC documentation — Security Reader vs general Reader distinction"
+    },
+    {
+      "fact": "Alert dismissal/resolution: PATCH https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/alerts/{alertName}/dismiss?api-version=2022-01-01 with no body. To update status: PUT .../alerts/{alertName}?api-version=2022-01-01 with body { properties: { status: 'Dismissed' } }.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC REST API — Alerts - Update State"
+    },
+    {
+      "fact": "The alertName (resource name in the URL) is not the alert's displayName. It is the system-generated identifier in the 'name' field of the alert ARM resource, typically a GUID-like string. Use it for per-alert operations.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC Alerts resource model"
+    },
+    {
+      "fact": "Defender for Cloud alerts have a remediationSteps array in properties. Each step is a string. For monthly reports, joining remediationSteps with a line break produces actionable content for the remediation column.",
+      "verified_date": "2026-04-03",
+      "source": "MDFC Alert resource schema"
+    }
+  ],
+  "key_endpoints": {
+    "get_secure_score": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/secureScores/ascScore?api-version=2020-01-01",
+    "list_secure_score_controls": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/secureScoreControls?api-version=2020-01-01",
+    "list_alerts": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/alerts?api-version=2022-01-01",
+    "list_alerts_high": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/alerts?api-version=2022-01-01&$filter=properties/severity eq 'High' and properties/status eq 'Active'",
+    "list_recommendations": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/recommendations?api-version=2020-01-01",
+    "list_unhealthy_recommendations": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/recommendations?api-version=2020-01-01&$filter=properties/status/code eq 'Unhealthy'",
+    "list_assessments": "GET https://management.azure.com/subscriptions/{sub}/providers/Microsoft.Security/assessments?api-version=2020-01-01",
+    "mg_secure_score": "GET https://management.azure.com/providers/Microsoft.Management/managementGroups/{mgId}/providers/Microsoft.Security/secureScores/ascScore?api-version=2020-01-01"
+  },
+  "logic_app_action_patterns": {
+    "get_secure_score_action": {
+      "description": "Fetch the current secure score for a subscription",
+      "HTTP_Get_Secure_Score": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/providers/Microsoft.Security/secureScores/ascScore",
+          "queries": {
+            "api-version": "2020-01-01"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        }
+      },
+      "response_expressions": {
+        "score_current": "@body('HTTP_Get_Secure_Score')?['properties']?['score']?['current']",
+        "score_max": "@body('HTTP_Get_Secure_Score')?['properties']?['score']?['max']",
+        "score_percentage": "@{mul(div(body('HTTP_Get_Secure_Score')?['properties']?['score']?['current'], body('HTTP_Get_Secure_Score')?['properties']?['score']?['max']), 100)}"
+      }
+    },
+    "list_alerts_action": {
+      "description": "List all active High-severity MDFC alerts",
+      "HTTP_List_MDFC_Alerts": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/providers/Microsoft.Security/alerts",
+          "queries": {
+            "api-version": "2022-01-01",
+            "$filter": "properties/severity eq 'High' and properties/status eq 'Active'"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        }
+      },
+      "response_expressions": {
+        "alerts_array": "@body('HTTP_List_MDFC_Alerts')?['value']",
+        "next_link": "@body('HTTP_List_MDFC_Alerts')?['nextLink']",
+        "alert_name_in_loop": "@items('For_each_alert')?['properties']?['alertDisplayName']",
+        "alert_resource": "@items('For_each_alert')?['properties']?['compromisedEntity']",
+        "alert_severity": "@items('For_each_alert')?['properties']?['severity']",
+        "alert_description": "@items('For_each_alert')?['properties']?['description']",
+        "alert_remediation_steps": "@join(items('For_each_alert')?['properties']?['remediationSteps'], '\n')"
+      }
+    },
+    "list_recommendations_action": {
+      "description": "List all Unhealthy recommendations for monthly posture report",
+      "HTTP_List_Recommendations": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/providers/Microsoft.Security/recommendations",
+          "queries": {
+            "api-version": "2020-01-01",
+            "$filter": "properties/status/code eq 'Unhealthy'"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        }
+      },
+      "response_expressions": {
+        "recommendations_array": "@body('HTTP_List_Recommendations')?['value']",
+        "rec_name_in_loop": "@items('For_each_rec')?['properties']?['displayName']",
+        "rec_severity": "@items('For_each_rec')?['properties']?['severity']",
+        "rec_remediation": "@items('For_each_rec')?['properties']?['remediationDescription']",
+        "affected_resource_count": "@items('For_each_rec')?['properties']?['resourceDetails']?['id']"
+      }
+    },
+    "secure_score_controls_action": {
+      "description": "List all secure score controls with scores for breakdown reporting",
+      "HTTP_List_Score_Controls": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/providers/Microsoft.Security/secureScoreControls",
+          "queries": {
+            "api-version": "2020-01-01",
+            "$expand": "definition"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "audience": "https://management.azure.com/"
+          }
+        }
+      },
+      "response_expressions": {
+        "controls_array": "@body('HTTP_List_Score_Controls')?['value']",
+        "control_name": "@items('For_each_control')?['properties']?['displayName']",
+        "control_score_current": "@items('For_each_control')?['properties']?['score']?['current']",
+        "control_score_max": "@items('For_each_control')?['properties']?['score']?['max']",
+        "healthy_resources": "@items('For_each_control')?['properties']?['healthyResourceCount']",
+        "unhealthy_resources": "@items('For_each_control')?['properties']?['unhealthyResourceCount']"
+      }
+    }
+  },
+  "monthly_posture_report_pattern": {
+    "description": "Sequence for a monthly MDFC posture report — runs all four pulls in order and assembles for SharePoint/email",
+    "step_1_secure_score": "HTTP_Get_Secure_Score — GET secureScores/ascScore",
+    "step_2_controls": "HTTP_List_Score_Controls — GET secureScoreControls?$expand=definition",
+    "step_3_alerts": "HTTP_List_MDFC_Alerts — GET alerts?$filter=severity eq High and status eq Active (with pagination)",
+    "step_4_recommendations": "HTTP_List_Recommendations — GET recommendations?$filter=status/code eq Unhealthy (with pagination)",
+    "step_5_compose": "Compose_Report_Payload — assemble all data into a single JSON object",
+    "step_6_persist": "Create SharePoint item or call Power BI push dataset",
+    "note": "Steps 1-4 can run in parallel (no dependencies between them) — omit runAfter between them to let Logic Apps execute concurrently. Only step_5 depends on all four completing."
+  },
+  "implementation_notes": [
+    "There is no MDFC managed connector for Logic Apps. The HTTP action with MSI is the only pattern. Auth audience is always 'https://management.azure.com/' (with trailing slash).",
+    "Security Reader is the minimum RBAC role. Assign it at subscription scope, not resource group scope — MDFC resources are subscription-level providers.",
+    "The Recommendations API can return thousands of items on large subscriptions. Use $filter=properties/status/code eq 'Unhealthy' to limit results to actionable items only.",
+    "The Alerts API uses api-version 2022-01-01. The older 2019-01-01 version is deprecated and returns a different schema — do not use it.",
+    "Secure score computation: current/max gives a ratio; multiply by 100 for percentage. Logic Apps expression: mul(div(float(current), float(max)), 100). Cast to float first to avoid integer division returning 0.",
+    "For multi-subscription reporting, run the secure score and alerts calls in a foreach loop over an array of subscription IDs. Collect results into a union array.",
+    "The $expand=definition query parameter on secureScoreControls returns additional metadata including the control's recommendations list and description. Include it for detailed control-level reports.",
+    "MDFC alerts have a startTimeUtc and endTimeUtc in properties. For monthly filters, use OData: $filter=properties/startTimeUtc ge 2025-03-01T00:00:00Z to scope to the reporting period.",
+    "remediationSteps is an array of strings, not a single string. Use join() to concatenate for CSV or text output: @join(item()?['properties']?['remediationSteps'], ' | ').",
+    "Assessments provide resource-level granularity — useful when you need to know exactly which VMs or storage accounts failed a specific check. They complement recommendations (which aggregate across resources)."
+  ],
+  "common_failures": [
+    "MSI missing Security Reader role — all MDFC calls return 403. General Reader role is NOT sufficient for Microsoft.Security resources.",
+    "Using general Reader RBAC role — returns 403 because Microsoft.Security/* requires Security Reader specifically.",
+    "Wrong api-version on alerts endpoint — using 2019-01-01 returns a different schema where alert properties are at different paths.",
+    "Integer division in secure score percentage — div(0, 100) returns 0 in Logic Apps integer math. Cast current and max to float before dividing.",
+    "Not paginating recommendations — silently gets only the first page (~100 items) on subscriptions with many resources.",
+    "Using displayName instead of name (GUID) as the alertName in per-alert REST operations — returns 404.",
+    "Querying at resource group scope for subscription-level resources — Microsoft.Security providers are subscription-scoped and return 404 when addressed through a resource group path."
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/defenderforcloud/alerts/list",
+    "https://learn.microsoft.com/en-us/rest/api/defenderforcloud/secure-scores/get",
+    "https://learn.microsoft.com/en-us/rest/api/defenderforcloud/secure-score-controls/list",
+    "https://learn.microsoft.com/en-us/rest/api/defenderforcloud/assessments/list",
+    "https://learn.microsoft.com/en-us/rest/api/defenderforcloud/recommendations/list",
+    "https://learn.microsoft.com/en-us/azure/defender-for-cloud/permissions"
+  ],
+  "last_verified": "2026-04-03T00:00:00Z",
+  "related_entries": [
+    "sentinel-rest-api-direct-http-patterns",
+    "logic-apps-msi-arm-http-auth-pattern",
+    "ms-graph-security-alerts-incidents",
+    "azure-logic-apps-production-patterns"
+  ],
+  "source_projects": ["manual-research"]
+}

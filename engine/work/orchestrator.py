@@ -10,6 +10,16 @@ from engine.work.task_state import TaskState
 
 _ENV: dict[str, Any] = {}
 
+# Normalized review status values. LLMs may return "failed", "FAIL", "reject",
+# etc. — anything not explicitly "pass" is treated as failure to prevent
+# broken work from being presented as complete.
+_REVIEW_PASS_VALUES = frozenset({"pass", "passed", "approve", "approved", "lgtm", "ok", "success"})
+
+
+def _normalize_review_status(raw: str) -> str:
+    """Map an LLM review status to 'pass' or 'fail'."""
+    return "pass" if raw.strip().lower() in _REVIEW_PASS_VALUES else "fail"
+
 
 def configure_orchestrator_environment(**kwargs: Any) -> None:
     _ENV.update(kwargs)
@@ -44,7 +54,9 @@ def _record_step(
     summary: str,
     now_iso: Any,
 ) -> None:
-    task_state.setdefault("completed_steps", []).append({
+    if not task_state.get("completed_steps"):
+        task_state["completed_steps"] = []
+    task_state["completed_steps"].append({
         "agent": role,
         "timestamp": now_iso(),
         "status": status,
@@ -52,7 +64,9 @@ def _record_step(
         "artifact": artifact_path,
     })
     if artifact_path:
-        task_state.setdefault("artifacts", []).append(artifact_path)
+        if not task_state.get("artifacts"):
+            task_state["artifacts"] = []
+        task_state["artifacts"].append(artifact_path)
 
 
 def run_orchestration(
@@ -184,10 +198,13 @@ def run_orchestration(
         )
         return 1
 
-    if worker_res["output"].get("status") == "blocked":
-        blockers    = worker_res["output"].get("open_issues", [])
+    worker_output_1 = worker_res.get("output") or {}
+    if worker_output_1.get("status") == "blocked":
+        blockers    = worker_output_1.get("open_issues", [])
         blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
         emit_progress(f"[engine] Worker blocked: {blocker_msg}")
+        worker_artifact = persist_result(active_project, "worker", worker_output_1)
+        _record_step(task_state, "worker", "blocked", worker_artifact, blocker_msg, now_iso)
         task_state["pending_resolution"] = {
             "type":             "user_input_required",
             "message":          blocker_msg,
@@ -197,11 +214,11 @@ def run_orchestration(
         write_json(task_state_path, task_state)
         return 1
 
-    if worker_res["output"].get("needs_user_input"):
-        needed      = worker_res["output"].get("open_issues", [])
+    if worker_output_1.get("needs_user_input"):
+        needed      = worker_output_1.get("open_issues", [])
         needed_msg  = "; ".join(needed) or "Worker requires user input to continue."
         emit_progress(f"[engine] Worker needs user input: {needed_msg}")
-        worker_artifact = persist_result(active_project, "worker", worker_res["output"])
+        worker_artifact = persist_result(active_project, "worker", worker_output_1)
         _record_step(task_state, "worker", "blocked", worker_artifact, needed_msg, now_iso)
         task_state["pending_resolution"] = {
             "type":             "user_input_required",
@@ -212,16 +229,22 @@ def run_orchestration(
         write_json(task_state_path, task_state)
         return 1
 
-    worker_artifact = persist_result(active_project, "worker", worker_res["output"])
-    worker_summary  = worker_res["output"].get("summary", "Worker completed.")
+    worker_artifact = persist_result(active_project, "worker", worker_output_1)
+    worker_summary  = worker_output_1.get("summary", "Worker completed.")
     _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
     task_state["last_updated"] = now_iso()
     write_json(task_state_path, task_state)
     emit_progress(f"[engine] Worker done: {worker_summary}")
 
     # ── Optional research if worker flagged external unknowns ────────────────
-    if worker_res["output"].get("needs_research"):
-        questions = worker_res["output"].get("open_issues", [])
+    research_questions = (
+        [q for q in worker_output_1.get("open_issues", []) if isinstance(q, str) and q.strip()]
+        if worker_output_1.get("needs_research") else []
+    )
+    if worker_output_1.get("needs_research") and not research_questions:
+        emit_progress("[engine] Worker flagged needs_research but provided no questions — skipping research.")
+    if research_questions:
+        questions = research_questions
         numbered = "\n".join(f"Q{i+1}: {q}" for i, q in enumerate(questions))
         research_task = (
             f"Answer these specific questions needed to complete the task:\n"
@@ -237,8 +260,9 @@ def run_orchestration(
             emit_progress(f"[engine] Research failed: {research_res.get('error', '')}")
             return 1
 
-        research_artifact = persist_result(active_project, "research", research_res["output"])
-        research_summary  = research_res["output"].get("summary", "Research completed.")
+        research_output   = research_res.get("output") or {}
+        research_artifact = persist_result(active_project, "research", research_output)
+        research_summary  = research_output.get("summary", "Research completed.")
         _record_step(task_state, "research", "success", research_artifact, research_summary, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)
@@ -260,16 +284,48 @@ def run_orchestration(
             emit_progress(f"[engine] Worker (post-research) failed: {worker_res.get('error', '')}")
             return 1
 
-        worker_artifact = persist_result(active_project, "worker", worker_res["output"])
-        worker_summary  = worker_res["output"].get("summary", "Worker completed.")
+        worker_output = worker_res.get("output") or {}
+        if worker_output.get("status") == "blocked":
+            blockers    = worker_output.get("open_issues", [])
+            blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
+            emit_progress(f"[engine] Worker (post-research) blocked: {blocker_msg}")
+            worker_artifact = persist_result(active_project, "worker", worker_output)
+            _record_step(task_state, "worker", "blocked", worker_artifact, blocker_msg, now_iso)
+            task_state["pending_resolution"] = {
+                "type":             "user_input_required",
+                "message":          blocker_msg,
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
+        if worker_output.get("needs_user_input"):
+            needed      = worker_output.get("open_issues", [])
+            needed_msg  = "; ".join(needed) or "Worker requires user input to continue."
+            emit_progress(f"[engine] Worker (post-research) needs user input: {needed_msg}")
+            worker_artifact = persist_result(active_project, "worker", worker_output)
+            _record_step(task_state, "worker", "blocked", worker_artifact, needed_msg, now_iso)
+            task_state["pending_resolution"] = {
+                "type":             "user_input_required",
+                "message":          needed_msg,
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
+        worker_artifact = persist_result(active_project, "worker", worker_output)
+        worker_summary  = worker_output.get("summary", "Worker completed.")
         _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)
         emit_progress(f"[engine] Worker done: {worker_summary}")
 
     # ── Review ───────────────────────────────────────────────────────────────
-    worker_summary_for_review = worker_res["output"].get("summary", "")
-    worker_open_issues        = worker_res["output"].get("open_issues", [])
+    _final_worker_output      = worker_res.get("output") or {}
+    worker_summary_for_review = _final_worker_output.get("summary", "")
+    worker_open_issues        = _final_worker_output.get("open_issues", [])
     review_context = f"Worker summary: {worker_summary_for_review}"
     if worker_open_issues:
         review_context += "\nWorker flagged open issues:\n" + "\n".join(f"- {i}" for i in worker_open_issues)
@@ -287,9 +343,9 @@ def run_orchestration(
         )
         return 1
 
-    review_output  = review_res["output"]
+    review_output  = review_res.get("output") or {}
     review_artifact = persist_result(active_project, "review", review_output)
-    review_status  = review_output.get("status", "pass")
+    review_status  = _normalize_review_status(review_output.get("status", "pass"))
     review_summary = review_output.get("summary", "Review completed.")
     _record_step(task_state, "review", review_status, review_artifact, review_summary, now_iso)
     task_state["last_updated"] = now_iso()
@@ -308,6 +364,9 @@ def run_orchestration(
             + (f"\n\nRequired fixes:\n{fix_lines}" if fix_lines else "")
         )
 
+        task_state["rework_loop_count"] = task_state.get("rework_loop_count", 0) + 1
+        write_json(task_state_path, task_state)
+
         emit_progress("[engine] Review requested rework. Running one rework cycle...")
         worker_res2 = run_agent_with_capabilities(
             "worker", rework_task, "Rework based on review feedback",
@@ -318,8 +377,39 @@ def run_orchestration(
             emit_progress(f"[engine] Rework worker failed: {worker_res2.get('error', '')}")
             return 1
 
-        worker_artifact2 = persist_result(active_project, "worker", worker_res2["output"])
-        worker_summary2  = worker_res2["output"].get("summary", "Rework completed.")
+        rework_output = worker_res2.get("output") or {}
+        if rework_output.get("status") == "blocked":
+            blockers    = rework_output.get("open_issues", [])
+            blocker_msg = "; ".join(blockers) or "Rework worker reported a hard blocker."
+            emit_progress(f"[engine] Rework worker blocked: {blocker_msg}")
+            rework_artifact = persist_result(active_project, "worker", rework_output)
+            _record_step(task_state, "worker", "blocked", rework_artifact, blocker_msg, now_iso)
+            task_state["pending_resolution"] = {
+                "type":             "user_input_required",
+                "message":          blocker_msg,
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
+        if rework_output.get("needs_user_input"):
+            needed      = rework_output.get("open_issues", [])
+            needed_msg  = "; ".join(needed) or "Rework worker requires user input to continue."
+            emit_progress(f"[engine] Rework worker needs user input: {needed_msg}")
+            worker_artifact2 = persist_result(active_project, "worker", rework_output)
+            _record_step(task_state, "worker", "blocked", worker_artifact2, needed_msg, now_iso)
+            task_state["pending_resolution"] = {
+                "type":             "user_input_required",
+                "message":          needed_msg,
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
+        worker_artifact2 = persist_result(active_project, "worker", rework_output)
+        worker_summary2  = rework_output.get("summary", "Rework completed.")
         _record_step(task_state, "worker", "success", worker_artifact2, worker_summary2, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)
@@ -343,9 +433,9 @@ def run_orchestration(
             emit_progress(f"[engine] Final review failed: {review_res2.get('error', '')}")
             return 1
 
-        review_output2  = review_res2["output"]
+        review_output2  = review_res2.get("output") or {}
         review_artifact2 = persist_result(active_project, "review", review_output2)
-        review_status2  = review_output2.get("status", "pass")
+        review_status2  = _normalize_review_status(review_output2.get("status", "pass"))
         review_summary2 = review_output2.get("summary", "Final review completed.")
         _record_step(task_state, "review", review_status2, review_artifact2, review_summary2, now_iso)
         task_state["last_updated"] = now_iso()

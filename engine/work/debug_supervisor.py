@@ -52,28 +52,41 @@ def issue_detail_path(issue: dict[str, Any]) -> Path:
     return detail_path
 
 
-def run_verification_commands(commands: list[str]) -> list[dict[str, Any]]:
+def run_verification_commands(commands: list[str], *, timeout: int = 300) -> list[dict[str, Any]]:
     if not commands:
         raise SystemExit("At least one --verify-command is required.")
     results: list[dict[str, Any]] = []
     for command in commands:
-        completed = subprocess.run(
-            command,
-            shell=True,
-            cwd=REPO_ROOT,
-            text=True,
-            capture_output=True,
-        )
-        results.append(
-            {
-                "command": command,
-                "returncode": completed.returncode,
-                "passed": completed.returncode == 0,
-                "stdout": completed.stdout[-8000:],
-                "stderr": completed.stderr[-8000:],
-                "ran_at": now_iso(),
-            }
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                shell=True,
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+            )
+            results.append(
+                {
+                    "command": command,
+                    "returncode": completed.returncode,
+                    "passed": completed.returncode == 0,
+                    "stdout": completed.stdout[-8000:],
+                    "stderr": completed.stderr[-8000:],
+                    "ran_at": now_iso(),
+                }
+            )
+        except subprocess.TimeoutExpired:
+            results.append(
+                {
+                    "command": command,
+                    "returncode": -1,
+                    "passed": False,
+                    "stdout": "",
+                    "stderr": f"Command timed out after {timeout}s",
+                    "ran_at": now_iso(),
+                }
+            )
     return results
 
 

@@ -72,6 +72,7 @@ from engine.work.runtime_helpers import (
     extract_session_id_from_text as _runtime_extract_session_id_from_text,
     is_known_feedback as _runtime_is_acceptance_feedback,
     load_json as _runtime_load_json,
+    load_json_safe as _runtime_load_json_safe,
     now_iso as _runtime_now_iso,
     resolve_active_project as _runtime_resolve_active_project,
     runtime_check_output_has_success as _runtime_runtime_check_output_has_success,
@@ -114,6 +115,8 @@ ENVIRONMENTAL_BLOCK_PHRASES = {
     "econnrefused", "enotfound", "ehostunreach", "enetunreach",
     "ssl certificate", "tls handshake", "proxy error", "firewall blocked",
     "rate limit exceeded", "http 429", "http 503", "http 502", "http 504",
+    "http 500", "internal server error", "bad gateway", "service unavailable",
+    "gateway timeout", "server overloaded", "model capacity exhausted",
     "environment did not provide", "could not resolve",
     "credentials not available", "credentials not found",
 }
@@ -298,6 +301,9 @@ def now_iso() -> str:
 def load_json(path: Path) -> Any:
     return _runtime_load_json(path)
 
+def load_json_safe(path: Path) -> Any:
+    return _runtime_load_json_safe(path)
+
 def write_json(path: Path, data: Any) -> None:
     _runtime_write_json(path, data)
 
@@ -472,7 +478,7 @@ def save_last_active_project(project: dict[str, Any] | None) -> None:
 
 def close_project(project_id: str, agent_bin: str | None = None) -> int:
     """Close a project by ID: clear pending resolution and save a KB entry from the final worker output."""
-    registry = load_json(REGISTRY_PATH)
+    registry = load_json_safe(REGISTRY_PATH)
     project = next(
         (p for p in registry.get("projects", []) if p["project_id"] == project_id), None
     )
@@ -511,7 +517,7 @@ def _extract_project_knowledge(project: dict, task_state: dict) -> None:
 
     try:
         artifact = load_json(worker_artifacts[0])
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, ValueError):
         return
 
     # Only extract from successful runs
@@ -600,7 +606,7 @@ def store_secrets(project_id: str, entries: list[dict[str, Any]], source: str = 
         project_id,
         entries,
         secrets_projects_dir=SECRETS_PROJECTS_DIR,
-        load_json=load_json,
+        load_json=load_json_safe,
         write_json=write_json,
         now_iso=now_iso,
         source=source,
@@ -611,7 +617,7 @@ def load_secrets(project_id: str, keys: list[str] | None = None) -> dict[str, An
     return project_state_work.load_secrets(
         project_id,
         secrets_projects_dir=SECRETS_PROJECTS_DIR,
-        load_json=load_json,
+        load_json=load_json_safe,
         keys=keys,
     )
 
@@ -733,8 +739,8 @@ def _effective_context_tokens() -> int:
 _COMPACTABLE_SECTION_PREFIXES = [
     "\nCoding Repo Fingerprint",          # optional coding hint; agent can read files directly
     "\nProject Files:",                   # directory listing; agent can discover via read_file
-    "\nResearch Artifact Summary",        # already compressed research summary
     "\nMatched Skills",                   # helpful but not required for correctness
+    "\nResearch Artifact Summary",        # last resort — research findings are critical for correctness
 ]
 
 _AGENT_OUTPUT_REMINDER = (
@@ -795,15 +801,17 @@ _AGENT_OUTPUT_TEMPLATES: dict[str, str] = {
   "summary": "one-sentence verdict",
   "findings": ["finding description"],
   "checks_run": [{"check": "description", "command": "cmd", "result": "passed | failed", "output": "..."}],
-  "blocking": ["blocking issue preventing acceptance"]
+  "blocking": ["blocking issue preventing acceptance"],
+  "rework_requests": ["specific fix the worker must apply"]
 }""",
     "research": """{
   "status": "success | partial | failed",
   "summary": "one-sentence summary of findings",
-  "facts": ["concrete fact (source: URL or reference)"],
   "sources": ["URL or document reference"],
-  "open_risks": ["risk or ambiguity affecting implementation"],
-  "implementation_notes": ["direct note on how to apply this fact"]
+  "technical_data": {
+    "answers": [{"question": "Q1: ...", "answer": "direct answer", "facts": ["atomic fact (source: URL)"], "implementation_notes": ["how to apply"]}],
+    "open_risks": ["risk or ambiguity affecting implementation"]
+  }
 }""",
 }
 
@@ -830,13 +838,13 @@ def _build_skills_context(role: str, inputs: list[str]) -> list[str]:
 def run_agent_with_capabilities(
     role: str, task: str, reason: str, inputs: list[str],
     project: dict[str, Any] | None, agent_bin: str,
-    force_full_artifacts: list[str] = None,
+    force_full_artifacts: list[str] | None = None,
     assignment_mode: str | None = None,
     delivery_mode: str | None = None,
     expected_result_shape: dict[str, Any] | None = None,
     session: AgentSession | None = None,
 ) -> dict[str, Any]:
-    from engine.work.destructive_guard import check_capability as _guard_check, is_absolute_block
+    from engine.work.destructive_guard import check_capability as _guard_check, is_absolute_block, _check_capability_specific
 
     _guard_blocks: list[str] = []
 
@@ -865,11 +873,32 @@ def run_agent_with_capabilities(
         # Check session-level allows first (operator previously said 'A')
         allow_key = _make_allow_key(cap_req, blocked)
         if allow_key in _SESSION_ALLOWED:
-            emit_progress(
-                f"[destructive-guard] Session-allowed (previously approved): "
-                f"'{cap_req.get('capability')}' — {allow_key}"
-            )
-            return execute_capability(cap_req)
+            # For role-allowlist session allows, still enforce capability-specific
+            # guards (shell blocklist, write protection, HTTP mutation checks).
+            # Without this, a session-allow for "research can use run_command"
+            # would also bypass the shell command blocklist.
+            if allow_key.startswith("role-allowlist:"):
+                cap_specific = _check_capability_specific(
+                    cap_req.get("capability", ""),
+                    cap_req.get("arguments") or {},
+                    delivery_mode,
+                )
+                if cap_specific is not None:
+                    # Capability-specific guard blocked — do NOT session-allow this
+                    blocked = cap_specific
+                    # Fall through to the normal soft-block prompt below
+                else:
+                    emit_progress(
+                        f"[destructive-guard] Session-allowed (previously approved): "
+                        f"'{cap_req.get('capability')}' — {allow_key}"
+                    )
+                    return execute_capability(cap_req)
+            else:
+                emit_progress(
+                    f"[destructive-guard] Session-allowed (previously approved): "
+                    f"'{cap_req.get('capability')}' — {allow_key}"
+                )
+                return execute_capability(cap_req)
 
         # Soft block — prompt the operator
         decision = _prompt_guard_block(cap_req, blocked, role, emit_progress)
@@ -984,7 +1013,7 @@ def build_prompt(
     project: dict[str, Any] | None,
     assignment_mode: str | None = None,
     delivery_mode: str | None = None,
-    force_full_artifacts: list[str] = None,
+    force_full_artifacts: list[str] | None = None,
     expected_result_shape: dict[str, Any] | None = None,
     session: AgentSession | None = None,
 ) -> str:
@@ -1085,7 +1114,7 @@ def run_agent(
     inputs_or_project: list[str] | dict[str, Any] | None = None,
     project_or_agent_bin: dict[str, Any] | str | None = None,
     agent_bin: str | None = None,
-    force_full_artifacts: list[str] = None,
+    force_full_artifacts: list[str] | None = None,
     delivery_mode: str | None = None,
     expected_result_shape: dict[str, Any] | None = None,
     session: AgentSession | None = None,
@@ -1158,7 +1187,7 @@ def delete_projects(project_ids: list[str], *, delete_all: bool = False) -> int:
     """Delete one or more projects: remove folder and registry entry."""
     import shutil as _shutil
 
-    registry = load_json(REGISTRY_PATH)
+    registry = load_json_safe(REGISTRY_PATH)
     projects = registry.get("projects", [])
 
     if delete_all:
@@ -1182,7 +1211,13 @@ def delete_projects(project_ids: list[str], *, delete_all: bool = False) -> int:
 
     for project in targets:
         pid = project["project_id"]
-        home = project.get("project_home") or str(Path(project["project_root"]).parent)
+        try:
+            home = project.get("project_home") or str(Path(project["project_root"]).parent)
+        except KeyError:
+            emit_progress(f"[engine] Warning: project '{pid}' has no path in registry — removing entry only.")
+            if pid == last_active_id:
+                cleared_last_active = True
+            continue
         home_path = Path(home)
         if home_path.exists():
             _shutil.rmtree(home_path)

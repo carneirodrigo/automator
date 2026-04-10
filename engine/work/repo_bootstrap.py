@@ -137,6 +137,9 @@ def ensure_repo_structure() -> None:
                 needs_refresh = str(link.readlink()) != target
             except OSError:
                 needs_refresh = True
+            # Also refresh if the symlink is broken (target doesn't exist)
+            if not needs_refresh and not link.exists():
+                needs_refresh = True
         if needs_refresh:
             link.unlink(missing_ok=True)
         if not link.exists():

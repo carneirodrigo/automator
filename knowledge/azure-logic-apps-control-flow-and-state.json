@@ -69,6 +69,31 @@
       "fact": "Data Operations actions include Compose, Parse JSON, Select, Filter array, Join, Create CSV table, and Create HTML table.",
       "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption",
       "verified_date": "2026-03-28"
+    },
+    {
+      "fact": "The Filter array (Query) action requires the 'where' field to be a template language expression string such as \"@equals(item()?['field'], 'value')\". Passing a condition object ({ \"and\": [...] }) as used in Condition/If actions is rejected at save time with the error 'Property where must be a template language expression'.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-perform-data-operations?tabs=consumption#filter-array-action",
+      "verified_date": "2026-04-08"
+    },
+    {
+      "fact": "IncrementVariable only works reliably with a literal integer value. Passing a dynamic expression such as \"@length(body('SomeAction'))\" produces unpredictable results at runtime — the variable receives wrong values or the increment is silently ignored.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+      "verified_date": "2026-04-08"
+    },
+    {
+      "fact": "SetVariable does not allow self-reference. An expression like \"@add(variables('x'), someValue)\" inside a SetVariable action targeting variable 'x' is rejected at save time with the error 'Self reference is not supported when updating the value of variable x'.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+      "verified_date": "2026-04-08"
+    },
+    {
+      "fact": "The correct pattern for accumulating a dynamically computed value into a variable is: (1) use a Compose action to resolve the expression into a concrete integer output, then (2) use IncrementVariable with value set to @outputs('ComposeName'). This works because IncrementVariable receives a pre-resolved integer rather than a raw expression string.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+      "verified_date": "2026-04-08"
+    },
+    {
+      "fact": "Multiple IncrementVariable actions targeting different variables must still run sequentially. Running them in parallel branches causes state-store collisions and produces wrong accumulated values even when each action targets a distinct variable.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-create-variables-store-values",
+      "verified_date": "2026-04-08"
     }
   ],
   "implementation_notes": [
@@ -78,14 +103,20 @@
     "Use For each for per-item processing and Until for polling or wait-until-state-changes patterns.",
     "Use scopes to model grouped phases such as retrieve, transform, persist, and cleanup so downstream run-after logic can react to phase-level outcome instead of individual actions.",
     "Use variables sparingly. Prefer action outputs and expressions for simple data flow, and reserve variables for counters, accumulators, or state that truly spans multiple later actions.",
-    "Use Compose for lightweight shaping, Parse JSON for schema-backed tokens, Select for projection, and Filter array for record selection before writes or notifications."
+    "Use Compose for lightweight shaping, Parse JSON for schema-backed tokens, Select for projection, and Filter array for record selection before writes or notifications.",
+    "To count filtered results efficiently without a For each loop: use Filter array (Query) to produce a filtered array, then Compose to capture its length, then IncrementVariable referencing the Compose output. Never skip the intermediate Compose step.",
+    "Filter array 'where' expressions must use the full expression syntax with item() — for example @equals(item()?['field'], true) or @or(...) — not condition objects. When the filter condition is complex, build a single @or(...) or @and(...) expression string rather than nesting condition objects."
   ],
   "caveats": [
     "Switch supports equality matching only. Use Condition or expressions when you need greater-than, less-than, contains, or compound logic.",
     "Parallel branches and parallel For each iterations can create race conditions when they mutate shared variables or rely on ordering.",
     "Nested For each behavior differs from top-level For each because nested loops run sequentially.",
     "Until loops can become expensive or slow if the stop condition and iteration limits are not designed carefully.",
-    "Overusing variables can make workflow state harder to reason about than direct action-to-action expressions."
+    "Overusing variables can make workflow state harder to reason about than direct action-to-action expressions.",
+    "IncrementVariable with a dynamic expression value silently produces wrong results — always use a Compose intermediary.",
+    "SetVariable self-reference is a hard save-time error, not a runtime error. It will always be caught when deploying the workflow.",
+    "Filter array 'where' accepts expression strings only — condition objects are a save-time hard error.",
+    "All IncrementVariable actions must be sequential regardless of which variable they target."
   ],
   "authoritative_sources": [
     "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-conditional-statement",

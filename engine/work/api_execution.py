@@ -14,13 +14,20 @@ logger = logging.getLogger(__name__)
 
 # Default models per vendor when none specified in config
 _DEFAULT_MODELS: dict[str, str] = {
-    "claude": "claude-sonnet-4-20250514",
+    "claude": "claude-sonnet-4-6",
     "gemini": "gemini-2.5-pro",
     "openai": "gpt-4.1",
 }
 
 # Maximum tokens for API responses
 _DEFAULT_MAX_TOKENS = 16384
+
+
+def _sanitize_api_error(error: str, api_key: str | None) -> str:
+    """Remove API key fragments from vendor SDK error messages."""
+    if api_key and len(api_key) >= 8 and api_key in error:
+        error = error.replace(api_key, "[REDACTED]")
+    return error[:500]
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +73,7 @@ def _call_anthropic(
                 text_parts.append(block.text)
         return {"ok": True, "text": "".join(text_parts), "error": ""}
     except Exception as exc:
-        return {"ok": False, "error": str(exc), "text": ""}
+        return {"ok": False, "error": _sanitize_api_error(str(exc), api_key), "text": ""}
 
 
 def _call_google(
@@ -97,7 +104,7 @@ def _call_google(
         text = response.text if response.text else ""
         return {"ok": True, "text": text, "error": ""}
     except Exception as exc:
-        return {"ok": False, "error": str(exc), "text": ""}
+        return {"ok": False, "error": _sanitize_api_error(str(exc), api_key), "text": ""}
 
 
 def _call_openai(
@@ -134,7 +141,7 @@ def _call_openai(
         text = response.choices[0].message.content if response.choices else ""
         return {"ok": True, "text": text or "", "error": ""}
     except Exception as exc:
-        return {"ok": False, "error": str(exc), "text": ""}
+        return {"ok": False, "error": _sanitize_api_error(str(exc), api_key), "text": ""}
 
 
 def _get_api_caller(backend_name: str) -> Callable[..., dict[str, Any]] | None:
@@ -309,13 +316,29 @@ def runtime_check_api(
             "details": f"No API caller for {backend_name}",
         }
 
-    result = caller(
-        'Respond with exactly: {"status": "ok"}',
-        model,
-        api_key,
-        base_url,
-        25,
-    )
+    # Wrap in a thread with timeout to handle vendors that ignore timeout_seconds
+    # (e.g., google-genai SDK doesn't expose a simple timeout parameter).
+    check_timeout = 25
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        future = executor.submit(
+            caller,
+            'Respond with exactly: {"status": "ok"}',
+            model,
+            api_key,
+            base_url,
+            check_timeout,
+        )
+        result = future.result(timeout=check_timeout + 5)
+    except (concurrent.futures.TimeoutError, Exception) as exc:
+        return {
+            "backend": f"{backend_name} (api)",
+            "ok": False,
+            "reason": "timeout",
+            "details": f"API check timed out after {check_timeout}s: {type(exc).__name__}",
+        }
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     if result["ok"]:
         return {

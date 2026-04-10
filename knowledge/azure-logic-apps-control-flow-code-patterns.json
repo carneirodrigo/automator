@@ -18,6 +18,11 @@
       "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-loops"
     },
     {
+      "fact": "Until loop do-while guard fix: when the exit condition may already be true before the first iteration (e.g., next_url is empty on a single-page result), wrap the Until in an If Condition that checks the condition first. Without this guard, the loop body executes once unconditionally, causing null reference errors on actions that rely on the value being non-empty. Pattern: If_* checks 'next_url != empty string'; if true, runs Loop_* (Until); else branch is empty. The next group's first P1 action must use runAfter: { 'If_*': ['Succeeded'] }, not 'Loop_*'. Example If expression: { \"and\": [{ \"not\": { \"equals\": [\"@variables('next_url')\", \"\"] } }] }",
+      "verified_date": "2026-04-03",
+      "source": "production Logic App — pagination loop bug fix confirmed working after wrapping Until in If guard"
+    },
+    {
       "fact": "Scope action type is 'Scope'. It groups actions into a named unit. The Scope's own status (Succeeded/Failed/Skipped/TimedOut) is the aggregate status of its contained actions. Use runAfter on a downstream Scope to implement catch/finally patterns.",
       "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-control-flow-run-steps-group-scopes"
     },

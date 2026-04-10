@@ -1,0 +1,191 @@
+{
+  "id": "logic-apps-triggers",
+  "title": "Azure Logic Apps - Trigger Types With Exact JSON From Real Sentinel Playbooks",
+  "description": "All trigger types found in real-world Sentinel playbook examples: incident trigger, alert trigger, recurrence, HTTP request, and manual.",
+  "tags": ["logic-apps", "triggers", "sentinel", "incident-trigger", "alert-trigger", "webhook", "recurrence"],
+  "source": "real-world-examples",
+  "extracted_from": [
+    "Add-UserToWatchlist-IncidentTrigger.txt",
+    "Add-UserToWatchlist-SidToUPN.txt",
+    "Block-AADUser-Incident.txt",
+    "Suppress_Tenable_SAMR_alerts.txt",
+    "Teams-notifications-webhook.txt",
+    "CyberSecurityASM-Notification-Email.txt"
+  ],
+  "content": {
+    "sentinel_incident_trigger": {
+      "description": "The primary trigger for Microsoft Sentinel playbooks. Fires when a Sentinel incident is created. Type is ApiConnectionWebhook. The trigger name in the designer is 'Microsoft_Sentinel_incident'.",
+      "json": {
+        "Microsoft_Sentinel_incident": {
+          "type": "ApiConnectionWebhook",
+          "inputs": {
+            "body": {
+              "callback_url": "@{listCallbackUrl()}"
+            },
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+              }
+            },
+            "path": "/incident-creation"
+          }
+        }
+      },
+      "key_fields": {
+        "type": "ApiConnectionWebhook — this is a webhook-style trigger that registers a callback URL with Sentinel",
+        "callback_url": "@{listCallbackUrl()} — Logic Apps built-in function that returns the webhook callback URL for this run",
+        "path": "/incident-creation — the Sentinel connector endpoint that registers the webhook",
+        "connection_key": "azuresentinel — the key used in $connections to reference the Sentinel connection"
+      },
+      "connection_key_variants": [
+        "azuresentinel — most common, used for service-account authenticated connections",
+        "azuresentinel_1 — suffix variant when multiple Sentinel connections exist",
+        "azuresentinel-1 — hyphen variant seen in some exports",
+        "microsoftsentinel — newer connector name, used in updated playbooks",
+        "azuresentinel_1 — when trigger uses MSI connection distinct from action connections"
+      ],
+      "what_is_available_downstream": {
+        "triggerBody()": "The full incident payload. All incident data is accessed via @triggerBody()?['object']?['properties']?[...]",
+        "incident_fields": {
+          "title": "@triggerBody()?['object']?['properties']?['title']",
+          "description": "@triggerBody()?['object']?['properties']?['description']",
+          "incidentNumber": "@triggerBody()?['object']?['properties']?['incidentNumber']",
+          "incidentUrl": "@triggerBody()?['object']?['properties']?['incidentUrl']",
+          "severity": "@triggerBody()?['object']?['properties']?['severity']",
+          "createdTimeUtc": "@triggerBody()?['object']?['properties']?['createdTimeUtc']",
+          "relatedEntities": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+          "alertProductNames": "@triggerBody()?['object']?['properties']?['additionalData']?['alertProductNames']",
+          "tactics": "@triggerBody()?['object']?['properties']?['additionalData']?['tactics']"
+        },
+        "workspace_fields": {
+          "SubscriptionId": "@triggerBody()?['workspaceInfo']?['SubscriptionId']",
+          "ResourceGroupName": "@triggerBody()?['workspaceInfo']?['ResourceGroupName']",
+          "workspaceId": "@triggerBody()?['workspaceId']"
+        }
+      },
+      "required_connection_declaration": {
+        "in_definition_parameters": {
+          "$connections": {
+            "type": "Object",
+            "defaultValue": {}
+          }
+        },
+        "in_outer_parameters": {
+          "$connections": {
+            "type": "Object",
+            "value": {
+              "azuresentinel": {
+                "id": "/subscriptions/{subId}/providers/Microsoft.Web/locations/{region}/managedApis/azuresentinel",
+                "connectionId": "/subscriptions/{subId}/resourceGroups/{rgName}/providers/Microsoft.Web/connections/{connectionName}",
+                "connectionName": "{connectionName}",
+                "connectionProperties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "sentinel_alert_trigger": {
+      "description": "Alert-level trigger (not incident-level). Fires for each individual Sentinel alert. Found in Suppress_Tenable_SAMR_alerts.txt. Path is '/subscribe' not '/incident-creation'.",
+      "json": {
+        "Microsoft_Sentinel_alert": {
+          "type": "ApiConnectionWebhook",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+              }
+            },
+            "body": {
+              "callback_url": "@{listCallbackUrl()}"
+            },
+            "path": "/subscribe"
+          }
+        }
+      },
+      "key_difference_from_incident_trigger": "path is '/subscribe' instead of '/incident-creation'",
+      "what_is_available_downstream": {
+        "description": "Alert-level trigger body is different from incident-level. Fields are at top level of triggerBody().",
+        "fields": {
+          "AlertDisplayName": "@triggerBody()?['AlertDisplayName']",
+          "SystemAlertId": "@triggerBody()?['SystemAlertId']",
+          "StartTimeUtc": "@triggerBody()?['StartTimeUtc']",
+          "WorkspaceSubscriptionId": "@triggerBody()?['WorkspaceSubscriptionId']",
+          "WorkspaceResourceGroup": "@triggerBody()?['WorkspaceResourceGroup']",
+          "WorkspaceId": "@triggerBody()?['WorkspaceId']"
+        }
+      }
+    },
+
+    "recurrence_trigger": {
+      "description": "Schedule-based trigger. Fires on a defined interval. No connector needed.",
+      "json": {
+        "Recurrence": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Hour",
+            "interval": 1
+          }
+        }
+      },
+      "frequency_options": ["Second", "Minute", "Hour", "Day", "Week", "Month"],
+      "advanced_schedule_example": {
+        "Recurrence": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Week",
+            "interval": 1,
+            "schedule": {
+              "weekDays": ["Monday"],
+              "hours": ["9"],
+              "minutes": [0]
+            },
+            "startTime": "2024-01-01T09:00:00Z",
+            "timeZone": "AUS Eastern Standard Time"
+          }
+        }
+      },
+      "what_is_available_downstream": "No trigger body. Use @utcNow() to get current time."
+    },
+
+    "http_request_trigger": {
+      "description": "HTTP/request trigger. Exposes an HTTPS endpoint. Fires when a POST is received. Generates a URL after first save.",
+      "json": {
+        "manual": {
+          "type": "Request",
+          "kind": "Http",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "incidentId": { "type": "string" },
+                "severity": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "what_is_available_downstream": {
+        "full_body": "@triggerBody()",
+        "specific_field": "@triggerBody()?['incidentId']",
+        "headers": "@triggerOutputs()?['headers']?['X-Custom-Header']"
+      },
+      "notes": [
+        "The 'schema' property is optional but provides IntelliSense in downstream expression picker",
+        "Without a schema, use @triggerBody()?['fieldName'] with null-safe ?[''] navigation",
+        "The generated URL includes a SAS token — treat it as a secret"
+      ]
+    },
+
+    "trigger_naming_convention": {
+      "description": "The trigger key name in the 'triggers' object becomes the trigger's identity. In downstream expressions, the trigger is always referenced as triggerBody() or triggerOutputs() — never by name.",
+      "common_names_seen": [
+        "Microsoft_Sentinel_incident",
+        "Microsoft_Sentinel_alert",
+        "Recurrence",
+        "manual"
+      ]
+    }
+  }
+}

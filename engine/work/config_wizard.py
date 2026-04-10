@@ -93,7 +93,7 @@ _API_KEY_FIELDS = {
     "openai": "openai_api_key",
 }
 _DEFAULT_MODELS = {
-    "anthropic": "claude-sonnet-4-20250514",
+    "anthropic": "claude-sonnet-4-6",
     "google": "gemini-2.5-pro",
     "openai": "gpt-4.1",
 }
