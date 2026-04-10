@@ -137,7 +137,13 @@ The system follows an agent-driven orchestration model:
 ### Pipeline
 
 ```
-user → worker → review → [pass: complete | fail: one rework → complete]
+user → [plan?] → worker → review → [pass: complete | fail: one rework → complete]
+```
+
+For complex tasks (multiple systems, credentials, sequential steps), the engine runs a lightweight planning step first:
+
+```
+user → plan(questions?) → [user answers] → worker(with plan) → review → complete
 ```
 
 When the worker signals `needs_research: true`, the engine dispatches research and re-runs the worker:
@@ -153,8 +159,12 @@ The engine runs a fixed lifecycle with no dynamic routing:
 3. `review` — verifies the output; one rework cycle is allowed if review fails
 4. `complete` — engine presents delivery files for user acceptance
 
-**Resilience features:**
+**Delivery assurance features:**
 
+- **Task planning:** Complex tasks (multiple systems, credentials, sequential steps) trigger a lightweight planning step that decomposes the request into ordered steps. If critical information is missing, the engine returns questions to the user before starting implementation. Simple tasks skip planning entirely (zero extra tokens).
+- **Write-test-fix cycle:** The worker is required to run code after writing it, fix failures, and iterate — not just write and report success. Capability rounds are used for test-fix cycles.
+- **Delivery verification:** After the worker reports success, the engine verifies that claimed files (artifacts, changes_made) actually exist on disk.
+- **Review enforcement:** Reviews that pass without running any commands or tests are auto-demoted to fail, triggering a rework cycle with actual verification.
 - **Transient retry:** Rate limits, timeouts, and provider errors are retried up to 2 times with exponential backoff (5s, 10s). Fatal errors (binary not found, permission denied) fail immediately.
 - **Output validation:** Each stage's output is checked for minimum required fields (worker: `summary`; review: `status`). Empty or structureless output fails the stage instead of passing silently.
 - **Review default:** If the review agent returns no `status` field (unparseable output), the engine defaults to "fail" and triggers a rework cycle rather than silently accepting broken work.

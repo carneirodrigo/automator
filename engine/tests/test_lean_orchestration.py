@@ -13,6 +13,9 @@ Covers:
 10. Worker output validation gate
 11. Review default to fail on missing status
 12. Stage resume from prior worker output
+13. Task planning heuristic
+14. Review enforcement: pass without checks → demoted to fail
+15. Delivery file verification
 """
 
 from __future__ import annotations
@@ -24,8 +27,10 @@ from typing import Any
 from unittest.mock import MagicMock, call, patch
 
 from engine.work.orchestrator import (
+    _needs_planning,
     _next_project_id,
     _project_name_from_request,
+    _verify_delivery_files,
     configure_orchestrator_environment,
     run_orchestration,
 )
@@ -83,7 +88,7 @@ def _review_pass(summary: str = "Looks good.") -> dict[str, Any]:
         "status": "pass",
         "summary": summary,
         "findings": [],
-        "checks_run": [],
+        "checks_run": [{"check": "syntax check", "command": "python3 -c 'import script'", "result": "passed", "output": ""}],
         "blocking": [],
     })
 
@@ -841,6 +846,104 @@ class TestReviewDefaultFail(unittest.TestCase):
         )
         self.assertEqual(rc, 0)
         # Should have gone through: worker → review(fail) → rework → final review(pass)
+        roles = [c[0][0] for c in run_agent.call_args_list]
+        self.assertEqual(roles, ["worker", "review", "worker", "review"])
+
+
+# ---------------------------------------------------------------------------
+# Task planning heuristic
+# ---------------------------------------------------------------------------
+
+class TestNeedsPlanning(unittest.TestCase):
+    """Heuristic correctly separates simple tasks from complex ones."""
+
+    def test_simple_task_skips_planning(self):
+        self.assertFalse(_needs_planning("write a hello world script"))
+
+    def test_short_task_skips_planning(self):
+        self.assertFalse(_needs_planning("add retry logic"))
+
+    def test_rework_skips_planning(self):
+        self.assertFalse(_needs_planning("Rework required. Fix the indentation."))
+
+    def test_complex_task_triggers_planning(self):
+        self.assertTrue(_needs_planning(
+            "build a script that authenticates to Microsoft Graph API "
+            "and then fetches all SharePoint sites and stores the results"
+        ))
+
+    def test_multi_system_triggers_planning(self):
+        self.assertTrue(_needs_planning(
+            "connect to Azure Defender and Qualys, pull vulnerability data, "
+            "and deploy the results to a SharePoint list"
+        ))
+
+
+# ---------------------------------------------------------------------------
+# Delivery file verification
+# ---------------------------------------------------------------------------
+
+class TestVerifyDeliveryFiles(unittest.TestCase):
+    def test_empty_output_returns_no_missing(self):
+        self.assertEqual(_verify_delivery_files({}, "/tmp"), [])
+
+    def test_existing_file_not_flagged(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as f:
+            f.write(b"print('hello')")
+            path = f.name
+        try:
+            result = _verify_delivery_files({"artifacts": [path]}, "/tmp")
+            self.assertEqual(result, [])
+        finally:
+            os.unlink(path)
+
+    def test_missing_file_flagged(self):
+        result = _verify_delivery_files(
+            {"artifacts": ["/tmp/nonexistent_12345.py"]}, "/tmp"
+        )
+        self.assertEqual(len(result), 1)
+        self.assertIn("not found", result[0])
+
+
+# ---------------------------------------------------------------------------
+# Review enforcement: pass without checks → demoted to fail
+# ---------------------------------------------------------------------------
+
+class TestReviewEnforcement(unittest.TestCase):
+    """Review that passes with empty checks_run should be demoted to fail."""
+
+    def test_review_pass_no_checks_triggers_rework(self):
+        task_state = [_make_task_state()]
+        # Review passes but with empty checks_run — should be demoted to fail.
+        review_no_checks = _make_agent_result({
+            "status": "pass",
+            "summary": "Looks fine.",
+            "findings": [],
+            "checks_run": [],
+            "blocking": [],
+        })
+        run_agent = MagicMock(side_effect=[
+            _worker_pass(),
+            review_no_checks,       # first review: pass but no checks → demoted to fail
+            _worker_pass("Fixed."), # rework
+            _review_pass(),         # final review with proper checks
+        ])
+        project, ts_path = _configure(run_agent, task_state, project=_make_project("001"))
+        rc = run_orchestration(
+            request="build something",
+            agent_bin="claude",
+            debug_mode=False,
+            execute_agents=True,
+            active_project=project,
+            task_state=task_state[0],
+            task_state_path=ts_path,
+            fork_hint=None,
+            pending_secrets=[],
+            pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        # Should have 4 calls: worker → review(demoted) → rework → final review
         roles = [c[0][0] for c in run_agent.call_args_list]
         self.assertEqual(roles, ["worker", "review", "worker", "review"])
 

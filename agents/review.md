@@ -36,9 +36,11 @@ When the task notes that this is a final review after rework, check each previou
 
 ## Verification Policy
 
-- Run the deliverable or its tests directly. Do not rely solely on reading code.
-- If the worker's `checks_run` show passing tests, verify at least one of them yourself.
+- You MUST run at least one `run_command` or `run_tests` capability before returning your verdict. Reading code alone is not sufficient.
+- If the worker delivered a script, run it. If tests exist, run them. If neither is possible, run a syntax check or import test.
+- If the worker's `checks_run` show passing tests, re-run at least one of them yourself and compare results.
 - If the task involved a script, run it with a representative input and check the output.
+- If you return `status: pass` with an empty `checks_run`, the engine will reject your review. You must provide evidence.
 
 ## Scope Rules
 

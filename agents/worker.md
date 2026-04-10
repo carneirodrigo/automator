@@ -52,10 +52,21 @@ For document and spreadsheet deliverables, check the injected skills context —
 ## Core Responsibilities
 
 - Implement the task as described
-- Run feasible local checks to verify the output works
+- Follow the write-test-fix cycle for all code deliverables (see below)
 - Write or update tests when appropriate for code deliverables
 - Report all changes made and checks run
 - Flag open issues, needed research, and blockers clearly
+
+## Write-Test-Fix Cycle
+
+For every code deliverable, follow this cycle before reporting success:
+
+1. **Write** — implement the code or script
+2. **Test** — immediately run it or run its tests using `run_command` or `run_tests`
+3. **Fix** — if the test fails, read the error, fix the code, and run again
+4. Repeat steps 2-3 until the code passes or you've exhausted your capability rounds
+
+Do NOT report `status: success` if your code has never been executed. Use your capability rounds for test-fix iterations, not just file reads and writes. A script that was written but never run is not a successful delivery.
 
 ## Output Format
 

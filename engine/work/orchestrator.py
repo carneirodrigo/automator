@@ -68,6 +68,99 @@ def _validate_agent_output(output: dict[str, Any], role: str) -> str | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Lightweight task planning — heuristic gate + minimal LLM call
+# ---------------------------------------------------------------------------
+
+# Signals that suggest a task needs planning before implementation.
+_COMPLEXITY_SIGNALS = re.compile(
+    r"\b("
+    r"and\s+then|step\s+\d|first.*then|after\s+that|finally"
+    r"|authenticate|credentials|secret|token|api\s+key"
+    r"|sharepoint|graph\s+api|power\s+bi|azure|qualys|defender"
+    r"|multiple|several|each|every|all\s+the"
+    r"|deploy|migrate|integrate|connect\s+to"
+    r")\w*\b",
+    re.IGNORECASE,
+)
+
+# Short, direct requests that don't need planning.
+_SIMPLICITY_SIGNALS = re.compile(
+    r"^(write|create|build|make|generate|add)\s+a?\s*(simple\s+)?(script|file|function|class|test|hello)",
+    re.IGNORECASE,
+)
+
+_PLANNING_PROMPT_TEMPLATE = """\
+You are a task planner. Analyse the request below and return a JSON object.
+
+Rules:
+- If the request is clear and self-contained, return a plan with ordered steps.
+- If critical information is missing (which system, what credentials, what format, what target), return questions.
+- Do NOT ask about things you can reasonably assume or discover during implementation.
+- Do NOT ask more than 3 questions. Focus on what blocks implementation.
+- Keep the plan to 3-7 steps. Each step should be one concrete action.
+
+Request: {request}
+
+Return exactly this JSON (no markdown fences, no prose):
+{{"plan": ["step 1", "step 2", ...], "questions": ["question for the user, if any"], "reasoning": "one line on why you chose plan-only or plan+questions"}}
+"""
+
+
+def _needs_planning(request: str) -> bool:
+    """Heuristic: does this request warrant a planning step?
+
+    Returns False for short, simple, or rework requests — these go straight
+    to the worker.  Returns True when multiple complexity signals are present.
+    """
+    # Never plan on rework, continue, or acceptance flows.
+    if any(kw in request.lower() for kw in ("rework required", "rework based on", "continue:")):
+        return False
+    # Very short requests are almost always simple.
+    words = request.split()
+    if len(words) < 10:
+        return False
+    # Count complexity signals — need at least 2 distinct matches.
+    matches = set(m.group().lower() for m in _COMPLEXITY_SIGNALS.finditer(request))
+    # For moderately short requests, simplicity signals override low complexity.
+    if _SIMPLICITY_SIGNALS.search(request) and len(matches) < 3:
+        return False
+    return len(matches) >= 2
+
+
+def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[str]:
+    """Check that files the worker claims to have created actually exist.
+
+    Returns a list of missing file descriptions (empty if all OK).
+    """
+    missing: list[str] = []
+    root = Path(project_root) if project_root else None
+
+    for entry in output.get("artifacts", []):
+        if not isinstance(entry, str) or not entry.strip():
+            continue
+        p = Path(entry)
+        if not p.is_absolute() and root:
+            p = root / entry
+        if not p.exists():
+            missing.append(f"artifact not found: {entry}")
+
+    for entry in output.get("changes_made", []):
+        if not isinstance(entry, str):
+            continue
+        # Format is "path/to/file: what changed" — extract the path part.
+        path_part = entry.split(":")[0].strip()
+        if not path_part or path_part.startswith("("):
+            continue
+        p = Path(path_part)
+        if not p.is_absolute() and root:
+            p = root / path_part
+        if not p.exists():
+            missing.append(f"changed file not found: {path_part}")
+
+    return missing
+
+
 def configure_orchestrator_environment(**kwargs: Any) -> None:
     _ENV.update(kwargs)
 
@@ -188,6 +281,11 @@ def run_orchestration(
             original = pending.get("original_request", request)
             worker_task = f"Rework based on user feedback:\n\n{feedback}\n\nOriginal task: {original}"
             emit_progress("[engine] User feedback received. Running rework.")
+        elif prior_type == "planning_questions":
+            # User answered planning questions — the plan is in task_state["plan"],
+            # and the user's answers are in `request`.  The planning injection
+            # below (the _has_prior_plan branch) will combine them.
+            worker_task = request
         else:
             worker_task = f"Continue: {pending.get('message', '')}. User input: {request}"
 
@@ -237,6 +335,64 @@ def run_orchestration(
         return 0
 
     project_inputs = _get_project_input_paths(active_project["project_id"])
+
+    # ── Lightweight planning for complex tasks ──────────────────────────────
+    # Only fires on fresh runs (no pending_resolution consumed above) when
+    # the heuristic detects complexity.  Uses a minimal prompt — no KB, no
+    # skills, no capability reference — to keep token cost low.
+    _has_prior_plan = bool(task_state.get("plan"))
+    if not _has_prior_plan and _needs_planning(worker_task):
+        emit_progress("[engine] Complex task detected — running lightweight planning step...")
+        planning_prompt = _PLANNING_PROMPT_TEMPLATE.format(request=worker_task)
+        plan_res = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "worker", planning_prompt, "Plan the task before implementation",
+                [], active_project, agent_bin,
+            ),
+            "worker", emit_progress,
+        )
+        plan_output = plan_res.get("output") or {} if plan_res.get("status") != "failed" else {}
+        plan_steps = plan_output.get("plan", [])
+        plan_questions = plan_output.get("questions", [])
+
+        if plan_steps:
+            task_state["plan"] = plan_steps
+            write_json(task_state_path, task_state)
+
+        if plan_questions:
+            questions_text = "\n".join(f"  {i+1}. {q}" for i, q in enumerate(plan_questions))
+            emit_progress(f"[engine] Planning identified questions:\n{questions_text}")
+            task_state["pending_resolution"] = {
+                "type":             "planning_questions",
+                "message":          f"Before starting, the engine needs clarification:\n{questions_text}",
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            _pid = active_project["project_id"]
+            emit_progress(
+                f"[engine] Answer the questions above to proceed:\n"
+                f"  ./automator --cli {agent_bin} --project continue --id {_pid} --task '<your answers>'"
+            )
+            return 0
+
+        if plan_steps:
+            numbered_plan = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(plan_steps))
+            worker_task = (
+                f"Execute this plan step by step:\n{numbered_plan}\n\n"
+                f"Original request: {worker_task}"
+            )
+            emit_progress(f"[engine] Plan ready ({len(plan_steps)} steps). Proceeding to worker.")
+
+    elif _has_prior_plan:
+        # Resume from a prior planning step — inject the stored plan.
+        plan_steps = task_state["plan"]
+        numbered_plan = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(plan_steps))
+        worker_task = (
+            f"Execute this plan step by step:\n{numbered_plan}\n\n"
+            f"Original request: {task_state.get('user_request', worker_task)}\n\n"
+            f"User clarifications: {worker_task}"
+        )
 
     # ── Stage resume: reuse successful worker output from a prior run ──────
     _resumed_worker = False
@@ -313,6 +469,13 @@ def run_orchestration(
             task_state["last_updated"] = now_iso()
             write_json(task_state_path, task_state)
             return 1
+
+        # Verify claimed delivery files actually exist on disk.
+        missing = _verify_delivery_files(worker_output_1, active_project.get("project_root", ""))
+        if missing:
+            for m in missing:
+                emit_progress(f"[engine] Delivery verification: {m}")
+            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) not found. Review will catch this.")
 
         worker_artifact = persist_result(active_project, "worker", worker_output_1)
         worker_summary  = worker_output_1.get("summary", "Worker completed.")
@@ -450,6 +613,19 @@ def run_orchestration(
     # is unparseable and should not be silently accepted as passing.
     review_status  = _normalize_review_status(review_output.get("status", "fail"))
     review_summary = review_output.get("summary", "Review completed.")
+
+    # Enforce review verification: a pass with no checks_run means the review
+    # didn't actually test anything — demote to fail.
+    if review_status == "pass" and not review_output.get("checks_run"):
+        review_status = "fail"
+        review_summary = "Review passed without running any checks — demoted to fail."
+        if not review_output.get("blocking"):
+            review_output["blocking"] = []
+        review_output["blocking"].append("Review must run at least one command or test before passing.")
+        if not review_output.get("rework_requests"):
+            review_output["rework_requests"] = []
+        review_output["rework_requests"].append("Re-run review with actual test execution.")
+        emit_progress("[engine] Review passed without running checks — treating as fail.")
     _record_step(task_state, "review", review_status, review_artifact, review_summary, now_iso)
     task_state["last_updated"] = now_iso()
     write_json(task_state_path, task_state)

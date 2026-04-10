@@ -33,6 +33,7 @@ class TaskState(TypedDict, total=False):
     last_updated: str                          # ISO-8601 UTC
     completed_steps: list[CompletedStep]
     completed_stages: list[str]                # stages that completed successfully (for resume)
+    plan: list[str]                            # planning step output (ordered implementation steps)
     pruned_environmental_steps: list[Any]
     artifacts: list[str]
     rework_loop_count: int
