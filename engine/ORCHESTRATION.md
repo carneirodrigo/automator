@@ -153,6 +153,13 @@ The engine runs a fixed lifecycle with no dynamic routing:
 3. `review` — verifies the output; one rework cycle is allowed if review fails
 4. `complete` — engine presents delivery files for user acceptance
 
+**Resilience features:**
+
+- **Transient retry:** Rate limits, timeouts, and provider errors are retried up to 2 times with exponential backoff (5s, 10s). Fatal errors (binary not found, permission denied) fail immediately.
+- **Output validation:** Each stage's output is checked for minimum required fields (worker: `summary`; review: `status`). Empty or structureless output fails the stage instead of passing silently.
+- **Review default:** If the review agent returns no `status` field (unparseable output), the engine defaults to "fail" and triggers a rework cycle rather than silently accepting broken work.
+- **Stage resume:** On `--project continue` after a failed review, the engine detects the prior successful worker artifact and skips directly to review instead of re-running the full pipeline.
+
 **Project IDs** are sequential numbers: `001`, `002`, `003`, etc.
 
 **Project Forking:** Use the keyword `fork` in your request, or the front-door CLI `./automator --cli <llm> --project fork --id <project-id> --task <description>`, to create a new project that inherits artifacts from an existing one. The engine copies selected artifacts from the source project and marks them as inherited.

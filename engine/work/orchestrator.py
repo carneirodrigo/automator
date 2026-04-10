@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time as _time_module
 from pathlib import Path
 from typing import Any
 
@@ -15,10 +16,56 @@ _ENV: dict[str, Any] = {}
 # broken work from being presented as complete.
 _REVIEW_PASS_VALUES = frozenset({"pass", "passed", "approve", "approved", "lgtm", "ok", "success"})
 
+# Error categories that are transient and worth retrying.
+_RETRIABLE_ERRORS = frozenset({"rate_limited", "timeout", "provider_error"})
+_MAX_STAGE_RETRIES = 2
+_RETRY_BACKOFF_BASE = 5  # seconds; doubles each retry
+
 
 def _normalize_review_status(raw: str) -> str:
     """Map an LLM review status to 'pass' or 'fail'."""
     return "pass" if raw.strip().lower() in _REVIEW_PASS_VALUES else "fail"
+
+
+def _run_with_retry(
+    run_fn: Any,
+    role: str,
+    emit_progress: Any,
+) -> dict[str, Any]:
+    """Run an agent stage with retry on transient errors.
+
+    Retries up to _MAX_STAGE_RETRIES times with exponential backoff for
+    rate_limited, timeout, and provider_error categories.
+    """
+    last_result: dict[str, Any] = {}
+    for attempt in range(_MAX_STAGE_RETRIES + 1):
+        last_result = run_fn()
+        if last_result["status"] != "failed":
+            return last_result
+        category = last_result.get("error_category", "unknown")
+        if category not in _RETRIABLE_ERRORS or attempt >= _MAX_STAGE_RETRIES:
+            return last_result
+        delay = _RETRY_BACKOFF_BASE * (2 ** attempt)
+        emit_progress(
+            f"[engine] {role} failed with {category} (attempt {attempt + 1}/{_MAX_STAGE_RETRIES + 1}). "
+            f"Retrying in {delay}s..."
+        )
+        _time_module.sleep(delay)
+    return last_result
+
+
+def _validate_agent_output(output: dict[str, Any], role: str) -> str | None:
+    """Check that agent output has minimum required fields.
+
+    Returns an error message if validation fails, None if output is acceptable.
+    """
+    if not output:
+        return f"{role} returned empty output"
+    if role in ("worker",) and not output.get("summary"):
+        return f"{role} output is missing 'summary' field"
+    if role == "review" and "status" not in output:
+        return f"review output is missing 'status' field — treating as fail"
+    return None
 
 
 def configure_orchestrator_environment(**kwargs: Any) -> None:
@@ -191,64 +238,96 @@ def run_orchestration(
 
     project_inputs = _get_project_input_paths(active_project["project_id"])
 
-    # ── Worker ───────────────────────────────────────────────────────────────
+    # ── Stage resume: reuse successful worker output from a prior run ──────
+    _resumed_worker = False
     worker_artifact: str = ""
-    emit_progress("[engine] Running worker...")
-    worker_res = run_agent_with_capabilities(
-        "worker", worker_task, "Implement the task",
-        project_inputs, active_project, agent_bin,
-    )
-    if worker_res["status"] == "failed":
-        emit_progress(
-            f"[engine] Worker failed ({worker_res.get('error_category', 'unknown')}): "
-            f"{worker_res.get('error', '')}"
+    worker_res: dict[str, Any] = {}
+
+    last_worker_step = None
+    for step in reversed(task_state.get("completed_steps", [])):
+        if step.get("agent") == "worker":
+            last_worker_step = step
+            break
+
+    if (last_worker_step
+            and last_worker_step.get("status") == "success"
+            and last_worker_step.get("artifact")
+            and Path(last_worker_step["artifact"]).exists()):
+        # Prior run completed the worker successfully — reload its output.
+        prior_output = load_json(Path(last_worker_step["artifact"]))
+        if prior_output and prior_output.get("summary"):
+            worker_artifact = last_worker_step["artifact"]
+            worker_res = {"status": "success", "output": prior_output}
+            _resumed_worker = True
+            emit_progress("[engine] Resuming from prior worker output — skipping to review.")
+
+    if not _resumed_worker:
+        emit_progress("[engine] Running worker...")
+        worker_res = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "worker", worker_task, "Implement the task",
+                project_inputs, active_project, agent_bin,
+            ),
+            "worker", emit_progress,
         )
-        return 1
+        if worker_res["status"] == "failed":
+            emit_progress(
+                f"[engine] Worker failed ({worker_res.get('error_category', 'unknown')}): "
+                f"{worker_res.get('error', '')}"
+            )
+            return 1
 
     worker_output_1 = worker_res.get("output") or {}
-    if worker_output_1.get("status") == "blocked":
-        blockers    = worker_output_1.get("open_issues", [])
-        blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
-        emit_progress(f"[engine] Worker blocked: {blocker_msg}")
+    if not _resumed_worker:
+        validation_err = _validate_agent_output(worker_output_1, "worker")
+        if validation_err:
+            emit_progress(f"[engine] Worker output validation failed: {validation_err}")
+            return 1
+    if not _resumed_worker:
+        if worker_output_1.get("status") == "blocked":
+            blockers    = worker_output_1.get("open_issues", [])
+            blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
+            emit_progress(f"[engine] Worker blocked: {blocker_msg}")
+            worker_artifact = persist_result(active_project, "worker", worker_output_1)
+            _record_step(task_state, "worker", "blocked", worker_artifact, blocker_msg, now_iso)
+            task_state["pending_resolution"] = {
+                "type":             "user_input_required",
+                "message":          blocker_msg,
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
+        if worker_output_1.get("needs_user_input"):
+            needed      = worker_output_1.get("open_issues", [])
+            needed_msg  = "; ".join(needed) or "Worker requires user input to continue."
+            emit_progress(f"[engine] Worker needs user input: {needed_msg}")
+            worker_artifact = persist_result(active_project, "worker", worker_output_1)
+            _record_step(task_state, "worker", "blocked", worker_artifact, needed_msg, now_iso)
+            task_state["pending_resolution"] = {
+                "type":             "user_input_required",
+                "message":          needed_msg,
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
         worker_artifact = persist_result(active_project, "worker", worker_output_1)
-        _record_step(task_state, "worker", "blocked", worker_artifact, blocker_msg, now_iso)
-        task_state["pending_resolution"] = {
-            "type":             "user_input_required",
-            "message":          blocker_msg,
-            "original_request": request,
-        }
+        worker_summary  = worker_output_1.get("summary", "Worker completed.")
+        _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)
-        return 1
-
-    if worker_output_1.get("needs_user_input"):
-        needed      = worker_output_1.get("open_issues", [])
-        needed_msg  = "; ".join(needed) or "Worker requires user input to continue."
-        emit_progress(f"[engine] Worker needs user input: {needed_msg}")
-        worker_artifact = persist_result(active_project, "worker", worker_output_1)
-        _record_step(task_state, "worker", "blocked", worker_artifact, needed_msg, now_iso)
-        task_state["pending_resolution"] = {
-            "type":             "user_input_required",
-            "message":          needed_msg,
-            "original_request": request,
-        }
-        task_state["last_updated"] = now_iso()
-        write_json(task_state_path, task_state)
-        return 1
-
-    worker_artifact = persist_result(active_project, "worker", worker_output_1)
-    worker_summary  = worker_output_1.get("summary", "Worker completed.")
-    _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
-    task_state["last_updated"] = now_iso()
-    write_json(task_state_path, task_state)
-    emit_progress(f"[engine] Worker done: {worker_summary}")
+        emit_progress(f"[engine] Worker done: {worker_summary}")
 
     # ── Optional research if worker flagged external unknowns ────────────────
+    # Skip research on resume — the resumed artifact already completed this path.
     research_questions = (
         [q for q in worker_output_1.get("open_issues", []) if isinstance(q, str) and q.strip()]
-        if worker_output_1.get("needs_research") else []
+        if worker_output_1.get("needs_research") and not _resumed_worker else []
     )
-    if worker_output_1.get("needs_research") and not research_questions:
+    if worker_output_1.get("needs_research") and not _resumed_worker and not research_questions:
         emit_progress("[engine] Worker flagged needs_research but provided no questions — skipping research.")
     if research_questions:
         questions = research_questions
@@ -259,9 +338,12 @@ def run_orchestration(
             + f"\n\nOriginal task: {worker_task}"
         )
         emit_progress("[engine] Worker needs research. Running research agent...")
-        research_res = run_agent_with_capabilities(
-            "research", research_task, "Answer worker's open questions",
-            project_inputs, active_project, agent_bin,
+        research_res = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "research", research_task, "Answer worker's open questions",
+                project_inputs, active_project, agent_bin,
+            ),
+            "research", emit_progress,
         )
         if research_res["status"] == "failed":
             emit_progress(f"[engine] Research failed: {research_res.get('error', '')}")
@@ -282,16 +364,25 @@ def run_orchestration(
             f"Questions answered: {numbered}. "
             f"Focus on `technical_data.answers[].implementation_notes` for direct guidance."
         )
-        worker_res = run_agent_with_capabilities(
-            "worker", f"{worker_task}\n\n{research_context}", "Implement the task using research findings",
-            [p for p in project_inputs + [research_artifact] if p],
-            active_project, agent_bin,
+        _post_research_inputs = [p for p in project_inputs + [research_artifact] if p]
+        _post_research_task = f"{worker_task}\n\n{research_context}"
+        worker_res = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "worker", _post_research_task, "Implement the task using research findings",
+                _post_research_inputs,
+                active_project, agent_bin,
+            ),
+            "worker", emit_progress,
         )
         if worker_res["status"] == "failed":
             emit_progress(f"[engine] Worker (post-research) failed: {worker_res.get('error', '')}")
             return 1
 
         worker_output = worker_res.get("output") or {}
+        validation_err = _validate_agent_output(worker_output, "worker")
+        if validation_err:
+            emit_progress(f"[engine] Worker (post-research) output validation failed: {validation_err}")
+            return 1
         if worker_output.get("status") == "blocked":
             blockers    = worker_output.get("open_issues", [])
             blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
@@ -338,10 +429,13 @@ def run_orchestration(
         review_context += "\nWorker flagged open issues:\n" + "\n".join(f"- {i}" for i in worker_open_issues)
     review_task = f"Review the worker output for this task:\n\n{worker_task}\n\n{review_context}"
     emit_progress("[engine] Running review...")
-    review_res = run_agent_with_capabilities(
-        "review", review_task, "Review worker delivery",
-        [p for p in project_inputs + [worker_artifact] if p],
-        active_project, agent_bin,
+    review_res = _run_with_retry(
+        lambda: run_agent_with_capabilities(
+            "review", review_task, "Review worker delivery",
+            [p for p in project_inputs + [worker_artifact] if p],
+            active_project, agent_bin,
+        ),
+        "review", emit_progress,
     )
     if review_res["status"] == "failed":
         emit_progress(
@@ -352,7 +446,9 @@ def run_orchestration(
 
     review_output  = review_res.get("output") or {}
     review_artifact = persist_result(active_project, "review", review_output)
-    review_status  = _normalize_review_status(review_output.get("status", "pass"))
+    # Default to "fail" — if the review agent returned no status field, the output
+    # is unparseable and should not be silently accepted as passing.
+    review_status  = _normalize_review_status(review_output.get("status", "fail"))
     review_summary = review_output.get("summary", "Review completed.")
     _record_step(task_state, "review", review_status, review_artifact, review_summary, now_iso)
     task_state["last_updated"] = now_iso()
@@ -375,10 +471,14 @@ def run_orchestration(
         write_json(task_state_path, task_state)
 
         emit_progress("[engine] Review requested rework. Running one rework cycle...")
-        worker_res2 = run_agent_with_capabilities(
-            "worker", rework_task, "Rework based on review feedback",
-            [p for p in project_inputs + [worker_artifact, review_artifact] if p],
-            active_project, agent_bin,
+        _rework_inputs = [p for p in project_inputs + [worker_artifact, review_artifact] if p]
+        worker_res2 = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "worker", rework_task, "Rework based on review feedback",
+                _rework_inputs,
+                active_project, agent_bin,
+            ),
+            "worker", emit_progress,
         )
         if worker_res2["status"] == "failed":
             emit_progress(f"[engine] Rework worker failed: {worker_res2.get('error', '')}")
@@ -431,10 +531,14 @@ def run_orchestration(
             + (f"\n\nThe worker was asked to apply these fixes:\n{fix_lines}" if fix_lines else "")
             + "\n\nVerify each issue above is resolved before passing."
         )
-        review_res2 = run_agent_with_capabilities(
-            "review", final_review_task, "Final review after rework",
-            [p for p in project_inputs + [worker_artifact2, review_artifact] if p],
-            active_project, agent_bin,
+        _final_review_inputs = [p for p in project_inputs + [worker_artifact2, review_artifact] if p]
+        review_res2 = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "review", final_review_task, "Final review after rework",
+                _final_review_inputs,
+                active_project, agent_bin,
+            ),
+            "review", emit_progress,
         )
         if review_res2["status"] == "failed":
             emit_progress(f"[engine] Final review failed: {review_res2.get('error', '')}")
@@ -442,7 +546,8 @@ def run_orchestration(
 
         review_output2  = review_res2.get("output") or {}
         review_artifact2 = persist_result(active_project, "review", review_output2)
-        review_status2  = _normalize_review_status(review_output2.get("status", "pass"))
+        # Same as first review: default to "fail" when status field is missing.
+        review_status2  = _normalize_review_status(review_output2.get("status", "fail"))
         review_summary2 = review_output2.get("summary", "Final review completed.")
         _record_step(task_state, "review", review_status2, review_artifact2, review_summary2, now_iso)
         task_state["last_updated"] = now_iso()

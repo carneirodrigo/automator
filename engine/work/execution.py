@@ -591,7 +591,12 @@ def run_agent_with_capabilities(
                 kept.append(entry)
                 total += len(entry)
             kept.reverse()
-            cumulative_results = "\n\n".join(kept)
+            dropped = len(all_round_results) - len(kept)
+            truncation_note = (
+                f"[engine] Note: {dropped} earlier capability round(s) "
+                f"were dropped to fit the context budget. Only the most recent rounds are shown."
+            )
+            cumulative_results = truncation_note + "\n\n" + "\n\n".join(kept)
         augmented_task = (
             f"{task}\n\n"
             f"Runtime Capability Results ({capability_round} round(s) so far):\n{cumulative_results}\n\n"

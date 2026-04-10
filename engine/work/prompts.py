@@ -486,7 +486,10 @@ def _build_knowledge_context(role: str, task: str = "", reason: str = "", projec
             sources_catalog = _load_json(KNOWLEDGE_SOURCES_PATH)
             sources_json = serialize_for_prompt(sources_catalog)
             if len(sources_json) > 35_000:
-                sources_json = sources_json[:35_000] + "\n... [TRUNCATED]"
+                sources_json = sources_json[:35_000] + (
+                    "\n... [TRUNCATED — source catalog exceeded 35KB context budget. "
+                    "Some source families may be missing. Use manifest lookup for complete coverage.]"
+                )
             context.extend([
                 "\nLocal Knowledge Source Catalog (use this to choose authoritative vendor/platform docs before open-ended search):",
                 sources_json,

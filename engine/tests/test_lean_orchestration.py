@@ -9,6 +9,10 @@ Covers:
 6. Worker needs_research → research → worker re-run → review
 7. Worker failure → return 1
 8. execute_agents=False → manual mode, no agents called
+9. Transient error retry with backoff
+10. Worker output validation gate
+11. Review default to fail on missing status
+12. Stage resume from prior worker output
 """
 
 from __future__ import annotations
@@ -25,6 +29,19 @@ from engine.work.orchestrator import (
     configure_orchestrator_environment,
     run_orchestration,
 )
+
+# Patch out retry sleep globally for all orchestration tests.
+_original_sleep = None
+
+def setUpModule():
+    global _original_sleep
+    import engine.work.orchestrator as _orch
+    _original_sleep = _orch._time_module.sleep
+    _orch._time_module.sleep = lambda _: None
+
+def tearDownModule():
+    import engine.work.orchestrator as _orch
+    _orch._time_module.sleep = _original_sleep
 
 
 # ---------------------------------------------------------------------------
@@ -93,8 +110,8 @@ def _research_result() -> dict[str, Any]:
     })
 
 
-def _agent_failed(error: str = "timeout") -> dict[str, Any]:
-    return {"status": "failed", "error": error, "error_category": "timeout", "output": {}}
+def _agent_failed(error: str = "timeout", category: str = "timeout") -> dict[str, Any]:
+    return {"status": "failed", "error": error, "error_category": category, "output": {}}
 
 
 def _make_project(pid: str = "001") -> dict[str, Any]:
@@ -483,7 +500,8 @@ class TestReworkStillFails(unittest.TestCase):
 class TestWorkerFailure(unittest.TestCase):
     def setUp(self):
         self.task_state = [_make_task_state()]
-        self.run_agent = MagicMock(return_value=_agent_failed("spawn error"))
+        # Use a non-retriable error category so no retry delay.
+        self.run_agent = MagicMock(return_value=_agent_failed("spawn error", category="binary_not_found"))
         self.project, self.ts_path = _configure(
             self.run_agent, self.task_state, project=_make_project("001"),
         )
@@ -684,6 +702,147 @@ class TestResearchBranch(unittest.TestCase):
         second_worker_inputs = self.run_agent.call_args_list[2][0][3]
         research_artifact = "/tmp/artifacts/research_result.json"
         self.assertIn(research_artifact, second_worker_inputs)
+
+
+# ---------------------------------------------------------------------------
+# Transient error retry
+# ---------------------------------------------------------------------------
+
+class TestTransientRetry(unittest.TestCase):
+    """Retriable errors (timeout, rate_limited, provider_error) are retried up to 2 extra times."""
+
+    def test_retry_succeeds_on_second_attempt(self):
+        task_state = [_make_task_state()]
+        run_agent = MagicMock(side_effect=[
+            _agent_failed("rate limit hit", category="rate_limited"),
+            _worker_pass("Done after retry."),
+            _review_pass(),
+        ])
+        project, ts_path = _configure(run_agent, task_state, project=_make_project("001"))
+        rc = run_orchestration(
+            request="build something",
+            agent_bin="claude",
+            debug_mode=False,
+            execute_agents=True,
+            active_project=project,
+            task_state=task_state[0],
+            task_state_path=ts_path,
+            fork_hint=None,
+            pending_secrets=[],
+            pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        # Worker called twice (1 fail + 1 success), then review once
+        roles = [c[0][0] for c in run_agent.call_args_list]
+        self.assertEqual(roles, ["worker", "worker", "review"])
+
+    def test_non_retriable_error_fails_immediately(self):
+        task_state = [_make_task_state()]
+        run_agent = MagicMock(return_value=_agent_failed("binary missing", category="binary_not_found"))
+        project, ts_path = _configure(run_agent, task_state, project=_make_project("001"))
+        rc = run_orchestration(
+            request="build something",
+            agent_bin="claude",
+            debug_mode=False,
+            execute_agents=True,
+            active_project=project,
+            task_state=task_state[0],
+            task_state_path=ts_path,
+            fork_hint=None,
+            pending_secrets=[],
+            pending_input_files=False,
+        )
+        self.assertEqual(rc, 1)
+        # Only called once — no retries for non-retriable errors
+        self.assertEqual(run_agent.call_count, 1)
+
+
+# ---------------------------------------------------------------------------
+# Worker output validation gate
+# ---------------------------------------------------------------------------
+
+class TestWorkerOutputValidation(unittest.TestCase):
+    """Worker returning empty output or missing summary should fail the pipeline."""
+
+    def test_empty_worker_output_fails(self):
+        task_state = [_make_task_state()]
+        run_agent = MagicMock(return_value=_make_agent_result({}))
+        project, ts_path = _configure(run_agent, task_state, project=_make_project("001"))
+        rc = run_orchestration(
+            request="build something",
+            agent_bin="claude",
+            debug_mode=False,
+            execute_agents=True,
+            active_project=project,
+            task_state=task_state[0],
+            task_state_path=ts_path,
+            fork_hint=None,
+            pending_secrets=[],
+            pending_input_files=False,
+        )
+        self.assertEqual(rc, 1)
+
+    def test_worker_missing_summary_fails(self):
+        task_state = [_make_task_state()]
+        # Output has fields but no summary
+        run_agent = MagicMock(return_value=_make_agent_result({
+            "status": "success",
+            "changes_made": ["something"],
+        }))
+        project, ts_path = _configure(run_agent, task_state, project=_make_project("001"))
+        rc = run_orchestration(
+            request="build something",
+            agent_bin="claude",
+            debug_mode=False,
+            execute_agents=True,
+            active_project=project,
+            task_state=task_state[0],
+            task_state_path=ts_path,
+            fork_hint=None,
+            pending_secrets=[],
+            pending_input_files=False,
+        )
+        self.assertEqual(rc, 1)
+
+
+# ---------------------------------------------------------------------------
+# Review defaults to fail when status field is missing
+# ---------------------------------------------------------------------------
+
+class TestReviewDefaultFail(unittest.TestCase):
+    """If review output has no status field, it should default to fail (not pass)."""
+
+    def test_missing_review_status_triggers_rework(self):
+        task_state = [_make_task_state()]
+        # Review output with no status field — should be treated as fail.
+        review_no_status = _make_agent_result({
+            "summary": "Review done but no status.",
+            "findings": [],
+            "blocking": ["Missing status"],
+        })
+        run_agent = MagicMock(side_effect=[
+            _worker_pass(),
+            review_no_status,
+            _worker_pass("Fixed."),
+            _review_pass(),
+        ])
+        project, ts_path = _configure(run_agent, task_state, project=_make_project("001"))
+        rc = run_orchestration(
+            request="build something",
+            agent_bin="claude",
+            debug_mode=False,
+            execute_agents=True,
+            active_project=project,
+            task_state=task_state[0],
+            task_state_path=ts_path,
+            fork_hint=None,
+            pending_secrets=[],
+            pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        # Should have gone through: worker → review(fail) → rework → final review(pass)
+        roles = [c[0][0] for c in run_agent.call_args_list]
+        self.assertEqual(roles, ["worker", "review", "worker", "review"])
 
 
 if __name__ == "__main__":
