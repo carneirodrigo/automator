@@ -29,7 +29,7 @@ Current techniques:
 
 17. **Structured host capabilities replacing raw subprocess output:** the 9 structured capabilities (`query_git_status`, `query_git_diff`, `query_git_log`, `search_code`, `run_tests`, `list_dir`, `find_files`, `stat_file`, `read_file_lines`) return typed structured data instead of raw subprocess text. Where an agent would previously call `run_command(["git", "status"])` and receive verbose human-readable output, it now receives a parsed `{branch, staged[], unstaged[], untracked[]}` object serialized in TOON. Structured results are significantly more compact than raw CLI output and eliminate the model's token cost of parsing unstructured text.
 
-18. **Agent rationalization guards:** each core agent spec includes a `## Common Rationalization Traps` section that names role-specific shortcuts that produce false passes. Preventing a single false pass avoids a full rework cycle. The guard text is injected into every agent prompt as part of the agent spec.
+18. **Agent rationalization guards:** agent specs include verification policies and scope rules that prevent role-specific shortcuts from producing false passes. The review spec requires at least one executed check before passing (engine-enforced), and the worker spec mandates a write-test-fix cycle. Preventing a single false pass avoids a full rework cycle.
 
 Non-goals:
 

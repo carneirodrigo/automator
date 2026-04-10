@@ -36,6 +36,8 @@ def build_agent_command(
     tells the CLI to read its full instructions from stdin.
     """
     parts = shlex.split(agent_bin)
+    if not parts:
+        raise ValueError(f"Invalid agent_bin: {agent_bin!r}")
     binary_name = parts[0].lower()
     cmd = [*parts]
     stdin_input: str | None = None

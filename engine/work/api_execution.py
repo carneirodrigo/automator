@@ -138,7 +138,7 @@ def _call_openai(
             messages=[{"role": "user", "content": prompt}],
             max_tokens=_DEFAULT_MAX_TOKENS,
         )
-        text = response.choices[0].message.content if response.choices else ""
+        text = response.choices[0].message.content if response.choices and len(response.choices) > 0 else ""
         return {"ok": True, "text": text or "", "error": ""}
     except Exception as exc:
         return {"ok": False, "error": _sanitize_api_error(str(exc), api_key), "text": ""}

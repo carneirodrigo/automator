@@ -344,7 +344,8 @@ def _is_backend_available(agent_bin: str) -> bool:
     # If global config is API mode, the configured provider is always "available"
     if _is_api_mode():
         return True
-    return shutil.which(shlex.split(agent_bin)[0]) is not None
+    parts = shlex.split(agent_bin)
+    return bool(parts) and shutil.which(parts[0]) is not None
 
 
 def run_runtime_check(agent_bin: str, timeout_seconds: int = 25) -> dict[str, Any]:

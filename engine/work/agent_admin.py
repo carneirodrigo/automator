@@ -31,7 +31,8 @@ def list_agents() -> list[dict[str, str]]:
     for path in sorted(AGENTS_DIR.glob("*.md")):
         title = path.stem
         try:
-            first_line = path.read_text(encoding="utf-8").splitlines()[0].strip()
+            lines = path.read_text(encoding="utf-8").splitlines()
+            first_line = lines[0].strip() if lines else ""
             if first_line.startswith("# "):
                 title = first_line[2:].strip()
         except OSError as exc:
