@@ -1,13 +1,7 @@
 {
   "user_request": "",
-  "active_agent": "",
   "completed_steps": [],
   "artifacts": [],
   "rework_loop_count": 0,
-  "last_updated": "",
-  "master_session": {},
-  "master_handoff": {},
-  "master_last_decision": {},
-  "persistent_sessions": {},
-  "persistent_handoffs": {}
+  "last_updated": ""
 }

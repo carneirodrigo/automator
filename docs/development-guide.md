@@ -23,9 +23,9 @@ The engine supports a fail-fast debug mode for reproducing orchestration faults 
 
 Invocation:
 
-- `./automator debug run --claude --project my-project "..."`
-- `./automator debug run --gemini --name smoke-project "..."`
-- `./automator debug run --codex "..."`
+- `./automator --cli claude --project new --debug --task "..."`
+- `./automator --cli gemini --project continue --debug --id my-project --task "..."`
+- `./automator --cli codex --project new --debug --task "..."`
 
 Intent:
 
