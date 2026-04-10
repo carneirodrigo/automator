@@ -17,7 +17,12 @@ def load_json(path: Path) -> Any:
     if not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        try:
+            return json.load(handle)
+        except json.JSONDecodeError as exc:
+            raise json.JSONDecodeError(
+                f"{exc.msg} (file: {path})", exc.doc[:200], exc.pos
+            ) from None
 
 
 def write_json(path: Path, data: Any) -> None:
