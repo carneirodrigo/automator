@@ -9,12 +9,11 @@ import os
 import re
 import shlex
 import shutil
-import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from dataclasses import asdict
-from typing import Any, Callable
+from typing import Any
 
 # --- Constants & Paths ---
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +21,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from engine.work.repo_paths import (
-    DEBUG_ISSUES_DIR,
     DEBUG_TRACKER_PATH,
     PROJECTS_DIR,
     RUNTIME_PROJECTS_DIR,
@@ -32,13 +30,9 @@ from engine.work.repo_paths import (
     INPUTS_DIR,
     SKILLS_CATALOG_PATH,
     SKILLS_DIR,
-    ensure_within_repo,
-    managed_project_root,
-    project_secrets_path,
-    validate_project_paths,
 )
 from engine.work.toon_adapter import serialize_for_prompt, serialize_artifact_for_prompt, is_toon_available
-from engine.work.secret_detector import detect_secrets, redact_secrets, scan_for_leaked_values
+from engine.work.secret_detector import detect_secrets, redact_secrets
 from engine.work import prompts as prompt_work
 from engine.work.debug_store import record_debug_issue as _record_debug_issue
 from engine.work.capabilities import (
@@ -87,7 +81,6 @@ from engine.work.api_execution import run_agent_api as _run_agent_api, runtime_c
 from engine.work.orchestration_state import (
     CMD_OUTPUT_INLINE_LIMIT,
     DATA_FILE_EXTENSIONS,
-    DEBUG_TRACKER_VERSION,
     MAX_CAPABILITY_ROUNDS,
     MAX_CAPABILITY_WRITE_SIZE,
     MAX_FILE_READ_SIZE,

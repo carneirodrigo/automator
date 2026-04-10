@@ -451,7 +451,7 @@ def run_orchestration(
             ),
             "worker", emit_progress,
         )
-        if worker_res["status"] == "failed":
+        if worker_res.get("status") == "failed":
             emit_progress(
                 f"[engine] Worker failed ({worker_res.get('error_category', 'unknown')}): "
                 f"{worker_res.get('error', '')}"
@@ -533,7 +533,7 @@ def run_orchestration(
             ),
             "research", emit_progress,
         )
-        if research_res["status"] == "failed":
+        if research_res.get("status") == "failed":
             emit_progress(f"[engine] Research failed: {research_res.get('error', '')}")
             return 1
 
@@ -562,7 +562,7 @@ def run_orchestration(
             ),
             "worker", emit_progress,
         )
-        if worker_res["status"] == "failed":
+        if worker_res.get("status") == "failed":
             emit_progress(f"[engine] Worker (post-research) failed: {worker_res.get('error', '')}")
             return 1
 
@@ -625,7 +625,7 @@ def run_orchestration(
         ),
         "review", emit_progress,
     )
-    if review_res["status"] == "failed":
+    if review_res.get("status") == "failed":
         emit_progress(
             f"[engine] Review failed ({review_res.get('error_category', 'unknown')}): "
             f"{review_res.get('error', '')}"
@@ -681,7 +681,7 @@ def run_orchestration(
             ),
             "worker", emit_progress,
         )
-        if worker_res2["status"] == "failed":
+        if worker_res2.get("status") == "failed":
             emit_progress(f"[engine] Rework worker failed: {worker_res2.get('error', '')}")
             return 1
 
@@ -741,7 +741,7 @@ def run_orchestration(
             ),
             "review", emit_progress,
         )
-        if review_res2["status"] == "failed":
+        if review_res2.get("status") == "failed":
             emit_progress(f"[engine] Final review failed: {review_res2.get('error', '')}")
             return 1
 

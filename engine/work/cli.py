@@ -12,7 +12,7 @@ from engine.work import config_wizard
 from engine.work import debug_supervisor
 from engine.work import engine_runtime
 from engine.work import skill_sync
-from engine.work.repo_paths import PROJECTS_DIR, REGISTRY_PATH
+from engine.work.repo_paths import REGISTRY_PATH
 
 _LEGACY_FLAGS = {
     "--claude", "--gemini", "--codex", "--agent-bin",

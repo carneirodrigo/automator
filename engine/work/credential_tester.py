@@ -9,7 +9,6 @@ credentials are usable before proceeding with credentialed work.
 from __future__ import annotations
 
 import base64
-import json
 import re
 from dataclasses import dataclass
 from enum import Enum
