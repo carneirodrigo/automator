@@ -154,37 +154,6 @@ def runtime_checks(
     return [run_runtime_check(backend) for backend in backends]
 
 
-def extract_summary(role: str, output: dict[str, Any]) -> str:
-    """Extract a human-readable summary from an agent's output."""
-    for key in (
-        "summary",
-        "message",
-        "latest_stage_summary",
-        "latest_result_summary",
-        "description",
-    ):
-        val = output.get(key)
-        if isinstance(val, str) and val:
-            return val
-
-    for wrapper_key in ("status_for_user", "status", "visible_status"):
-        wrapper = output.get(wrapper_key)
-        if isinstance(wrapper, dict):
-            for inner_key in ("latest_result_summary", "current_status", "latest_result"):
-                val = wrapper.get(inner_key)
-                if isinstance(val, str) and val:
-                    return val
-
-    if output.get("decision") == "route" and output.get("target_agent"):
-        reason = output.get("reason_for_routing", "")
-        summary = f"Routing to {output['target_agent']}"
-        if reason:
-            summary += f": {reason}"
-        return summary
-
-    return "No summary provided."
-
-
 def persist_result(
     project: dict[str, Any],
     role: str,
@@ -446,7 +415,6 @@ def run_agent(
     )
     prompt_tokens = estimate_tokens(prompt)
     cmd, stdin_input = build_agent_command(agent_bin, prompt, session=session)
-    is_toon_available()
     emit_progress(stage_start_message(role, task, prompt_tokens=prompt_tokens))
 
     cwd = project["project_root"] if project else repo_root

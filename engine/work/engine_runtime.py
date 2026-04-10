@@ -500,8 +500,6 @@ def close_project(project_id: str, agent_bin: str | None = None) -> int:
 
 def _extract_project_knowledge(project: dict, task_state: dict) -> None:
     """Save a compact KB entry from the project's final worker artifact."""
-    import re as _re
-
     artifacts_dir = Path(project["runtime_dir"]) / "artifacts"
     if not artifacts_dir.exists():
         return
@@ -534,7 +532,7 @@ def _extract_project_knowledge(project: dict, task_state: dict) -> None:
     project_name = project.get("project_name", project_id)
 
     # Derive a slug from the project name
-    slug = _re.sub(r"[^\w]+", "-", project_name.lower()).strip("-")[:60]
+    slug = re.sub(r"[^\w]+", "-", project_name.lower()).strip("-")[:60]
     entry_id = f"project-{project_id}-{slug}"
     filename = f"{entry_id}.json"
     kb_path = KNOWLEDGE_DIR / filename

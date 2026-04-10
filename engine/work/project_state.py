@@ -69,7 +69,6 @@ def bootstrap_project(
 
     if state_template_path.exists():
         state = load_json(state_template_path)
-        state["task_id"] = f"{project_id}-init"
         write_json(runtime_dir / "state" / "active_task.json", state)
 
     if config_template_path.exists():
