@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -28,24 +27,9 @@ def stage_start_message(role: str, task: str, *, prompt_tokens: int = 0) -> str:
     return f"{role}: starting{token_hint}"
 
 
-def stage_done_message(role: str, summary: str | None = None) -> str:
-    # Show the agent's own summary in full — truncating it mid-sentence is worse
-    # than showing nothing. Collapse whitespace but do not cut.
-    if not summary:
-        return f"{role}: done"
-    collapsed = _WHITESPACE_RE.sub(" ", summary).strip()
-    if not collapsed or collapsed.lower() == "no summary provided.":
-        return f"{role}: done"
-    return f"{role}: {collapsed}"
-
-
 def capability_message(role: str, capability: str) -> str:
     capability_name = summarize_text(capability, max_len=32) or "capability"
     return f"{role}: requested {capability_name}"
-
-
-def next_stage_message(role: str) -> str:
-    return f"engine: running {role} next"
 
 
 def elapsed_label(elapsed_seconds: float) -> str:
@@ -66,44 +50,6 @@ def heartbeat_message(role: str, started_at: datetime, *, now: datetime | None =
     if elapsed_seconds >= 120:
         return f"{role}: still running ({label}) — working, please wait"
     return f"{role}: still running ({label})"
-
-
-def run_summary_message(task_state: dict[str, Any], mode: str, *, max_stages: int = 12) -> str:
-    """Build a compact end-of-run summary block."""
-    _OUTCOME_LABELS = {
-        "complete": "complete — awaiting your response",
-        "blocked": "blocked — engine could not proceed",
-        "needs_clarification": "paused — clarification needed",
-        "rework_limit": "stopped — rework loop limit reached",
-        "manual": "stopped — manual mode",
-        "error": "stopped — unrecoverable error",
-    }
-    outcome = _OUTCOME_LABELS.get(mode, mode)
-
-    completed = task_state.get("completed_steps", [])
-    visible = completed
-
-    lines = [
-        "[engine] ── Run summary ──────────────────────────────────────",
-        f"[engine]  Outcome : {outcome}",
-    ]
-
-    if visible:
-        display = visible[-max_stages:] if len(visible) > max_stages else visible
-        stage_parts = []
-        for s in display:
-            agent = s.get("agent", "?")
-            status = s.get("status", "success")
-            stage_parts.append(f"{agent}[FAIL]" if status in ("failed", "blocked") else agent)
-        prefix = f"...+{len(visible) - max_stages} earlier... → " if len(visible) > max_stages else ""
-        lines.append(f"[engine]  Stages  : {prefix}{' → '.join(stage_parts)}")
-
-    rework = task_state.get("rework_loop_count", 0)
-    if rework:
-        lines.append(f"[engine]  Rework  : {rework} {'cycle' if rework == 1 else 'cycles'}")
-
-    lines.append("[engine] ─────────────────────────────────────────────────────")
-    return "\n".join(lines)
 
 
 def should_emit_heartbeat(

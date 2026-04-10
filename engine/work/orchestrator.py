@@ -42,8 +42,15 @@ def _next_project_id(registry: dict[str, Any]) -> str:
 
 
 def _project_name_from_request(request: str) -> str:
-    words = re.sub(r"[^\w\s]", "", request).split()
-    return " ".join(w.capitalize() for w in words[:5]) or "Untitled Project"
+    # Strip engine-injected framing so the name reflects the user's actual task.
+    cleaned = re.sub(
+        r"^(?:start\s+new\s+project\.?\s*(?:task:\s*)?|fork\s+\S+\s+into\s+a\s+new\s+project\.?\s*(?:task:\s*)?)",
+        "",
+        request,
+        flags=re.IGNORECASE,
+    ).strip()
+    words = re.sub(r"[^\w\s]", "", cleaned or request).split()
+    return " ".join(w.capitalize() for w in words[:6]) or "Untitled Project"
 
 
 def _record_step(

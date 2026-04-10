@@ -160,7 +160,6 @@ def record_debug_issue(
         },
         "stage_context": ctx_to_dict(ctx) if ctx else None,
         "task_state_summary": {
-            "active_agent": task_state.get("active_agent") if task_state else None,
             "last_updated": task_state.get("last_updated") if task_state else None,
             "completed_step_count": len(task_state.get("completed_steps", [])) if task_state else 0,
             "artifact_count": len(task_state.get("artifacts", [])) if task_state else 0,

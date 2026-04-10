@@ -178,11 +178,22 @@ class TestNextProjectId(unittest.TestCase):
 
 
 class TestProjectNameFromRequest(unittest.TestCase):
-    def test_capitalises_first_five_words(self):
+    def test_capitalises_first_words(self):
         self.assertEqual(
             _project_name_from_request("build a script to fetch github issues"),
-            "Build A Script To Fetch",
+            "Build A Script To Fetch Github",
         )
+
+    def test_strips_new_project_framing(self):
+        self.assertEqual(
+            _project_name_from_request("start new project. Task: write a fibonacci script"),
+            "Write A Fibonacci Script",
+        )
+
+    def test_strips_fork_framing(self):
+        name = _project_name_from_request("fork my-project into a new project. Task: add retry logic")
+        self.assertNotIn("fork", name.lower())
+        self.assertIn("Retry", name)
 
     def test_strips_punctuation(self):
         name = _project_name_from_request("create: a hello-world script!")

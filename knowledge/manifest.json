@@ -2875,7 +2875,7 @@
       "updated": "2026-04-03T00:00:00Z",
       "last_verified": "2026-04-03T00:00:00Z",
       "fresh_until": "2027-06-01T00:00:00Z",
-      "summary": "Connector 110s timeout and 500k row limit. No native pagination — time-window decomposition pattern with Until loop. Cross-workspace KQL via workspace() function. Multi-workspace fan-out via Log Analytics REST API. Compose for large result caching."
+      "summary": "Connector 110s timeout and 500k row limit. No native pagination \u2014 time-window decomposition pattern with Until loop. Cross-workspace KQL via workspace() function. Multi-workspace fan-out via Log Analytics REST API. Compose for large result caching."
     },
     {
       "id": "logic-apps-msi-arm-http-auth-pattern",
