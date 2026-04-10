@@ -101,8 +101,8 @@ Each role is restricted to a specific set of capabilities. Requesting a capabili
 
 | Role | Allowed capabilities |
 |---|---|
-| `worker` | `write_file`, `run_command`, `run_tests`, `save_memory`, `http_request_with_secret_binding`, `test_credentials`, all platform caps (`validate_logic_app_workflow`, `deploy_logic_app_definition`, `create_sharepoint_list_schema`, `create_powerbi_import_bundle`, `powerbi_import_artifact`, `powerbi_trigger_refresh`, `powerbi_check_refresh_status`), all read/git/secrets caps — deployment guarded by `delivery_mode: build_and_deploy` + operator prompt |
-| `research` | `http_request_with_secret_binding`, `test_credentials`, `persist_artifact`, `save_memory`, all read/secrets caps — no `write_file`, `run_command`, or deployment |
+| `worker` | `write_file`, `run_command`, `run_tests`, `persist_artifact`, `load_memory`, `save_memory`, `http_request_with_secret_binding`, `test_credentials`, all platform caps (`validate_logic_app_workflow`, `deploy_logic_app_definition`, `create_sharepoint_list_schema`, `create_powerbi_import_bundle`, `powerbi_import_artifact`, `powerbi_trigger_refresh`, `powerbi_check_refresh_status`), all read/git/secrets caps — deployment guarded by `delivery_mode: build_and_deploy` + operator prompt |
+| `research` | `http_request_with_secret_binding`, `test_credentials`, `persist_artifact`, `load_memory`, `save_memory`, all read/secrets caps — no `write_file`, `run_command`, or deployment |
 | `review` | `run_command`, `run_tests`, `persist_artifact`, all read/git/secrets caps — no `write_file` or deployment |
 
 ### Engine-created path tracking and write protection

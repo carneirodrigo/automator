@@ -35,7 +35,7 @@ def _needs_quoting(s: str) -> bool:
     if _LOOKS_NUMERIC.match(s):
         return True
     # Characters that would be ambiguous in TOON context
-    if any(c in s for c in (",", "\n", "\r", "\t")):
+    if any(c in s for c in (":", ",", "\n", "\r", "\t")):
         return True
     # Leading/trailing whitespace
     if s != s.strip():

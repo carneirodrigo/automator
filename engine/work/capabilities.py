@@ -864,7 +864,7 @@ def _check_write_path_allowed(safe_path: Path, capability: str) -> dict[str, Any
     """Shared check: block writes to protected directories (engine/, agents/, docs/, etc.)."""
     from engine.work.repo_paths import REPO_ROOT  # noqa: PLC0415
     try:
-        rel = str(safe_path.relative_to(REPO_ROOT)).replace("\\", "/")
+        rel = str(safe_path.resolve().relative_to(REPO_ROOT.resolve())).replace("\\", "/")
     except ValueError:
         return None
     from engine.work.destructive_guard import _PROTECTED_WRITE_PREFIXES  # noqa: PLC0415
@@ -880,6 +880,8 @@ def _check_write_path_allowed(safe_path: Path, capability: str) -> dict[str, Any
 
 
 def _cap_create_sharepoint_list_schema(capability: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    infer_project_id = _require("_infer_project_id_from_path")
+    get_project_secret_values = _require("_get_project_secret_values")
     target_path = arguments.get("path", "")
     schema = arguments.get("schema")
     if not target_path or schema is None:
@@ -889,6 +891,14 @@ def _cap_create_sharepoint_list_schema(capability: str, arguments: dict[str, Any
         blocked = _check_write_path_allowed(safe_path, capability)
         if blocked:
             return blocked
+        serialized = json.dumps(schema)
+        project_id = infer_project_id(safe_path)
+        if project_id:
+            secret_values = get_project_secret_values(project_id)
+            if secret_values:
+                leaked = scan_for_leaked_values(serialized, secret_values)
+                if leaked:
+                    return {"capability": capability, "status": "failed", "result": None, "issues": [f"BLOCKED: Content contains secret value(s): {', '.join(leaked)}."]}
         _write_json_file(safe_path, schema)
         return {"capability": capability, "status": "ok", "result": {"path": target_path}, "issues": []}
     except (ValueError, OSError) as exc:
@@ -896,6 +906,8 @@ def _cap_create_sharepoint_list_schema(capability: str, arguments: dict[str, Any
 
 
 def _cap_create_powerbi_import_bundle(capability: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    infer_project_id = _require("_infer_project_id_from_path")
+    get_project_secret_values = _require("_get_project_secret_values")
     target_path = arguments.get("path", "")
     bundle = arguments.get("bundle")
     if not target_path or bundle is None:
@@ -905,6 +917,14 @@ def _cap_create_powerbi_import_bundle(capability: str, arguments: dict[str, Any]
         blocked = _check_write_path_allowed(safe_path, capability)
         if blocked:
             return blocked
+        serialized = json.dumps(bundle)
+        project_id = infer_project_id(safe_path)
+        if project_id:
+            secret_values = get_project_secret_values(project_id)
+            if secret_values:
+                leaked = scan_for_leaked_values(serialized, secret_values)
+                if leaked:
+                    return {"capability": capability, "status": "failed", "result": None, "issues": [f"BLOCKED: Content contains secret value(s): {', '.join(leaked)}."]}
         _write_json_file(safe_path, bundle)
         return {"capability": capability, "status": "ok", "result": {"path": target_path}, "issues": []}
     except (ValueError, OSError) as exc:

@@ -94,7 +94,7 @@ def build_catalog(repo_filter: str | None = None, *, write_catalog: bool = True)
                 continue
 
             fm = parsed["frontmatter"]
-            skill_id = f"{repo_id}--{fm.get('name', skill_dir.name)}"
+            skill_id = f"{repo_id}--{skill_dir.name}"
 
             entry = {
                 "id": skill_id,
