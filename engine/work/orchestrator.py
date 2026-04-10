@@ -91,14 +91,24 @@ _SIMPLICITY_SIGNALS = re.compile(
 )
 
 _PLANNING_PROMPT_TEMPLATE = """\
-You are a task planner. Analyse the request below and return a JSON object.
+You are a task planner for an autonomous coding engine. Analyse the request and return a JSON object.
+
+Context:
+- The worker can write Python, call REST APIs, create documents, and run shell commands.
+- Credentials are provided by the user as files in the inputs/ directory (e.g. inputs/creds.json, inputs/secrets.txt). The engine auto-detects and vaults them.
+- The worker has access to a local knowledge base with API patterns for Microsoft Graph, Azure, SharePoint, Power BI, Qualys, and Defender.
+- The worker cannot ask follow-up questions once started — anything unclear must be resolved now.
 
 Rules:
-- If the request is clear and self-contained, return a plan with ordered steps.
-- If critical information is missing (which system, what credentials, what format, what target), return questions.
-- Do NOT ask about things you can reasonably assume or discover during implementation.
+- Return a plan with 3-7 ordered steps. Each step is one concrete action.
+- Return questions when critical prerequisites are missing. You MUST ask if:
+  * The task references an external API or service but no credentials or auth method is mentioned.
+  * The task mentions a specific resource (tenant, site, repo, workspace) but doesn't identify which one.
+  * The task is ambiguous about output format or destination (e.g. "store the results" — where?).
+- Frame credential questions as: "Please provide <what> in the inputs/ directory (e.g. inputs/<filename>)."
+- Do NOT ask about things the worker can discover by reading code, APIs, or the KB.
 - Do NOT ask more than 3 questions. Focus on what blocks implementation.
-- Keep the plan to 3-7 steps. Each step should be one concrete action.
+- If no questions are needed, return an empty questions list.
 
 Request: {request}
 
