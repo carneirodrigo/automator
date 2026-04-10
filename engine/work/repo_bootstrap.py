@@ -55,11 +55,11 @@ __pycache__/
 *.pyc
 .venv/
 
-# Auto-created symlinks (engine creates on run)
-ORCHESTRATION.md
-AGENTS.md
-CLAUDE.md
-GEMINI.md
+# Auto-created symlinks (engine creates on run — root-level only)
+/ORCHESTRATION.md
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
 
 # Security (local config/secrets)
 .env
