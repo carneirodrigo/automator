@@ -43,7 +43,7 @@ Install these separately—they are not Python packages.
 At least one is required as the engine spawns it via subprocess.
 
 - **Claude Code**: `npm install -g @anthropic-ai/claude-code`
-- **Gemini CLI**: `npm install -g @google-gemini/gemini-cli`
+- **Gemini CLI**: `npm install -g @google/gemini-cli`
 - **Codex CLI**: `npm install -g @openai/codex` (experimental)
 
 #### Usage
