@@ -898,6 +898,22 @@ class TestVerifyDeliveryFiles(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_relative_path_from_cwd(self):
+        """Relative paths should resolve from cwd (repo root), not project_root."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=".py", dir=os.getcwd()
+        ) as f:
+            f.write(b"print('hello')")
+            relpath = os.path.basename(f.name)
+        try:
+            result = _verify_delivery_files(
+                {"artifacts": [relpath]}, "/tmp/not_repo_root"
+            )
+            self.assertEqual(result, [])
+        finally:
+            os.unlink(f.name)
+
     def test_missing_file_flagged(self):
         result = _verify_delivery_files(
             {"artifacts": ["/tmp/nonexistent_12345.py"]}, "/tmp"

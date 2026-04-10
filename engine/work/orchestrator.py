@@ -132,17 +132,28 @@ def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[st
     """Check that files the worker claims to have created actually exist.
 
     Returns a list of missing file descriptions (empty if all OK).
+    Workers run from the repo root, so relative paths are tried from cwd first,
+    then from project_root as a fallback.
     """
     missing: list[str] = []
     root = Path(project_root) if project_root else None
 
+    def _exists(raw_path: str) -> bool:
+        p = Path(raw_path)
+        if p.is_absolute():
+            return p.exists()
+        # Try from cwd (repo root) first — workers typically use repo-relative paths.
+        if p.exists():
+            return True
+        # Fallback: try relative to project_root.
+        if root and (root / raw_path).exists():
+            return True
+        return False
+
     for entry in output.get("artifacts", []):
         if not isinstance(entry, str) or not entry.strip():
             continue
-        p = Path(entry)
-        if not p.is_absolute() and root:
-            p = root / entry
-        if not p.exists():
+        if not _exists(entry):
             missing.append(f"artifact not found: {entry}")
 
     for entry in output.get("changes_made", []):
@@ -152,10 +163,7 @@ def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[st
         path_part = entry.split(":")[0].strip()
         if not path_part or path_part.startswith("("):
             continue
-        p = Path(path_part)
-        if not p.is_absolute() and root:
-            p = root / path_part
-        if not p.exists():
+        if not _exists(path_part):
             missing.append(f"changed file not found: {path_part}")
 
     return missing
