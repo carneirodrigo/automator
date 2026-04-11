@@ -1,0 +1,87 @@
+{
+  "id": "entra-id-app-registration-rbac-patterns",
+  "title": "Entra ID — App Registrations, Service Principals, API Permissions, RBAC",
+  "source_family": "microsoft-graph",
+  "coverage_type": "patterns",
+  "applies_to": ["Entra ID app registration", "Service principal management", "API permissions", "Azure RBAC", "App consent"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "App registration vs service principal: app registration is the global identity definition (in the home tenant). Service principal is the local instance in a tenant. One app registration can have service principals in multiple tenants.",
+      "source_url": "https://learn.microsoft.com/en-us/entra/identity-platform/app-objects-and-service-principals",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List app registrations: GET https://graph.microsoft.com/v1.0/applications — returns {value: [{id, appId, displayName, requiredResourceAccess}]}",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/application-list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List service principals: GET https://graph.microsoft.com/v1.0/servicePrincipals — filter by appId: ?$filter=appId eq '{appId}'",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Two types of permissions: 'Delegated' (user context, requires user sign-in) and 'Application' (app-only, daemon/service). For automation, use Application permissions.",
+      "source_url": "https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Application permissions require admin consent. Delegated permissions may require admin consent depending on the permission (check 'Admin consent required' column in docs).",
+      "source_url": "https://learn.microsoft.com/en-us/entra/identity-platform/permissions-consent-overview",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Grant admin consent via Graph: POST /servicePrincipals/{spId}/appRoleAssignments with {principalId: spId, resourceId: targetSpId, appRoleId: roleId}",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-post-approleassignments",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Microsoft Graph resource service principal appId: '00000003-0000-0000-c000-000000000000'. Use this to find the resourceId for Graph API role assignments.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/permissions-reference",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Azure RBAC role assignments (for ARM/Sentinel/etc): PUT https://management.azure.com/{scope}/providers/Microsoft.Authorization/roleAssignments/{assignmentId}?api-version=2022-04-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/authorization/role-assignments/create",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common Azure RBAC role definition IDs: Reader=acdd72a7-3385-48ef-bd42-f606fba81ae7, Contributor=b24988ac-6180-42a0-ab88-20f7382dd24c, Microsoft Sentinel Reader=8d289c81-5878-46d4-8554-54e1e3d8b5cb",
+      "source_url": "https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Check granted permissions: GET /servicePrincipals/{spId}/appRoleAssignments — shows which API permissions have been granted via admin consent",
+      "source_url": "https://learn.microsoft.com/en-us/graph/api/serviceprincipal-list-approleassignments",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common Graph Application permission role IDs: User.Read.All=df021288-bdef-4463-88db-98f22de89214, Mail.Read=810c84a8-4a9e-49e6-bf7d-12d183f40d01, SecurityEvents.Read.All=bf394140-e372-4bf9-a898-299cfc7564e5",
+      "source_url": "https://learn.microsoft.com/en-us/graph/permissions-reference",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/entra/identity-platform/app-objects-and-service-principals",
+    "https://learn.microsoft.com/en-us/graph/permissions-reference",
+    "https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles"
+  ],
+  "implementation_notes": [
+    "Find the service principal for your app:\n```python\ndef get_sp_by_app_id(session, app_id):\n    url = 'https://graph.microsoft.com/v1.0/servicePrincipals'\n    params = {'$filter': f\"appId eq '{app_id}'\"}\n    resp = session.get(url, params=params, timeout=(10, 30))\n    resp.raise_for_status()\n    sps = resp.json().get('value', [])\n    return sps[0] if sps else None\n```",
+    "Check what API permissions are granted to an app:\n```python\ndef get_granted_permissions(session, sp_id):\n    url = f'https://graph.microsoft.com/v1.0/servicePrincipals/{sp_id}/appRoleAssignments'\n    resp = session.get(url, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json().get('value', [])\n```",
+    "Audit all app registrations with their permissions:\n```python\ndef audit_apps(session):\n    apps = graph_paginate(session, 'https://graph.microsoft.com/v1.0/applications', params={'$select': 'id,appId,displayName,requiredResourceAccess'})\n    for app in apps:\n        sp = get_sp_by_app_id(session, app['appId'])\n        if sp:\n            app['granted'] = get_granted_permissions(session, sp['id'])\n    return apps\n```",
+    "Distinguish API permissions (Graph) from Azure RBAC roles:\n- Graph API permissions: granted via servicePrincipals/{id}/appRoleAssignments against the Graph resource SP\n- Azure RBAC roles: granted via ARM /roleAssignments endpoint on a scope (subscription, resource group, resource)\n- An app that calls both Graph AND ARM needs BOTH types configured"
+  ],
+  "caveats": [
+    "Application permissions and Azure RBAC roles are completely separate systems — having User.Read.All (Graph) does NOT grant Reader (ARM)",
+    "App registrations are listed via Graph (/applications), but RBAC role assignments are via ARM (/roleAssignments) — different auth scopes",
+    "The 'id' field on an app registration is the object ID (for Graph calls). The 'appId' field is the application/client ID (for auth flows). They are different.",
+    "Deleting an app registration does NOT automatically remove its service principal or RBAC role assignments — orphaned permissions can persist",
+    "requiredResourceAccess on the app registration shows REQUESTED permissions. appRoleAssignments on the SP shows GRANTED permissions. They may differ if admin consent was not given."
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["ms-graph-oauth2-client-credentials", "ms-graph-entra-id-users-groups-service-principals", "azure-resource-manager-rest-api-patterns", "ms-graph-security-authorization"],
+  "source_projects": ["shared-seed"]
+}

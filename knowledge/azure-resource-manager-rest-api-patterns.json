@@ -1,0 +1,85 @@
+{
+  "id": "azure-resource-manager-rest-api-patterns",
+  "title": "Azure Resource Manager REST API — Auth, Subscriptions, Resources",
+  "source_family": "azure",
+  "coverage_type": "endpoint",
+  "applies_to": ["Azure resource management", "ARM REST API", "Azure subscriptions", "Resource group operations", "Azure inventory"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "ARM base URL: https://management.azure.com — all endpoints use this base with api-version query param",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Auth: OAuth2 client_credentials with scope=https://management.azure.com/.default (NOT graph.microsoft.com)",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/azure/#register-your-client-application-with-azure-ad",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List subscriptions: GET /subscriptions?api-version=2022-12-01 — returns {value: [{subscriptionId, displayName, state, tenantId}]}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/subscriptions/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List resource groups: GET /subscriptions/{subId}/resourcegroups?api-version=2024-03-01 — returns {value: [{name, location, properties.provisioningState}]}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/resource-groups/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List all resources in subscription: GET /subscriptions/{subId}/resources?api-version=2024-03-01 — supports $filter, $top, $expand",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/resources/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Filter resources by type: ?$filter=resourceType eq 'Microsoft.Compute/virtualMachines' — OData filter syntax",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/resources/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Pagination: ARM uses {nextLink} field (not @odata.nextLink) for paginated responses",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/azure/#async-operations-throttling-and-paging",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Throttling: ARM returns 429 with Retry-After header. Read limits: 250 reads/5min per subscription per region. Write limits: 1200 writes/hour per subscription",
+      "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/request-limits-and-throttling",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Required app permissions: Reader role on the subscription or resource group scope — assign via Azure RBAC, not API permissions in the app registration",
+      "source_url": "https://learn.microsoft.com/en-us/azure/role-based-access-control/role-assignments-rest",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get specific resource: GET /subscriptions/{subId}/resourceGroups/{rgName}/providers/{resourceProvider}/{resourceType}/{resourceName}?api-version={version}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/resources/get",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Resource tags: every resource has a 'tags' object in the response. Filter by tag: ?$filter=tagName eq 'env' and tagValue eq 'prod'",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/resources/list",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/resources/",
+    "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/request-limits-and-throttling"
+  ],
+  "implementation_notes": [
+    "Get ARM token (different scope from Graph):\n```python\ndef get_arm_token(tenant_id, client_id, client_secret):\n    url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'\n    resp = requests.post(url, data={\n        'grant_type': 'client_credentials',\n        'client_id': client_id,\n        'client_secret': client_secret,\n        'scope': 'https://management.azure.com/.default',\n    }, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json()['access_token']\n```",
+    "List all VMs across a subscription:\n```python\ndef list_vms(session, sub_id):\n    url = f'https://management.azure.com/subscriptions/{sub_id}/resources'\n    params = {'api-version': '2024-03-01', '$filter': \"resourceType eq 'Microsoft.Compute/virtualMachines'\"}\n    results = []\n    while url:\n        resp = session.get(url, params=params, timeout=(10, 30))\n        resp.raise_for_status()\n        data = resp.json()\n        results.extend(data.get('value', []))\n        url = data.get('nextLink')\n        params = None\n    return results\n```",
+    "Common resource types for filtering: Microsoft.Compute/virtualMachines, Microsoft.Network/networkSecurityGroups, Microsoft.Sql/servers, Microsoft.Storage/storageAccounts, Microsoft.Web/sites, Microsoft.KeyVault/vaults, Microsoft.Logic/workflows"
+  ],
+  "caveats": [
+    "ARM scope is management.azure.com — do NOT use graph.microsoft.com scope for ARM calls",
+    "api-version is REQUIRED on every ARM call — omitting it returns 400. Each resource provider has its own version.",
+    "ARM pagination uses 'nextLink' not '@odata.nextLink' — different from Graph API",
+    "The app registration must have RBAC role assignment (e.g., Reader) on the subscription, not just API permissions — this is a common confusion point",
+    "ARM throttling is per-subscription per-region — spreading calls across regions doesn't help if you're listing subscription-level resources"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["ms-graph-oauth2-client-credentials", "python-requests-http-client-patterns"],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,71 @@
+{
+  "id": "python-requests-http-client-patterns",
+  "title": "Python requests Library — Auth, Retry, Pagination, Error Handling",
+  "source_family": "python",
+  "coverage_type": "patterns",
+  "applies_to": ["Python HTTP client code", "REST API automation scripts", "API data retrieval"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "requests.Session() reuses TCP connections and persists headers/cookies across calls — always prefer Session over bare requests.get()",
+      "source_url": "https://docs.python-requests.org/en/latest/user/advanced/#session-objects",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "response.raise_for_status() raises requests.HTTPError for 4xx/5xx — use it after every call instead of manual status checks",
+      "source_url": "https://docs.python-requests.org/en/latest/api/#requests.Response.raise_for_status",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "requests.adapters.HTTPAdapter with urllib3.util.Retry provides built-in retry with backoff: Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])",
+      "source_url": "https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html#urllib3.util.Retry",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Mount the retry adapter on both http:// and https:// prefixes: session.mount('https://', HTTPAdapter(max_retries=retry))",
+      "source_url": "https://docs.python-requests.org/en/latest/user/advanced/#transport-adapters",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "For 429 Too Many Requests, read the Retry-After header (seconds or HTTP-date) and sleep that long before retrying",
+      "source_url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "response.json() raises ValueError/JSONDecodeError if body is not valid JSON — wrap in try/except when the API might return non-JSON error pages",
+      "source_url": "https://docs.python-requests.org/en/latest/api/#requests.Response.json",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "For OAuth2 bearer token auth, use session.headers.update({'Authorization': f'Bearer {token}'}) once rather than passing per-request",
+      "source_url": "https://docs.python-requests.org/en/latest/user/advanced/#session-objects",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Set timeout=(connect_timeout, read_timeout) on every request — never rely on the default (no timeout). Recommended: timeout=(10, 30)",
+      "source_url": "https://docs.python-requests.org/en/latest/user/advanced/#timeouts",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.python-requests.org/en/latest/",
+    "https://urllib3.readthedocs.io/en/latest/"
+  ],
+  "implementation_notes": [
+    "Standard session setup with retry:\n```python\nimport requests\nfrom requests.adapters import HTTPAdapter\nfrom urllib3.util.retry import Retry\n\ndef create_session(token: str | None = None) -> requests.Session:\n    session = requests.Session()\n    retry = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])\n    session.mount('https://', HTTPAdapter(max_retries=retry))\n    session.mount('http://', HTTPAdapter(max_retries=retry))\n    if token:\n        session.headers['Authorization'] = f'Bearer {token}'\n    session.headers['Accept'] = 'application/json'\n    return session\n```",
+    "OData / link-based pagination pattern (Microsoft Graph, SharePoint, etc.):\n```python\ndef paginate(session, url, params=None):\n    results = []\n    while url:\n        resp = session.get(url, params=params, timeout=(10, 30))\n        resp.raise_for_status()\n        data = resp.json()\n        results.extend(data.get('value', []))\n        url = data.get('@odata.nextLink') or data.get('next')\n        params = None  # nextLink includes query params\n    return results\n```",
+    "Offset/limit pagination pattern (Qualys, Bitsight, generic APIs):\n```python\ndef paginate_offset(session, url, page_size=100):\n    results, offset = [], 0\n    while True:\n        resp = session.get(url, params={'offset': offset, 'limit': page_size}, timeout=(10, 60))\n        resp.raise_for_status()\n        data = resp.json()\n        items = data.get('results', data.get('data', []))\n        results.extend(items)\n        if len(items) < page_size:\n            break\n        offset += page_size\n    return results\n```",
+    "Rate limit handling with Retry-After:\n```python\nimport time\n\ndef rate_limited_get(session, url, **kwargs):\n    resp = session.get(url, **kwargs)\n    if resp.status_code == 429:\n        wait = int(resp.headers.get('Retry-After', 60))\n        time.sleep(wait)\n        resp = session.get(url, **kwargs)\n    resp.raise_for_status()\n    return resp\n```",
+    "Form-encoded token request (OAuth2 client_credentials):\n```python\ndef get_token(tenant_id, client_id, client_secret, scope='https://graph.microsoft.com/.default'):\n    url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'\n    resp = requests.post(url, data={\n        'grant_type': 'client_credentials',\n        'client_id': client_id,\n        'client_secret': client_secret,\n        'scope': scope,\n    }, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json()['access_token']\n```"
+  ],
+  "caveats": [
+    "urllib3 Retry does NOT retry on 429 by default — you must include 429 in status_forcelist explicitly",
+    "Retry with backoff_factor=1 waits 0s, 1s, 2s, 4s between retries — for APIs with strict rate limits, check Retry-After header instead",
+    "requests does not validate SSL certs from custom CAs by default — use session.verify='/path/to/ca-bundle.crt' or set REQUESTS_CA_BUNDLE env var",
+    "Never disable SSL verification (verify=False) in production code"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["ms-graph-oauth2-client-credentials", "qualys-api-auth-conventions", "bitsight-api-auth-conventions"],
+  "source_projects": ["shared-seed"]
+}

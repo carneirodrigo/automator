@@ -1,0 +1,78 @@
+{
+  "id": "python-document-generation-patterns",
+  "title": "Python Document Generation — docx, xlsx, csv, pdf",
+  "source_family": "python",
+  "coverage_type": "patterns",
+  "applies_to": ["Document deliverables", "Report generation", "Data export", "Excel spreadsheets", "Word documents", "PDF reports"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "python-docx: Document() creates a new .docx; document.add_heading(text, level), add_paragraph(text), add_table(rows, cols) are the core methods",
+      "source_url": "https://python-docx.readthedocs.io/en/latest/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "python-docx: Styles are applied via paragraph.style = 'List Bullet' or run.bold = True, run.font.size = Pt(12)",
+      "source_url": "https://python-docx.readthedocs.io/en/latest/user/styles-understanding.html",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "openpyxl: Workbook() creates xlsx; wb.active returns the default sheet; ws.append([row_data]) adds a row; wb.save('file.xlsx') writes to disk",
+      "source_url": "https://openpyxl.readthedocs.io/en/stable/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "openpyxl: Auto-filter via ws.auto_filter.ref = ws.dimensions; freeze panes via ws.freeze_panes = 'A2' (freezes header row)",
+      "source_url": "https://openpyxl.readthedocs.io/en/stable/filters.html",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "openpyxl: Column width via ws.column_dimensions['A'].width = 25; number format via cell.number_format = '#,##0.00' or '0.0%' or 'yyyy-mm-dd'",
+      "source_url": "https://openpyxl.readthedocs.io/en/stable/styles.html",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "csv.DictWriter(f, fieldnames=headers) writes dicts; writer.writeheader() then writer.writerows(data). Always open with newline='' on Windows",
+      "source_url": "https://docs.python.org/3/library/csv.html",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "fpdf2 (FPDF2): FPDF() creates PDF; pdf.add_page(), pdf.set_font('Helvetica', size=12), pdf.cell(text='...'), pdf.output('file.pdf')",
+      "source_url": "https://py-pdf.github.io/fpdf2/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "fpdf2 multi_cell() wraps text automatically; cell() does not wrap. Use multi_cell for paragraphs, cell for table cells with known widths",
+      "source_url": "https://py-pdf.github.io/fpdf2/Text.html",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Verification: docx.Document('file.docx') loads without error; openpyxl.load_workbook('file.xlsx') loads without error; PDF check: open('file.pdf','rb').read(5) == b'%PDF-'",
+      "source_url": "https://python-docx.readthedocs.io/en/latest/",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://python-docx.readthedocs.io/en/latest/",
+    "https://openpyxl.readthedocs.io/en/stable/",
+    "https://docs.python.org/3/library/csv.html",
+    "https://py-pdf.github.io/fpdf2/"
+  ],
+  "implementation_notes": [
+    "Word document with styled content:\n```python\nfrom docx import Document\nfrom docx.shared import Pt, Inches\n\ndoc = Document()\ndoc.add_heading('Report Title', level=0)\ndoc.add_paragraph('Executive summary here.')\n\n# Table\ntable = doc.add_table(rows=1, cols=3, style='Light List Accent 1')\ntable.rows[0].cells[0].text = 'Name'\ntable.rows[0].cells[1].text = 'Status'\ntable.rows[0].cells[2].text = 'Score'\nfor item in data:\n    row = table.add_row().cells\n    row[0].text = item['name']\n    row[1].text = item['status']\n    row[2].text = str(item['score'])\n\ndoc.save('report.docx')\n```",
+    "Excel with formatting and auto-filter:\n```python\nfrom openpyxl import Workbook\nfrom openpyxl.styles import Font, PatternFill, Alignment\n\nwb = Workbook()\nws = wb.active\nws.title = 'Results'\n\n# Header row\nheaders = ['Host', 'Severity', 'CVE', 'Score']\nheader_fill = PatternFill('solid', fgColor='4472C4')\nheader_font = Font(bold=True, color='FFFFFF')\nfor col, h in enumerate(headers, 1):\n    cell = ws.cell(row=1, column=col, value=h)\n    cell.fill = header_fill\n    cell.font = header_font\n\n# Data rows\nfor row_data in data:\n    ws.append([row_data[h] for h in headers])\n\nws.auto_filter.ref = ws.dimensions\nws.freeze_panes = 'A2'\nfor col in ['A', 'B', 'C', 'D']:\n    ws.column_dimensions[col].width = 20\n\nwb.save('results.xlsx')\n```",
+    "CSV export:\n```python\nimport csv\n\nwith open('output.csv', 'w', newline='', encoding='utf-8') as f:\n    writer = csv.DictWriter(f, fieldnames=['host', 'severity', 'cve'])\n    writer.writeheader()\n    writer.writerows(data)\n```",
+    "PDF with fpdf2:\n```python\nfrom fpdf import FPDF\n\npdf = FPDF()\npdf.set_auto_page_break(auto=True, margin=15)\npdf.add_page()\npdf.set_font('Helvetica', 'B', 16)\npdf.cell(text='Security Report', new_x='LMARGIN', new_y='NEXT')\npdf.set_font('Helvetica', size=11)\npdf.multi_cell(w=0, text='Report content here...')\npdf.output('report.pdf')\n```"
+  ],
+  "caveats": [
+    "python-docx cannot open or modify .doc (old binary format) — only .docx",
+    "openpyxl cannot recalculate Excel formulas — if you write formulas, they only update when opened in Excel/LibreOffice",
+    "fpdf2 is the maintained fork of PyFPDF — install as 'fpdf2' (pip install fpdf2), import as 'from fpdf import FPDF'",
+    "For large datasets (>100K rows), consider writing CSV instead of xlsx to avoid memory issues",
+    "python-docx table style names are locale-sensitive — 'Light List Accent 1' works on English installs"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["python-requests-http-client-patterns"],
+  "source_projects": ["shared-seed"]
+}

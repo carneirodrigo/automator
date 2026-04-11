@@ -2900,6 +2900,160 @@
       "last_verified": "2026-04-03T00:00:00Z",
       "fresh_until": "2027-06-01T00:00:00Z",
       "summary": "Complete MSI HTTP auth reference: exact JSON block for system-assigned and user-assigned MSI, audience values per API (ARM with trailing slash, Graph without), PowerShell patterns to grant Graph/WDATP app permissions, RBAC role assignment, and common 401/403 failure modes."
+    },
+    {
+      "id": "project-002-create-a-script-that-prints-hello",
+      "title": "Create A Script That Prints Hello",
+      "file": "project-002-create-a-script-that-prints-hello.json",
+      "tags": [
+        "project-output"
+      ],
+      "source_family": "project",
+      "coverage_type": "output",
+      "source_project_id": "002",
+      "created": "2026-04-11T00:06:17.064829+00:00",
+      "updated": "2026-04-11T00:06:17.064829+00:00",
+      "last_verified": "2026-04-11T00:06:17.064829+00:00",
+      "fresh_until": "2026-04-11T00:06:17.064829+00:00",
+      "summary": "Added datetime import and current date/time output to the hello_world.py script as requested by review feedback."
+    },
+    {
+      "id": "python-requests-http-client-patterns",
+      "title": "Python requests Library \u2014 Auth, Retry, Pagination, Error Handling",
+      "file": "python-requests-http-client-patterns.json",
+      "tags": [
+        "python",
+        "requests",
+        "http-client",
+        "retry",
+        "pagination",
+        "oauth2",
+        "rate-limiting"
+      ],
+      "source_family": "python",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:39:06Z",
+      "updated": "2026-04-11T03:39:06Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Session setup with retry/backoff, OAuth2 bearer auth, OData and offset pagination, rate limit handling, timeout best practices"
+    },
+    {
+      "id": "python-document-generation-patterns",
+      "title": "Python Document Generation \u2014 docx, xlsx, csv, pdf",
+      "file": "python-document-generation-patterns.json",
+      "tags": [
+        "python",
+        "docx",
+        "xlsx",
+        "csv",
+        "pdf",
+        "openpyxl",
+        "python-docx",
+        "fpdf2",
+        "document-generation"
+      ],
+      "source_family": "python",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:39:06Z",
+      "updated": "2026-04-11T03:39:06Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Working code patterns for python-docx, openpyxl, csv.DictWriter, fpdf2 \u2014 styled tables, formatting, auto-filter, verification checks"
+    },
+    {
+      "id": "azure-resource-manager-rest-api-patterns",
+      "title": "Azure Resource Manager REST API \u2014 Auth, Subscriptions, Resources",
+      "file": "azure-resource-manager-rest-api-patterns.json",
+      "tags": [
+        "azure",
+        "arm",
+        "resource-manager",
+        "subscriptions",
+        "resource-groups",
+        "rbac",
+        "rest-api"
+      ],
+      "source_family": "azure",
+      "coverage_type": "endpoint",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:39:06Z",
+      "updated": "2026-04-11T03:39:06Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "ARM base URL, OAuth2 scope (management.azure.com), list subscriptions/resources/resource groups, OData filters, tag queries, throttling limits, RBAC requirements"
+    },
+    {
+      "id": "sentinel-rest-api-operations",
+      "title": "Microsoft Sentinel REST API \u2014 Incidents, Analytics Rules, Watchlists, Hunting",
+      "file": "sentinel-rest-api-operations.json",
+      "tags": [
+        "sentinel",
+        "siem",
+        "incidents",
+        "analytics-rules",
+        "watchlists",
+        "kql",
+        "hunting",
+        "log-analytics",
+        "rest-api"
+      ],
+      "source_family": "azure-sentinel",
+      "coverage_type": "endpoint",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:39:06Z",
+      "updated": "2026-04-11T03:39:06Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Sentinel incident CRUD, analytics rules, watchlists, hunting queries via REST and Log Analytics API. Auth scopes, endpoint patterns, KQL execution"
+    },
+    {
+      "id": "ms-graph-pagination-batch-query-patterns",
+      "title": "Microsoft Graph API \u2014 Pagination, $batch, $filter, $select, Error Handling",
+      "file": "ms-graph-pagination-batch-query-patterns.json",
+      "tags": [
+        "microsoft-graph",
+        "pagination",
+        "odata",
+        "batch",
+        "filter",
+        "select",
+        "throttling",
+        "error-handling"
+      ],
+      "source_family": "microsoft-graph",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:39:06Z",
+      "updated": "2026-04-11T03:39:06Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "@odata.nextLink pagination, $top/$filter/$select/$expand/$count, ConsistencyLevel:eventual for directory queries, $batch (max 20), 429 handling, error format"
+    },
+    {
+      "id": "entra-id-app-registration-rbac-patterns",
+      "title": "Entra ID \u2014 App Registrations, Service Principals, API Permissions, RBAC",
+      "file": "entra-id-app-registration-rbac-patterns.json",
+      "tags": [
+        "entra-id",
+        "azure-ad",
+        "app-registration",
+        "service-principal",
+        "rbac",
+        "api-permissions",
+        "admin-consent",
+        "role-assignments"
+      ],
+      "source_family": "microsoft-graph",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:39:06Z",
+      "updated": "2026-04-11T03:39:06Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "App registration vs service principal, application vs delegated permissions, admin consent via Graph, Azure RBAC role assignments, permission audit patterns, common role IDs"
     }
   ]
 }

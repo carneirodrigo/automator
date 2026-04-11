@@ -1,0 +1,91 @@
+{
+  "id": "sentinel-rest-api-operations",
+  "title": "Microsoft Sentinel REST API — Incidents, Analytics Rules, Watchlists, Hunting",
+  "source_family": "azure-sentinel",
+  "coverage_type": "endpoint",
+  "applies_to": ["Microsoft Sentinel automation", "Sentinel incident management", "Analytics rules", "Watchlist CRUD", "Hunting queries"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Sentinel API base: https://management.azure.com/subscriptions/{subId}/resourceGroups/{rgName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}/providers/Microsoft.SecurityInsights",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Auth: Same as ARM — OAuth2 with scope=https://management.azure.com/.default. Requires Microsoft Sentinel Contributor or Reader role on the workspace.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List incidents: GET .../incidents?api-version=2024-03-01 — returns {value: [{properties.title, properties.severity, properties.status, properties.createdTimeUtc}]}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/incidents/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Filter incidents by status: ?$filter=properties/status eq 'New' — OData filter on properties fields",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/incidents/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Incident severity values: High, Medium, Low, Informational. Status values: New, Active, Closed.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/incidents",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get incident alerts: GET .../incidents/{incidentId}/alerts?api-version=2024-03-01 — POST method despite being a read (Microsoft convention for this specific endpoint)",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/incidents/list-alerts",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get incident entities: POST .../incidents/{incidentId}/entities?api-version=2024-03-01 — also POST for read",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/incidents/list-entities",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List analytics rules: GET .../alertRules?api-version=2024-03-01 — returns scheduled, fusion, ML, NRT, and Microsoft Security Incident Creation rules",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/alert-rules/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List watchlists: GET .../watchlists?api-version=2024-03-01. Get items: GET .../watchlists/{alias}/watchlistItems?api-version=2024-03-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/watchlists/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Run hunting query: POST https://api.loganalytics.io/v1/workspaces/{workspaceId}/query with body {query: 'KQL string'} — uses Log Analytics scope, not ARM scope",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/loganalytics/dataaccess/query/execute",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Log Analytics auth scope: https://api.loganalytics.io/.default — different from ARM scope. App needs Log Analytics Reader role on workspace.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/loganalytics/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Incident comments: GET/PUT .../incidents/{incidentId}/comments/{commentId}?api-version=2024-03-01. Create comment: PUT with {properties: {message: 'text'}}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/securityinsights/incident-comments",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/securityinsights/",
+    "https://learn.microsoft.com/en-us/rest/api/loganalytics/"
+  ],
+  "implementation_notes": [
+    "Build the Sentinel base URL:\n```python\ndef sentinel_base(sub_id, rg_name, workspace_name):\n    return (\n        f'https://management.azure.com/subscriptions/{sub_id}'\n        f'/resourceGroups/{rg_name}'\n        f'/providers/Microsoft.OperationalInsights/workspaces/{workspace_name}'\n        f'/providers/Microsoft.SecurityInsights'\n    )\n```",
+    "List open incidents:\n```python\ndef list_incidents(session, base_url, status='New'):\n    url = f'{base_url}/incidents'\n    params = {'api-version': '2024-03-01', '$filter': f\"properties/status eq '{status}'\", '$top': 50, '$orderby': 'properties/createdTimeUtc desc'}\n    results = []\n    while url:\n        resp = session.get(url, params=params, timeout=(10, 30))\n        resp.raise_for_status()\n        data = resp.json()\n        results.extend(data.get('value', []))\n        url = data.get('nextLink')\n        params = None\n    return results\n```",
+    "Run KQL hunting query (uses different auth scope):\n```python\ndef run_kql(session, workspace_id, query):\n    url = f'https://api.loganalytics.io/v1/workspaces/{workspace_id}/query'\n    resp = session.post(url, json={'query': query}, timeout=(10, 120))\n    resp.raise_for_status()\n    tables = resp.json().get('tables', [])\n    if not tables:\n        return []\n    cols = [c['name'] for c in tables[0]['columns']]\n    return [dict(zip(cols, row)) for row in tables[0]['rows']]\n```\nNote: requires token with scope https://api.loganalytics.io/.default"
+  ],
+  "caveats": [
+    "Sentinel API uses ARM base URL and api-version — it is NOT a Graph API",
+    "incident alerts and entities endpoints use POST for reads — this is intentional, not an error",
+    "Log Analytics query API uses a DIFFERENT base URL (api.loganalytics.io) and scope than Sentinel management API",
+    "KQL queries have a 10-minute timeout and 500K row limit by default",
+    "Watchlist item IDs are GUIDs — you need to list items to find the ID before updating or deleting",
+    "api-version differences: some endpoints require 2024-03-01, older ones work with 2023-11-01 — always check the docs for the specific operation"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["azure-resource-manager-rest-api-patterns", "sentinel-rest-api-direct-http-patterns", "ms-graph-security-alerts-incidents"],
+  "source_projects": ["shared-seed"]
+}

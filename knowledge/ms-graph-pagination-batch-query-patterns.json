@@ -1,0 +1,93 @@
+{
+  "id": "ms-graph-pagination-batch-query-patterns",
+  "title": "Microsoft Graph API — Pagination, $batch, $filter, $select, Error Handling",
+  "source_family": "microsoft-graph",
+  "coverage_type": "patterns",
+  "applies_to": ["Graph API pagination", "OData queries", "Batch requests", "Graph error handling"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Pagination: Graph returns @odata.nextLink in the response body when more pages exist. Follow it with GET (no extra params — the URL includes them).",
+      "source_url": "https://learn.microsoft.com/en-us/graph/paging",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$top controls page size. Default varies by endpoint (typically 10-100). Max is endpoint-specific: /users max 999, /messages max 1000, /events max 50.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/paging",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$select reduces payload: GET /users?$select=id,displayName,mail — only returns requested fields. Always use $select for large collections.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/query-parameters#select-parameter",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$filter supports: eq, ne, gt, ge, lt, le, and, or, not, startsWith(), endsWith(), contains() (limited). Example: $filter=displayName eq 'John'",
+      "source_url": "https://learn.microsoft.com/en-us/graph/query-parameters#filter-parameter",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$count=true adds @odata.count to the response. Requires ConsistencyLevel: eventual header for directory objects (users, groups, apps).",
+      "source_url": "https://learn.microsoft.com/en-us/graph/aad-advanced-queries",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Advanced queries on directory objects require BOTH ConsistencyLevel: eventual header AND $count=true — omitting either silently returns incomplete results.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/aad-advanced-queries",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$batch endpoint: POST https://graph.microsoft.com/v1.0/$batch with body {requests: [{id, method, url, headers?, body?}]}. Max 20 requests per batch.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/json-batching",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Batch responses: {responses: [{id, status, headers, body}]} — status is per-request (some may be 200 while others are 429). Always check each response status.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/json-batching",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Graph error format: {error: {code, message, innerError: {date, request-id, client-request-id}}}. Common codes: InvalidAuthenticationToken (401), Authorization_RequestDenied (403), Request_ResourceNotFound (404), activityLimitReached (429).",
+      "source_url": "https://learn.microsoft.com/en-us/graph/errors",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Throttling: Graph returns 429 with Retry-After header (seconds). Per-app limits vary by endpoint. Typical: 10,000 requests per 10 minutes per app per tenant.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/throttling",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$orderby sorts results: $orderby=displayName asc. Not all fields are sortable — unsortable fields return 400.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/query-parameters#orderby-parameter",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "$expand retrieves related entities inline: GET /users/{id}?$expand=memberOf. Limit: max 20 expanded relationships.",
+      "source_url": "https://learn.microsoft.com/en-us/graph/query-parameters#expand-parameter",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/graph/paging",
+    "https://learn.microsoft.com/en-us/graph/query-parameters",
+    "https://learn.microsoft.com/en-us/graph/json-batching",
+    "https://learn.microsoft.com/en-us/graph/throttling"
+  ],
+  "implementation_notes": [
+    "Full pagination with all pages:\n```python\ndef graph_paginate(session, url, params=None):\n    results = []\n    while url:\n        resp = session.get(url, params=params, timeout=(10, 30))\n        resp.raise_for_status()\n        data = resp.json()\n        results.extend(data.get('value', []))\n        url = data.get('@odata.nextLink')\n        params = None  # nextLink includes all query params\n    return results\n```",
+    "Advanced directory query (users with filter + count):\n```python\ndef list_users_filtered(session, filter_expr):\n    url = 'https://graph.microsoft.com/v1.0/users'\n    params = {'$filter': filter_expr, '$count': 'true', '$select': 'id,displayName,mail,accountEnabled'}\n    headers = {'ConsistencyLevel': 'eventual'}  # REQUIRED for directory advanced queries\n    resp = session.get(url, params=params, headers=headers, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json()\n```",
+    "Batch request:\n```python\ndef graph_batch(session, requests_list):\n    batch = {'requests': [{'id': str(i), 'method': r['method'], 'url': r['url']} for i, r in enumerate(requests_list)]}\n    resp = session.post('https://graph.microsoft.com/v1.0/$batch', json=batch, timeout=(10, 60))\n    resp.raise_for_status()\n    return {r['id']: r for r in resp.json()['responses']}\n```",
+    "Robust error handling:\n```python\ndef graph_get(session, url, **kwargs):\n    resp = session.get(url, timeout=(10, 30), **kwargs)\n    if resp.status_code == 429:\n        wait = int(resp.headers.get('Retry-After', 60))\n        time.sleep(wait)\n        resp = session.get(url, timeout=(10, 30), **kwargs)\n    if resp.status_code >= 400:\n        error = resp.json().get('error', {})\n        raise RuntimeError(f\"Graph {resp.status_code}: {error.get('code')} — {error.get('message')}\")\n    return resp.json()\n```"
+  ],
+  "caveats": [
+    "$skip is NOT supported on most Graph endpoints — use @odata.nextLink pagination instead",
+    "contains() filter only works on specific string fields (mail, displayName) and requires ConsistencyLevel: eventual on directory objects",
+    "$batch requests are NOT atomic — each sub-request succeeds or fails independently",
+    "Some endpoints (e.g., /security/alerts) use different pagination ($skipToken) — check the specific endpoint docs",
+    "Graph v1.0 and beta may have different filter/sort capabilities for the same resource"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["ms-graph-oauth2-client-credentials", "ms-graph-api-conventions", "ms-graph-entra-id-users-groups-service-principals", "python-requests-http-client-patterns"],
+  "source_projects": ["shared-seed"]
+}
