@@ -1,123 +1,59 @@
 {
   "id": "powerbi-matrix-table-advanced-patterns",
-  "title": "Power BI - Matrix and Table Visual Advanced Patterns for Security Reporting",
-  "description": "Production patterns for matrix visuals with metrics as rows and periods as columns, conditional formatting (RAG icons, color scales), delta columns, fixed column ordering, grand total overrides, and drill-through from summary to detail",
-  "tags": ["power-bi", "matrix", "table", "conditional-formatting", "security-reporting", "rag", "drill-through", "period-comparison"],
-  "source": "web-research",
-  "references": [
-    "https://learn.microsoft.com/en-us/power-bi/visuals/desktop-matrix-visual",
-    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-conditional-table-formatting",
-    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-drillthrough",
-    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualization-tables"
+  "title": "Power BI Matrix and Table Advanced Patterns — Conditional Formatting, Grand Totals, Drill-Through, Sparklines",
+  "source_family": "power-bi",
+  "coverage_type": "patterns",
+  "applies_to": ["Matrix visual configuration", "Conditional formatting rules", "Grand total overrides", "Drill-through setup", "Sparklines in tables"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Security reporting matrix layout: Rows = MetricDim[MetricName], Columns = DateTable[MonthYear] (sorted by MonthSort), Values = [Metric Value]. Optionally add [MoM Change %] as second value. Set MetricDim[SortOrder] as Sort by Column for row ordering.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/visuals/desktop-matrix-visual",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Conditional formatting: Background color Rules (Format > Cell elements > Background color > fx > Rules), Icon sets (Icons > fx > Rules with Layout = 'Data only'), Color scale gradients (Gradient mode), Data bars (proportional bars in cells).",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-conditional-table-formatting",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Grand totals in a matrix are recalculated by re-running the measure with filters removed (not by summing visible cells). Use ISINSCOPE(column) to detect row grouping vs total level and override the grand total calculation.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/visuals/desktop-matrix-visual",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Power BI natively supports sparklines in Table and Matrix visuals. Add via Visualizations pane > 'Add a sparkline' in Values area. Set fixed Y-axis min/max for consistent scaling across rows.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/visuals/desktop-matrix-visual",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Conditional formatting rules applied to percentage measures operate on the underlying decimal (0.05), not the display value (5%). Set rules based on the decimal number.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-conditional-table-formatting",
+      "verified_date": "2026-04-11"
+    }
   ],
-  "content": {
-    "security_reporting_matrix_layout": {
-      "description": "The canonical security reporting matrix: rows = metric name (Sev5, Sev4, External, Internal, Alert Count), columns = time period (months or quarters), values = count for that metric/period intersection. Delta columns show change from prior period.",
-      "field_well_setup": [
-        "Rows: MetricDim[MetricName] — the metric dimension (one row per metric)",
-        "Columns: DateTable[MonthYear] — the period label (sorted by MonthSort)",
-        "Values: [Metric Value] — the base count measure",
-        "Optionally add [MoM Change %] as a second value alongside [Metric Value]"
-      ],
-      "column_ordering_fix": "Matrix columns sort by the column field's Sort by Column setting. Set DateTable[MonthYear] Sort by Column = DateTable[MonthSort] (integer YYYYMM). Without this, months appear alphabetically (Apr, Aug, Dec…) instead of chronologically. Steps: Data view > select DateTable > click MonthYear column > Column Tools > Sort by column > MonthSort.",
-      "limiting_visible_months": "To show only the last 12 months without a slicer, add a page-level or visual-level filter: DateTable[MonthSort] is Top N, top 12, by DateTable[MonthSort] DESC — or use a relative date filter on the DateTable[Date] column (last 12 months). Alternatively, add the slicer and set its default to last 12 months using a bookmark.",
-      "row_ordering": "To control metric row order (e.g. Sev5 always on top), add a SortOrder integer column to MetricDim and use Sort by Column. Or use a calculated column in MetricDim: SortOrder = SWITCH([MetricName], \"Sev5\",1, \"Sev4\",2, \"External\",3, \"Internal\",4, \"Alert Count\",5, 99)."
-    },
-    "delta_columns_pattern": {
-      "description": "Show the absolute change or % change from the prior period as a column alongside the raw value in the same matrix.",
-      "approach": "Add both [Metric Value] and [MoM Change %] to the Values field well. The matrix renders two value columns per period column. To label them, rename the measures with prefixes: '# Count' and '% MoM'.",
-      "rename_value_columns": "You cannot rename individual value column headers in the matrix field well — the header is always the measure name. Rename the measure itself in the Modeling pane: right-click measure > Rename. Use names like 'Count' and 'MoM %' for conciseness.",
-      "show_only_delta_for_latest_period": "A common pattern: show all historical months as Count only, but for the latest month also show MoM %. Achieve this with two separate matrices on the page — one with all months showing Count, one single-column showing the latest month's Count and MoM% — or use bookmarks to toggle between views.",
-      "delta_with_arrow_label": "// For a text delta column with arrow:\nMoM Label =\nVAR _Chg = [MoM Change %]\nRETURN\n    IF(ISBLANK(_Chg), \"\",\n    IF(_Chg > 0, \"▲ \" & FORMAT(_Chg, \"+0.0%\"),\n    IF(_Chg < 0, \"▼ \" & FORMAT(_Chg, \"0.0%\"),\n    \"→ 0.0%\")))\n// This is a text measure — useful for tooltip text but cannot be\n// conditionally formatted as a number. Use the numeric [MoM Change %]\n// for background color formatting."
-    },
-    "conditional_formatting": {
-      "background_color_rules": {
-        "description": "Color cells red/amber/green based on thresholds. In Format pane > Cell elements > Background color > switch to 'Rules' mode.",
-        "rag_on_count_column": "Field: [Metric Value] or the specific count measure.\nRules example for Sev5 Count:\n  If value >= 100 → Red (#FF0000)\n  If value >= 50 and < 100 → Amber/Yellow (#FFC000)\n  If value < 50 → Green (#70AD47)\nNote: Rules are applied top-down, first match wins.",
-        "rag_on_mom_percent": "Field: [MoM Change %] (numeric measure, formatted as %).\nRules for vulnerability counts (increase = bad):\n  If value > 0.05 → Red (increase > 5%)\n  If value >= -0.05 and <= 0.05 → Amber (within ±5%)\n  If value < -0.05 → Green (decrease > 5%)\n  Adjust thresholds to match your organisation's risk appetite.",
-        "steps": [
-          "1. Select the matrix visual",
-          "2. Format pane (paint roller) > Cell elements",
-          "3. Select the series/value column to format",
-          "4. Turn on 'Background color'",
-          "5. Click 'fx' button to open the formatting rules dialog",
-          "6. Switch from 'Gradient' to 'Rules'",
-          "7. Add rules: Number / Percent / Percentile, enter thresholds and colors",
-          "8. Click OK"
-        ]
-      },
-      "icon_sets": {
-        "description": "Show traffic-light icons (red/amber/green circles, arrows, flags) in cells instead of background colors.",
-        "steps": [
-          "1. Format pane > Cell elements > Icons > turn on > click fx",
-          "2. Style: choose icon set (circles, flags, arrows, etc.)",
-          "3. Layout: 'Left of data' or 'Right of data' or 'Data only' (icon only, no number)",
-          "4. Set rules the same way as background color — Number or Percent thresholds"
-        ],
-        "icon_only_pattern": "Set Layout = 'Data only' to show only the icon without the number. Pair this with a second column showing the numeric value. Useful for RAG status columns in a table.",
-        "rag_icon_dax_helper": "// Create an integer measure for icon formatting:\n// 2 = Red, 1 = Amber, 0 = Green (or invert depending on icon set)\nRAG Status =\nVAR _Val = [Metric Value]\nVAR _Chg = [MoM Change %]\nRETURN\n    IF(ISBLANK(_Val), BLANK(),\n    IF(_Chg > 0.1 || _Val > 100, 2,    -- Red: >10% increase or absolute > 100\n    IF(_Chg > 0 || _Val > 50,    1,    -- Amber: any increase or absolute > 50\n    0)))                               -- Green: decrease and absolute ≤ 50\n// Then use this measure as the 'Based on field' in the icon conditional formatting rules"
-      },
-      "color_scale_gradient": {
-        "description": "Gradient color scale: cells shade from one color (low) through another (mid) to a third (high). Useful for heatmap-style views.",
-        "steps": [
-          "1. Format pane > Cell elements > Background color > turn on > click fx",
-          "2. Keep mode as 'Gradient' (default)",
-          "3. Set Minimum, Center, Maximum values and colors",
-          "4. Typical security heatmap: Min = 0 (white/light green), Center = percentile, Max = largest value (dark red)"
-        ]
-      },
-      "data_bars": "Format pane > Cell elements > Data bars. Shows a bar within the cell proportional to the value. Useful for count columns in a table where relative size matters. Set min/max values to control bar scale."
-    },
-    "grand_totals_behavior": {
-      "default_behavior": "Grand totals in a matrix are calculated by re-running the measure with ALL filters removed for that dimension (not by summing visible cell values). This means a grand total row may show a different value than the sum of visible rows if the measure uses CALCULATE with context manipulation.",
-      "suppressing_grand_totals": "Format pane > Row subtotals > turn off 'Row grand total'. Or Column subtotals > turn off 'Column grand total'. Both can be turned off independently.",
-      "overriding_grand_total_with_dax": "// To show a custom grand total (e.g. show the MAX instead of SUM across metrics):\nMetric Value With Custom Total =\nIF(\n    ISINSCOPE(MetricDim[MetricName]),  -- inside a metric row\n    SUM(SecuritySnapshots[Value]),      -- normal row calculation\n    MAXX(VALUES(MetricDim[MetricName]), [Metric Value])  -- total row = max across metrics\n)\n// ISINSCOPE() returns TRUE when the specified column is in scope\n// (i.e., the row has been grouped by MetricName)",
-      "isinscope_pattern": "ISINSCOPE(column) is the production-grade way to detect when you are inside a specific row grouping vs at the total level. Use it to override what the total row shows:\n// Show blank at total level:\nMetric Value No Total =\n    IF(ISINSCOPE(MetricDim[MetricName]), [Metric Value], BLANK())",
-      "subtotals_for_categories": "If MetricDim has a hierarchy (Category > MetricName), Format pane > Row subtotals > 'Per row level' lets you show subtotals only at some levels."
-    },
-    "custom_column_headers": {
-      "limitation": "Power BI matrix column headers are always the values of the column field. You cannot rename individual column headers inside the visual — the only control is the field label from the data model.",
-      "workarounds": [
-        "Rename the column in the date table: change the column name in DAX (ADDCOLUMNS) or rename in the data model. But this changes the name everywhere the column is used.",
-        "Create a calculated column with the exact display text you want, e.g. a shorter format: MonthShort = FORMAT([Date], \"MMM'YY\") gives 'Jan'26'.",
-        "Use a Tablix/paginated report (Power BI Paginated Reports) if pixel-perfect column headers are required — they offer full header customisation.",
-        "Use the tooltip to show full labels while keeping matrix column headers short."
-      ],
-      "display_units_per_column": "You cannot set different format strings for different column groups in the same Values measure. Workaround: separate measures for count columns (whole number) and percent columns (percentage format)."
-    },
-    "drill_through": {
-      "overview": "Drill-through lets users right-click a cell in the summary matrix and navigate to a detail page filtered to that cell's context (e.g. click on 'Sev5 / Jan 2026' and see all individual Sev5 vulnerabilities for that month).",
-      "setup_steps": [
-        "1. Create a new report page: 'Detail'",
-        "2. On the Detail page, drag the drill-through anchor fields to the Drill through field well in the Visualizations pane. E.g.: MetricDim[MetricName] and DateTable[MonthYear]",
-        "3. Add visuals to the Detail page: a table showing individual vulnerability records, filtered by the drilled context",
-        "4. Power BI automatically adds a Back button to the Detail page",
-        "5. On the Summary page matrix: right-click any cell > Drill through > Detail"
-      ],
-      "drill_through_field_well": "The fields placed in the Drill through field well define what filters are passed. If you add MetricDim[MetricName], the detail page receives a filter for that specific metric. Add DateTable[MonthYear] to also pass the month.",
-      "cross_report_drill_through": "To drill through to a detail report in a different .pbix file in the same workspace, enable File > Options > Report settings > 'Allow visuals in this report to use drill through targets from other reports'.",
-      "drill_through_with_all_filters": "By default, drill-through passes the clicked dimension filter plus all active slicer/filter context. The detail page is pre-filtered. Use ALLEXCEPT in detail page measures to control which filters to respect.",
-      "back_button_behaviour": "The auto-generated Back button uses a bookmark navigation action. If you delete it, re-add a button manually and set Action > Type = Back."
-    },
-    "sparklines_in_tables": {
-      "overview": "Power BI natively supports sparklines in Table and Matrix visuals (added in 2022). Each row gets a small trend line showing the metric's history.",
-      "add_sparkline": [
-        "1. Select a Table or Matrix visual",
-        "2. In the Visualizations pane, click 'Add a sparkline' (small chart icon in the Values area)",
-        "3. Select the measure (e.g. [VulnCount]) and the axis field (e.g. DateTable[MonthYear])",
-        "4. Configure in Format pane > Sparklines: line color, marker, Y-axis min/max"
-      ],
-      "sparkline_y_axis_note": "By default each sparkline auto-scales its Y-axis independently. To compare magnitudes across rows, set a fixed Y-axis minimum (0) and maximum (e.g. 500) in Format pane > Sparklines > Y-axis > Range.",
-      "sparkline_for_trend_column": "Add a sparkline as the 'Trend' column in a table showing: Metric | Latest Count | MoM% | Trend. The trend sparkline shows the last 12 months visually in a compact cell."
-    },
-    "common_mistakes": [
-      "Not setting Sort by Column on the date period label — months appear alphabetically in matrix columns.",
-      "Using multiple measures with different format strings in the same Values position — all values adopt the first measure's format. Use separate measures with explicit FORMAT() if needed.",
-      "Conditional formatting rules set to Percent instead of Number when the measure is already formatted as a percentage — Power BI applies the rule to the underlying decimal (0.05), not the display value (5%). Set rules based on the underlying Number (0.05, not 5).",
-      "Grand total row summing metrics that should not be summed (e.g. summing a rating score across metrics) — use ISINSCOPE to suppress or override the total.",
-      "Drill-through not working because the drill-through field was added to the Filters pane instead of the Drill through field well — they look similar but are different.",
-      "Matrix shows '(Blank)' column when some fact rows have no matching DateTable row — check the relationship and ensure all snapshot dates exist in DateTable.",
-      "Adding too many column periods (24+ months) makes the matrix unusable on screen — limit to 12–13 months with a slicer or relative date filter."
-    ]
-  }
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/visuals/desktop-matrix-visual"
+  ],
+  "implementation_notes": [
+    "Matrix field well setup:\n- Rows: MetricDim[MetricName] (set Sort by Column = MetricDim[SortOrder])\n- Columns: DateTable[MonthYear] (set Sort by Column = DateTable[MonthSort])\n- Values: [Metric Value], optionally [MoM Change %]\n\nLimit visible months: page-level filter DateTable[MonthSort] Top N 12 DESC, or relative date filter on DateTable[Date] last 12 months.",
+    "Delta column with arrow label:\n```dax\nMoM Label =\n    VAR _Chg = [MoM Change %]\n    RETURN IF(ISBLANK(_Chg), \"\",\n           IF(_Chg > 0, \"▲ \" & FORMAT(_Chg, \"+0.0%\"),\n           IF(_Chg < 0, \"▼ \" & FORMAT(_Chg, \"0.0%\"), \"→ 0.0%\")))\n```",
+    "Conditional formatting setup:\n\nBackground color rules on count column:\n1. Select matrix > Format pane > Cell elements > select series\n2. Background color > On > fx\n3. Rules: If >= 100 → #FF4444 (Red), If >= 50 → #FFC000 (Amber), else → #70AD47 (Green)\n\nIcon sets for RAG column:\n1. Cell elements > Icons > On > fx\n2. Style: circles, Layout: Data only\n3. Based on field: [RAG Status] measure\n4. Rules: If = 2 → Red, If = 1 → Amber, If = 0 → Green\n\nRAG helper measure:\n```dax\nRAG Icon Value =\n    VAR _Val = [Metric Value]\n    VAR _Chg = [MoM Change %]\n    RETURN IF(ISBLANK(_Val), BLANK(),\n           IF(_Chg > 0.1 || _Val > 100, 2,\n           IF(_Chg > 0 || _Val > 50, 1, 0)))\n```",
+    "Grand total overrides with ISINSCOPE:\n```dax\n// Show custom grand total (e.g. MAX instead of SUM)\nMetric Value Custom Total =\n    IF(ISINSCOPE(MetricDim[MetricName]),\n        SUM(SecuritySnapshots[Value]),\n        MAXX(VALUES(MetricDim[MetricName]), [Metric Value]))\n\n// Show blank at total level\nMetric Value No Total =\n    IF(ISINSCOPE(MetricDim[MetricName]), [Metric Value], BLANK())\n```\n\nSuppress totals entirely: Format pane > Row subtotals > Off, or Column subtotals > Off.",
+    "Drill-through from matrix to detail:\n1. Create 'Detail' page\n2. Drag MetricDim[MetricName] + DateTable[MonthYear] to Drill through field well\n3. Add table visual with individual records on Detail page\n4. On Summary: right-click matrix cell > Drill through > Detail\n5. Back button is auto-generated (Action > Type = Back)\n\nCross-report drill-through: File > Options > Report settings > 'Allow visuals to use drill through from other reports'",
+    "Sparkline setup:\n1. Select Table/Matrix visual\n2. Visualizations pane > Values > Add sparkline (chart icon)\n3. Measure: [VulnCount], Axis: DateTable[MonthYear]\n4. Format > Sparklines > Y-axis > set fixed min=0, max for consistent comparison\n5. Layout: Metric | Latest Count | MoM% | Trend (sparkline)"
+  ],
+  "caveats": [
+    "Not setting Sort by Column on MonthYear causes months to appear alphabetically (Apr, Aug, Dec...)",
+    "Conditional formatting rules on percentages use underlying decimal (0.05 not 5%) — set thresholds accordingly",
+    "Grand total summing metrics that shouldn't be summed (e.g. rating scores) — use ISINSCOPE to override",
+    "Drill-through field placed in Filters pane instead of Drill through field well silently fails",
+    "Matrix shows '(Blank)' column when fact rows have no matching DateTable row — check relationships",
+    "24+ column periods make matrix unusable — limit to 12-13 months with slicer or filter",
+    "Multiple measures in same Values position all adopt the first measure's format string — use separate measures with explicit FORMAT()"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-security-dashboard-layout-patterns", "powerbi-visualizations-and-dax", "powerbi-time-intelligence-mom-qoq-yoy", "powerbi-snapshot-data-modeling"],
+  "source_projects": ["shared-seed"]
 }

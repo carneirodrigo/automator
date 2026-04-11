@@ -1,102 +1,65 @@
 {
   "id": "powerbi-date-calendar-table-patterns",
-  "title": "Power BI - Date/Calendar Table Production Patterns for Security Reporting",
-  "description": "Production DAX and M patterns for building a fully-featured date dimension: CALENDAR, CALENDARAUTO, all required columns, marking as date table, relationships to snapshot fact tables, and why security snapshot data needs a specific join strategy",
-  "tags": ["power-bi", "dax", "date-table", "calendar", "time-intelligence", "security-reporting", "star-schema"],
-  "source": "web-research",
-  "references": [
-    "https://learn.microsoft.com/en-us/power-bi/guidance/model-date-tables",
-    "https://learn.microsoft.com/en-us/dax/calendar-function-dax",
-    "https://learn.microsoft.com/en-us/dax/calendarauto-function-dax",
-    "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
-    "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-date-tables"
+  "title": "Power BI Date/Calendar Table — DAX and M Patterns, Mark as Date Table, Snapshot Join Strategy",
+  "source_family": "power-bi",
+  "coverage_type": "patterns",
+  "applies_to": ["Power BI date table creation", "Calendar table patterns", "Mark as date table", "Snapshot data join strategy"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI time intelligence DAX functions require a dedicated date table marked as a Date Table. The auto date/time hidden tables are inadequate for cross-table time intelligence. Disable auto date/time when using a proper date table.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/model-date-tables",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Mark as Date Table requirements: column must be type Date (not DateTime), unique values (one row per day), no blanks, no missing dates, must span complete calendar years (Jan 1 through Dec 31).",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-date-tables",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "CALENDAR(start, end) generates a table with one Date column spanning the specified range. CALENDARAUTO() scans all date columns in the model for automatic range detection.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/calendar-function-dax",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Sort by Column is required for display labels: MonthYear sorted by MonthSort (YYYYMM integer), MonthName sorted by Month number. Without it, months appear alphabetically.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-sort-by-column",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "One date dimension services all fact tables via separate relationships. Never create multiple date tables — it breaks cross-visual filtering.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/model-date-tables",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "For monthly snapshot data joined on Date, the snapshot date must be normalised to the first of the month (#date(Year, Month, 1)). Alternatively, use a YearMonthKey integer (YYYYMM) for the join.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
+      "verified_date": "2026-04-11"
+    }
   ],
-  "content": {
-    "why_a_proper_date_table_is_mandatory": {
-      "summary": "Power BI's built-in time intelligence DAX functions (PREVIOUSMONTH, DATEADD, SAMEPERIODLASTYEAR, TOTALYTD, etc.) require a dedicated date dimension table marked as a Date Table. Without it, those functions produce incorrect results or errors. The auto date/time feature Power BI creates by default is hidden and inadequate for cross-table time intelligence.",
-      "auto_date_time_problem": "Power BI Desktop has an 'Auto date/time' setting (File > Options > Data Load > Time intelligence) that creates a hidden DateTime table per date column. These hidden tables cannot be used across multiple fact tables, cannot be marked as the date table, and do not support quarter or fiscal year groupings. Disable auto date/time when you have a proper date table.",
-      "disable_auto_date_time": "File > Options and settings > Options > Data Load > uncheck 'Auto date/time for new files'. Also uncheck for the current file under Current File > Data Load.",
-      "single_date_table_rule": "One date dimension table services all fact tables via separate relationships. Never create multiple date tables — it breaks cross-visual filtering."
-    },
-    "dax_calendar_patterns": {
-      "minimal_calendar": "// Minimal: just the Date column\nDateTable =\nCALENDAR(DATE(2023,1,1), DATE(2026,12,31))",
-      "production_date_table_full": "// Full production date table — create as a Calculated Table\n// Modeling tab > New Table\nDateTable =\nVAR _Start = DATE(2023, 1, 1)\nVAR _End   = DATE(2027, 12, 31)   -- extend to cover future planned periods\nVAR _Base  = CALENDAR(_Start, _End)\nRETURN\nADDCOLUMNS(\n    _Base,\n\n    -- ── Core integers ──────────────────────────────────────────────────\n    \"Year\",           YEAR([Date]),\n    \"QuarterNum\",     QUARTER([Date]),\n    \"Month\",          MONTH([Date]),\n    \"Day\",            DAY([Date]),\n    \"WeekNum\",        WEEKNUM([Date], 2),   -- ISO week (Mon start)\n    \"DayOfWeek\",      WEEKDAY([Date], 2),   -- 1=Mon … 7=Sun\n\n    -- ── Sort keys (numeric, use these for Sort by Column) ───────────────\n    \"MonthSort\",      YEAR([Date]) * 100 + MONTH([Date]),       -- 202401, 202402 …\n    \"QuarterSort\",    YEAR([Date]) * 10  + QUARTER([Date]),     -- 20231, 20232 …\n\n    -- ── Display labels ──────────────────────────────────────────────────\n    \"MonthName\",      FORMAT([Date], \"MMMM\"),                   -- January\n    \"MonthShort\",     FORMAT([Date], \"MMM\"),                    -- Jan\n    \"MonthYear\",      FORMAT([Date], \"MMM YYYY\"),               -- Jan 2026\n    \"MonthYearISO\",   FORMAT([Date], \"YYYY-MM\"),                -- 2026-01  (sorts correctly as text)\n    \"QuarterLabel\",   \"Q\" & FORMAT(QUARTER([Date]),\"0\") & \" \" & FORMAT([Date],\"YYYY\"),  -- Q1 2026\n    \"QuarterShort\",   \"Q\" & FORMAT(QUARTER([Date]),\"0\"),        -- Q1\n    \"YearStr\",        FORMAT([Date], \"YYYY\"),                   -- 2026\n\n    -- ── Fiscal year support (adjust fiscal start month as needed) ────────\n    -- Example: fiscal year starts October (FY2026 = Oct 2025 – Sep 2026)\n    \"FiscalYear\",     IF(MONTH([Date]) >= 10, YEAR([Date]) + 1, YEAR([Date])),\n    \"FiscalQuarter\",  \"FQ\" & FORMAT(INT(MOD(MONTH([Date]) - 10 + 12, 12) / 3) + 1, \"0\"),\n    \"FiscalYearLabel\",IF(MONTH([Date]) >= 10,\n                        \"FY\" & FORMAT(YEAR([Date])+1,\"0\"),\n                        \"FY\" & FORMAT(YEAR([Date]),\"0\")),\n\n    -- ── Flags ────────────────────────────────────────────────────────────\n    \"IsWeekend\",      IF(WEEKDAY([Date], 2) >= 6, TRUE(), FALSE()),\n    \"IsCurrentMonth\", IF(YEAR([Date]) = YEAR(TODAY()) && MONTH([Date]) = MONTH(TODAY()), TRUE(), FALSE()),\n    \"IsCurrentYear\",  IF(YEAR([Date]) = YEAR(TODAY()), TRUE(), FALSE())\n)",
-      "calendarauto_variant": "// CALENDARAUTO scans all date columns in the model and automatically\n// sets the start/end to cover all dates found (full calendar years).\n// Use when fact tables already exist and you want automatic range coverage.\nDateTable =\nADDCOLUMNS(\n    CALENDARAUTO(),   -- no args: auto-range; or CALENDARAUTO(9) for fiscal year end month = September\n    \"Year\",           YEAR([Date]),\n    \"Month\",          MONTH([Date]),\n    \"MonthYear\",      FORMAT([Date], \"MMM YYYY\"),\n    \"MonthSort\",      YEAR([Date]) * 100 + MONTH([Date]),\n    \"QuarterLabel\",   \"Q\" & FORMAT(QUARTER([Date]),\"0\") & \" \" & FORMAT([Date],\"YYYY\"),\n    \"QuarterSort\",    YEAR([Date]) * 10 + QUARTER([Date]),\n    \"WeekNum\",        WEEKNUM([Date], 2)\n)",
-      "calendarauto_warning": "CALENDARAUTO fails if no date or datetime columns exist in the model. It also includes dates from calculated columns and measures, which can produce unexpectedly wide ranges. Prefer explicit CALENDAR(start, end) for production models where the range is known."
-    },
-    "sort_by_column_setup": {
-      "summary": "Display labels like 'Jan 2026' or 'Q1 2026' sort alphabetically by default, which produces wrong order. Set Sort by Column to the corresponding integer sort key.",
-      "steps": [
-        "1. In Data view, select the DateTable",
-        "2. Click the MonthYear column (e.g. 'Jan 2026')",
-        "3. Column Tools ribbon > Sort by column > MonthSort (202601)",
-        "4. Repeat: select QuarterLabel > Sort by column > QuarterSort",
-        "5. Select MonthName > Sort by column > Month (1–12)",
-        "6. Select MonthShort > Sort by column > Month",
-        "7. Select YearStr > Sort by column > Year"
-      ],
-      "common_mistake": "Forgetting Sort by Column means your matrix columns show months in alphabetical order: Apr, Aug, Dec, Feb… instead of Jan, Feb, Mar. Always set it for every display label."
-    },
-    "marking_as_date_table": {
-      "requirement": "The date table MUST be marked as a Date Table for DAX time intelligence functions to work correctly. Without this, PREVIOUSMONTH, TOTALYTD, SAMEPERIODLASTYEAR, etc. either error or return wrong results.",
-      "requirements_for_marking": [
-        "The date column must be type Date (not DateTime — strip time component if needed)",
-        "No duplicate date values — exactly one row per calendar day",
-        "No blank/null values in the Date column",
-        "No missing dates — every day from start to end must be present",
-        "Must span complete calendar years (Jan 1 through Dec 31 for every year in scope)"
-      ],
-      "steps": [
-        "1. In Power BI Desktop, select the DateTable in the Data view",
-        "2. Click 'Table Tools' in the ribbon",
-        "3. Click 'Mark as date table'",
-        "4. In the dialog, select the Date column",
-        "5. Click OK — Power BI validates the column meets all requirements",
-        "6. If validation fails: check for duplicates (COUNT vs DISTINCTCOUNT), check for blanks, check range spans full years"
-      ],
-      "validation_dax": "// Run these in a blank table measure to diagnose mark-as-date-table failures:\n// Check for duplicates:\nDateDuplicates = COUNTROWS('DateTable') - DISTINCTCOUNT('DateTable'[Date])\n// Should be 0. If > 0, dates are not unique.\n\n// Check for blanks:\nDateBlanks = CALCULATE(COUNTROWS('DateTable'), ISBLANK('DateTable'[Date]))\n// Should be 0.\n\n// Check range covers full years:\nDateRangeStart = MIN('DateTable'[Date])  -- should be Jan 1\nDateRangeEnd   = MAX('DateTable'[Date])  -- should be Dec 31"
-    },
-    "relationship_to_fact_tables": {
-      "standard_pattern": {
-        "description": "Create a many-to-one relationship from the fact table's date column to DateTable[Date]. Filter direction: single (DateTable filters FactTable). This is the star schema standard.",
-        "setup": "In Model view: drag DateTable[Date] onto FactTable[SnapshotDate]. Power BI infers many-to-one automatically. Verify in the relationship editor: Cardinality = Many to one (*:1), Cross filter direction = Single.",
-        "cardinality_note": "Many-to-one means the fact table can have many rows for dates that appear once in the date table. For monthly snapshots with one row per month, there will be many date table rows with no matching fact rows — this is expected and correct."
-      },
-      "snapshot_data_join_strategy": {
-        "problem": "Security snapshot data has one row per month (or quarter), not one row per day. The snapshot date is typically the 1st of the month (2026-01-01, 2026-02-01…). A direct relationship on the Date column works technically, but time intelligence calculations only aggregate on the one day that matches — not the whole month.",
-        "correct_approach": "Join DateTable[Date] to FactTable[SnapshotDate] where SnapshotDate is always the first day of the period (created in Power Query as #date(Year, Month, 1)). This works because DateTable has a row for Jan 1, Feb 1, etc. When a month slicer selects 'Jan 2026', it filters DateTable to all 31 days of January, and only the snapshot with Date = Jan 1 matches — which is correct.",
-        "alternative_yearmonth_key": "If snapshot dates are not normalised to the 1st, add a YearMonth integer key (YYYYMM) to both tables and create the relationship on that key instead of Date. This is more robust.\n\n// In DateTable (DAX calculated column or ADDCOLUMNS):\n\"YearMonthKey\", YEAR([Date]) * 100 + MONTH([Date])   -- 202601\n\n// In FactTable (Power Query M step):\nAddYearMonthKey = Table.AddColumn(Source, \"YearMonthKey\",\n    each Date.Year([SnapshotDate]) * 100 + Date.Month([SnapshotDate]),\n    Int64.Type)\n\n// Then relationship: DateTable[YearMonthKey] (1) -> FactTable[YearMonthKey] (*)\n// This joins on YYYYMM integers — no ambiguity about day."
-      },
-      "multiple_fact_tables": {
-        "description": "When you have both monthly and quarterly fact tables, both can use the same DateTable with separate relationships.",
-        "setup": [
-          "Monthly fact table: relationship on SnapshotDate (first of month) or YearMonthKey",
-          "Quarterly fact table: relationship on QuarterStartDate (Jan 1, Apr 1, Jul 1, Oct 1) or a QuarterKey (YYYYQ)",
-          "Both relationships use the same DateTable — slicers filter both tables simultaneously"
-        ],
-        "quarterly_key_example": "// Add QuarterKey to DateTable:\n\"QuarterKey\", YEAR([Date]) * 10 + QUARTER([Date])   -- 20261, 20262 …\n\n// In quarterly fact table (Power Query M):\nAddQuarterKey = Table.AddColumn(Source, \"QuarterKey\",\n    each Date.Year([QuarterStartDate]) * 10 + Date.QuarterOfYear([QuarterStartDate]),\n    Int64.Type)"
-      }
-    },
-    "range_join_vs_snapshot_join": {
-      "snapshot_join": {
-        "description": "Security data is almost always snapshot data: a count of vulnerabilities or alerts as-of a point in time. The join is point-in-time: fact row matches the date table row for the exact snapshot date. This is the correct and simple approach.",
-        "example": "Fact row: {SnapshotDate: 2026-03-01, Metric: 'Sev5 Count', Value: 142}\nDate table row: {Date: 2026-03-01, Month: 3, QuarterLabel: 'Q1 2026'}\nJoin: FactTable[SnapshotDate] = DateTable[Date] — works directly."
-      },
-      "range_join": {
-        "description": "Range joins (fact row covers a date range, e.g. a vulnerability open from Jan 15 to Feb 20) are not natively supported in Power BI relationships. They require DAX workarounds using CALCULATE with FILTER or bridge tables.",
-        "when_needed": "Only needed if you're tracking incident duration, time-to-remediate, or SLA compliance across calendar periods — not for periodic snapshot data.",
-        "workaround_pattern": "// For range-based reporting (e.g. how many vulns were OPEN in each month):\n// Do NOT try to create a range relationship.\n// Instead: build a bridge table in Power Query that explodes each open period\n// into one row per month it covers:\n\n// Power Query M: expand date ranges to month-rows\nExpandRanges = Table.TransformRows(FactTable, (row) =>\n    let\n        StartMonth = Date.StartOfMonth(row[OpenDate]),\n        EndMonth   = Date.StartOfMonth(row[CloseDate] ?? DateTime.Date(DateTime.LocalNow())),\n        MonthCount = Duration.Days(EndMonth - StartMonth) / 30 + 1,\n        Months     = List.Generate(\n            () => StartMonth,\n            each _ <= EndMonth,\n            each Date.AddMonths(_, 1)\n        )\n    in\n        List.Transform(Months, (m) => Record.AddField(row, \"MonthDate\", m))\n)"
-      }
-    },
-    "common_mistakes": [
-      "Using CALENDARAUTO() before any date columns exist in the model — causes an error. Load at least one fact table first.",
-      "Not setting Sort by Column on MonthYear/QuarterLabel columns — months sort alphabetically.",
-      "Forgetting to Mark as Date Table — PREVIOUSMONTH and TOTALYTD silently return wrong results.",
-      "Creating the date table with DateTime type instead of Date — mark-as-date-table validation fails.",
-      "Using a date table that doesn't cover the full first and last years — time intelligence for those boundary years is incorrect.",
-      "Building separate date tables for different fact tables — breaks cross-table slicer filtering.",
-      "Joining snapshot fact tables on a non-normalised date (e.g. 2026-03-15 instead of 2026-03-01) — time intelligence functions skip those months.",
-      "Leaving Auto date/time enabled alongside a manual date table — creates hidden duplicate date hierarchies that confuse drill-down in visuals."
-    ]
-  }
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/guidance/model-date-tables"
+  ],
+  "implementation_notes": [
+    "Production DAX date table (create as Calculated Table: Modeling > New Table):\n```dax\nDateTable =\nVAR _Start = DATE(2023, 1, 1)\nVAR _End   = DATE(2027, 12, 31)\nVAR _Base  = CALENDAR(_Start, _End)\nRETURN\nADDCOLUMNS(_Base,\n    -- Core integers\n    \"Year\",          YEAR([Date]),\n    \"QuarterNum\",    QUARTER([Date]),\n    \"Month\",         MONTH([Date]),\n    \"Day\",           DAY([Date]),\n    \"WeekNum\",       WEEKNUM([Date], 2),\n    \"DayOfWeek\",     WEEKDAY([Date], 2),\n    -- Sort keys (use for Sort by Column)\n    \"MonthSort\",     YEAR([Date]) * 100 + MONTH([Date]),\n    \"QuarterSort\",   YEAR([Date]) * 10  + QUARTER([Date]),\n    -- Display labels\n    \"MonthName\",     FORMAT([Date], \"MMMM\"),\n    \"MonthShort\",    FORMAT([Date], \"MMM\"),\n    \"MonthYear\",     FORMAT([Date], \"MMM YYYY\"),\n    \"MonthYearISO\",  FORMAT([Date], \"YYYY-MM\"),\n    \"QuarterLabel\",  \"Q\" & FORMAT(QUARTER([Date]),\"0\") & \" \" & FORMAT([Date],\"YYYY\"),\n    \"YearStr\",       FORMAT([Date], \"YYYY\"),\n    -- Fiscal year (October start)\n    \"FiscalYear\",    IF(MONTH([Date]) >= 10, YEAR([Date]) + 1, YEAR([Date])),\n    \"FiscalQuarter\", \"FQ\" & FORMAT(INT(MOD(MONTH([Date]) - 10 + 12, 12) / 3) + 1, \"0\"),\n    -- Flags\n    \"IsWeekend\",     IF(WEEKDAY([Date], 2) >= 6, TRUE(), FALSE()),\n    \"IsCurrentMonth\",IF(YEAR([Date]) = YEAR(TODAY()) && MONTH([Date]) = MONTH(TODAY()), TRUE(), FALSE())\n)\n```",
+    "Power Query M date table alternative:\n```m\nlet\n    StartDate = #date(2023, 1, 1),\n    EndDate   = Date.From(DateTime.LocalNow()),\n    DateCount = Duration.Days(EndDate - StartDate) + 1,\n    DateList  = List.Dates(StartDate, DateCount, #duration(1, 0, 0, 0)),\n    Base      = Table.FromList(DateList, Splitter.SplitByNothing(), {\"Date\"}),\n    Typed     = Table.TransformColumnTypes(Base, {{\"Date\", type date}}),\n    AddYear   = Table.AddColumn(Typed, \"Year\", each Date.Year([Date]), Int64.Type),\n    AddMonth  = Table.AddColumn(AddYear, \"MonthNumber\", each Date.Month([Date]), Int64.Type),\n    AddMonthName = Table.AddColumn(AddMonth, \"MonthName\", each Date.ToText([Date], \"MMMM\"), type text),\n    AddYearMonth = Table.AddColumn(AddMonthName, \"YearMonth\",\n        each Text.From([Year]) & \"-\" & Text.PadStart(Text.From([MonthNumber]), 2, \"0\"), type text),\n    AddQuarter = Table.AddColumn(AddYearMonth, \"Quarter\",\n        each \"Q\" & Text.From(Date.QuarterOfYear([Date])), type text),\n    Sorted = Table.Sort(AddQuarter, {{\"Date\", Order.Ascending}})\nin\n    Sorted\n```",
+    "Sort by Column setup steps:\n1. Data view > select DateTable\n2. Click MonthYear column > Column Tools > Sort by column > MonthSort\n3. Click QuarterLabel > Sort by column > QuarterSort\n4. Click MonthName > Sort by column > Month\n5. Click YearStr > Sort by column > Year",
+    "Mark as Date Table steps:\n1. Data view > select DateTable\n2. Table Tools ribbon > Mark as date table\n3. Select the Date column > OK\n4. If validation fails, check: duplicates (COUNTROWS vs DISTINCTCOUNT), blanks, full year coverage",
+    "Snapshot data join strategy:\n```\n// Option 1: Join on Date directly (snapshot dates must be 1st of month)\nDateTable[Date] (1) → FactTable[SnapshotDate] (*)\n\n// Option 2: Join on YearMonthKey (more robust)\n// DateTable: \"YearMonthKey\", YEAR([Date]) * 100 + MONTH([Date])\n// FactTable (M): Table.AddColumn(Source, \"YearMonthKey\",\n//     each Date.Year([SnapshotDate]) * 100 + Date.Month([SnapshotDate]), Int64.Type)\nDateTable[YearMonthKey] (1) → FactTable[YearMonthKey] (*)\n```",
+    "Multiple fact tables sharing one DateTable:\n- Monthly fact: relationship on SnapshotDate (1st of month) or YearMonthKey\n- Quarterly fact: relationship on QuarterStartDate (Jan 1, Apr 1, Jul 1, Oct 1) or QuarterKey (YYYYQ)\n- Both use the same DateTable — slicers filter both tables simultaneously"
+  ],
+  "caveats": [
+    "CALENDARAUTO() fails if no date columns exist in the model — load at least one fact table first",
+    "Not setting Sort by Column on MonthYear/QuarterLabel causes alphabetical ordering",
+    "Forgetting to Mark as Date Table makes PREVIOUSMONTH/TOTALYTD silently return wrong results",
+    "DateTime type instead of Date causes mark-as-date-table validation to fail",
+    "Date table must cover full years — partial first/last years break time intelligence for those boundaries",
+    "Joining snapshot data on non-normalised dates (e.g. 2026-03-15 instead of 2026-03-01) skips those months",
+    "Leaving Auto date/time enabled alongside a manual date table creates hidden duplicate date hierarchies",
+    "Building separate date tables for different fact tables breaks cross-table slicer filtering"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-time-intelligence-mom-qoq-yoy", "powerbi-snapshot-data-modeling", "powerbi-visualizations-and-dax", "powerbi-monthly-dynamic-reports"],
+  "source_projects": ["shared-seed"]
 }

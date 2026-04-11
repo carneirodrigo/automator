@@ -2572,19 +2572,27 @@
     },
     {
       "id": "powerbi-sharepoint-csv-datasource",
-      "title": "Power BI - SharePoint CSV Data Source Connection",
+      "title": "Power BI SharePoint CSV Data Source \u2014 Folder Connector, Authentication, Scheduled Refresh",
       "description": "Connect Power BI to CSV files in SharePoint document libraries using the Folder connector and Power Query M",
       "tags": [
         "power-bi",
         "sharepoint",
         "csv",
+        "data-source",
+        "scheduled-refresh",
         "power-query"
       ],
-      "file": "powerbi-sharepoint-csv-datasource.json"
+      "file": "powerbi-sharepoint-csv-datasource.json",
+      "source_family": "power-bi",
+      "coverage_type": "patterns",
+      "summary": "SharePoint folder connector, CSV combine M code, authentication (OAuth2 vs SP), scheduled refresh config, auto-pickup of new files",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z"
     },
     {
       "id": "powerbi-monthly-dynamic-reports",
-      "title": "Power BI - Dynamic Monthly Reports from SharePoint CSVs",
+      "title": "Power BI Dynamic Monthly Reports \u2014 SharePoint CSV Combine, Date Extraction, Auto-Refresh",
       "description": "Auto-adjusting monthly reports: combine CSVs by month, date dimension, time intelligence, slicer patterns",
       "tags": [
         "power-bi",
@@ -2592,74 +2600,101 @@
         "csv",
         "monthly",
         "dynamic",
-        "dax"
+        "power-query"
       ],
-      "file": "powerbi-monthly-dynamic-reports.json"
+      "file": "powerbi-monthly-dynamic-reports.json",
+      "source_family": "power-bi",
+      "coverage_type": "patterns",
+      "summary": "File naming conventions, date extraction from filenames, full M combine query, DAX date table, month slicer, auto-refresh on upload",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z"
     },
     {
       "id": "powerbi-visualizations-and-dax",
-      "title": "Power BI - Visualizations, Charts, and DAX Measures",
+      "title": "Power BI Visualizations, Charts, and DAX Measure Patterns",
       "description": "All visual types, how to configure them, DAX measure patterns including time intelligence",
       "tags": [
         "power-bi",
         "dax",
-        "charts",
         "visualizations",
-        "measures"
+        "charts",
+        "measures",
+        "calculate",
+        "star-schema"
       ],
-      "file": "powerbi-visualizations-and-dax.json"
+      "file": "powerbi-visualizations-and-dax.json",
+      "source_family": "power-bi",
+      "coverage_type": "patterns",
+      "summary": "Visual selection guide, DAX aggregations/CALCULATE/filter manipulation, conditional formatting, star schema, report design best practices",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z"
     },
     {
       "id": "powerbi-power-query-m-reference",
-      "title": "Power BI - Power Query M Language Reference",
+      "title": "Power Query M Language Reference \u2014 Syntax, Functions, SharePoint CSV Patterns",
       "description": "M language syntax, SharePoint functions, CSV parsing, table/text/date functions, complete templates",
       "tags": [
         "power-bi",
         "power-query",
         "m-language",
         "sharepoint",
-        "csv"
+        "csv",
+        "table-functions"
       ],
-      "file": "powerbi-power-query-m-reference.json"
+      "file": "powerbi-power-query-m-reference.json",
+      "source_family": "power-bi",
+      "coverage_type": "reference",
+      "summary": "M syntax (let/in, each), table/text/date/list functions, SharePoint.Files connector, CSV combine template, custom function pattern",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z"
     },
     {
       "id": "powerbi-rest-api-and-deployment",
-      "title": "Power BI - REST API, Deployment and .pbix Structure",
+      "title": "Power BI REST API \u2014 Import, Refresh, Credentials, Workspace Management, Python Patterns",
       "description": "REST API endpoints for import/refresh/credentials, authentication, .pbix file format internals, workspace concepts",
       "tags": [
         "power-bi",
         "rest-api",
         "deployment",
         "pbix",
-        "automation"
+        "automation",
+        "python",
+        "refresh"
       ],
-      "file": "powerbi-rest-api-and-deployment.json"
+      "file": "powerbi-rest-api-and-deployment.json",
+      "source_family": "power-bi",
+      "coverage_type": "endpoint",
+      "summary": "Python patterns for PBIX import, trigger/poll refresh, scheduled refresh config, parameter updates, workspace management, export to PDF",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z"
     },
     {
       "id": "powerbi-date-calendar-table-patterns",
-      "title": "Power BI - Date/Calendar Table Production Patterns for Security Reporting",
+      "title": "Power BI Date/Calendar Table \u2014 DAX and M Patterns, Mark as Date Table, Snapshot Join Strategy",
       "description": "Production DAX and M patterns for a fully-featured date dimension: CALENDAR, CALENDARAUTO, all required columns (Year, Quarter, QuarterLabel, Month, MonthYear, MonthSort, QuarterSort, WeekNum), mark as date table, relationships to snapshot fact tables, snapshot vs range join strategy",
       "tags": [
         "power-bi",
-        "dax",
         "date-table",
         "calendar",
         "time-intelligence",
-        "security-reporting",
         "star-schema"
       ],
       "file": "powerbi-date-calendar-table-patterns.json",
       "source_family": "power-bi",
-      "coverage_type": "pattern",
+      "coverage_type": "patterns",
       "created": "2026-04-03T00:00:00Z",
-      "updated": "2026-04-03T00:00:00Z",
-      "last_verified": "2026-04-03T00:00:00Z",
-      "fresh_until": "2027-04-03T00:00:00Z",
-      "summary": "Full production DAX date table with CALENDAR/CALENDARAUTO, all display and sort columns (MonthYear, QuarterLabel, MonthSort, QuarterSort, WeekNum, fiscal year), mark-as-date-table requirements and validation, Sort by Column setup, and snapshot join strategy including YearMonthKey integer key for robust period matching"
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Production DAX/M calendar table, Sort by Column setup, mark as date table, snapshot data join strategy, YearMonthKey pattern"
     },
     {
       "id": "powerbi-time-intelligence-mom-qoq-yoy",
-      "title": "Power BI - Time Intelligence DAX: MoM, QoQ, YoY, Rolling Windows, Missing Periods",
+      "title": "Power BI Time Intelligence DAX \u2014 MoM, QoQ, YoY, Rolling Windows, Missing Periods",
       "description": "Production DAX for period-over-period comparisons: MoM, QoQ, YoY absolute and percent change, YTD/QTD, running totals, last-N-periods rolling windows, DATEADD patterns, and handling missing snapshot months with COALESCE and LASTNONBLANK",
       "tags": [
         "power-bi",
@@ -2668,48 +2703,41 @@
         "mom",
         "qoq",
         "yoy",
-        "dateadd",
-        "security-reporting",
-        "rolling-window",
-        "missing-data"
+        "rolling-window"
       ],
       "file": "powerbi-time-intelligence-mom-qoq-yoy.json",
       "source_family": "power-bi",
-      "coverage_type": "pattern",
+      "coverage_type": "patterns",
       "created": "2026-04-03T00:00:00Z",
-      "updated": "2026-04-03T00:00:00Z",
-      "last_verified": "2026-04-03T00:00:00Z",
-      "fresh_until": "2027-04-03T00:00:00Z",
-      "summary": "Complete DAX patterns for MoM/QoQ/YoY change (absolute and %), PREVIOUSMONTH/PREVIOUSQUARTER/SAMEPERIODLASTYEAR, DATEADD, DATESINPERIOD rolling windows, TOTALYTD/QTD, LASTNONBLANK carry-forward for missing months, and multi-metric single-measure pattern"
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "PREVIOUSMONTH/DATEADD/SAMEPERIODLASTYEAR measures, rolling windows, YTD/QTD, carry-forward for missing periods, multi-metric pattern"
     },
     {
       "id": "powerbi-matrix-table-advanced-patterns",
-      "title": "Power BI - Matrix and Table Visual Advanced Patterns for Security Reporting",
+      "title": "Power BI Matrix and Table Advanced Patterns \u2014 Conditional Formatting, Grand Totals, Drill-Through, Sparklines",
       "description": "Production patterns for the security reporting matrix layout (metrics as rows, periods as columns), RAG conditional formatting with icons and color scales, delta columns, fixed column ordering, grand total override with ISINSCOPE, drill-through, and sparklines",
       "tags": [
         "power-bi",
         "matrix",
         "table",
         "conditional-formatting",
-        "security-reporting",
-        "rag",
         "drill-through",
-        "period-comparison",
-        "isinscope",
-        "sparkline"
+        "sparklines"
       ],
       "file": "powerbi-matrix-table-advanced-patterns.json",
       "source_family": "power-bi",
-      "coverage_type": "pattern",
+      "coverage_type": "patterns",
       "created": "2026-04-03T00:00:00Z",
-      "updated": "2026-04-03T00:00:00Z",
-      "last_verified": "2026-04-03T00:00:00Z",
-      "fresh_until": "2027-04-03T00:00:00Z",
-      "summary": "Matrix visual configuration for security dashboards: rows=metric, columns=period, Sort by Column fix for chronological ordering, conditional formatting rules for RAG icons and background colors, delta columns with MoM labels, grand total suppression and ISINSCOPE override, drill-through setup, and native sparklines"
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Matrix field wells, RAG conditional formatting rules/icons, ISINSCOPE grand total overrides, drill-through setup, sparkline configuration"
     },
     {
       "id": "powerbi-period-slicer-and-crossfilter",
-      "title": "Power BI - Period Slicer, Sync, Bookmarks, and Field Parameters for Security Dashboards",
+      "title": "Power BI Slicers, Sync, Bookmarks, Field Parameters, and Cross-Filter Control",
       "description": "Production patterns for date slicers (between, relative, dropdown, tile), syncing slicers across pages, default last-12-months behaviour, bookmarks for Monthly/Quarterly/Yearly view switching, and field parameters for dynamic axis switching without bookmarks",
       "tags": [
         "power-bi",
@@ -2717,23 +2745,20 @@
         "cross-filter",
         "bookmarks",
         "field-parameters",
-        "sync-slicers",
-        "security-reporting",
-        "date-slicer",
-        "relative-date"
+        "sync-slicers"
       ],
       "file": "powerbi-period-slicer-and-crossfilter.json",
       "source_family": "power-bi",
-      "coverage_type": "pattern",
+      "coverage_type": "patterns",
       "created": "2026-04-03T00:00:00Z",
-      "updated": "2026-04-03T00:00:00Z",
-      "last_verified": "2026-04-03T00:00:00Z",
-      "fresh_until": "2027-04-03T00:00:00Z",
-      "summary": "Slicer types (list, dropdown, between date range, relative date, tile), sync slicers across pages, default last-12-months pattern, bookmark-based Monthly/Quarterly/Yearly view switcher with hidden visual groups, field parameters for dynamic axis switching, and cross-filter Edit interactions control"
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Slicer types, sync across pages, bookmark view switching, field parameters for dynamic axes, cross-filter control, default last 12 months"
     },
     {
       "id": "powerbi-security-dashboard-layout-patterns",
-      "title": "Power BI - Security Metrics Dashboard Layout Patterns",
+      "title": "Power BI Security Dashboard Layout \u2014 KPI Cards, RAG Status, Matrix, Trend Charts, Drill-Through",
       "description": "Production patterns for security reporting: KPI cards with prior-period comparison, RAG traffic-light status columns, multi-metric matrix layout with sparklines, threshold-driven conditional formatting, dynamic titles, trend charts, and drill-through from summary to detail",
       "tags": [
         "power-bi",
@@ -2741,45 +2766,37 @@
         "kpi",
         "rag",
         "dashboard-layout",
-        "sparkline",
-        "drill-through",
-        "conditional-formatting",
-        "vulnerability-reporting",
-        "kpi-card"
+        "drill-through"
       ],
       "file": "powerbi-security-dashboard-layout-patterns.json",
       "source_family": "power-bi",
-      "coverage_type": "pattern",
+      "coverage_type": "patterns",
       "created": "2026-04-03T00:00:00Z",
-      "updated": "2026-04-03T00:00:00Z",
-      "last_verified": "2026-04-03T00:00:00Z",
-      "fresh_until": "2027-04-03T00:00:00Z",
-      "summary": "Security dashboard page layout: KPI card row with vs-prior-month comparison, RAG icon column with per-metric thresholds from MetricDim via SELECTEDVALUE, multi-metric matrix rows with sparklines, trend line chart with normalisation for mixed-scale metrics, and drill-through configuration"
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Summary page zones, KPI cards with comparison, dynamic RAG thresholds, normalised trend measures, drill-through setup, sparklines"
     },
     {
       "id": "powerbi-snapshot-data-modeling",
-      "title": "Power BI - Data Modeling for Security Snapshot Data: Star Schema, Unpivoting, and Period Combination",
+      "title": "Power BI Data Modeling for Security Snapshots \u2014 Star Schema, Unpivoting, Period Combination",
       "description": "Production modeling for periodic security snapshot data: star schema design, MetricDim dimension table, unpivoting wide CSVs to tall fact tables in Power Query M, combining monthly and quarterly snapshots, YearMonthKey join pattern, and why deltas must stay in DAX not the fact table",
       "tags": [
         "power-bi",
         "data-modeling",
         "star-schema",
-        "power-query",
         "unpivot",
         "security-reporting",
-        "snapshot-data",
-        "fact-table",
-        "sharepoint-csv",
-        "metric-dimension"
+        "snapshot-data"
       ],
       "file": "powerbi-snapshot-data-modeling.json",
       "source_family": "power-bi",
-      "coverage_type": "pattern",
+      "coverage_type": "patterns",
       "created": "2026-04-03T00:00:00Z",
-      "updated": "2026-04-03T00:00:00Z",
-      "last_verified": "2026-04-03T00:00:00Z",
-      "fresh_until": "2027-04-03T00:00:00Z",
-      "summary": "Star schema for security snapshots: SecuritySnapshots fact table grain (one row per period per metric), MetricDim with thresholds and sort order, YearMonthKey integer join key, Table.UnpivotOtherColumns M pattern to convert wide CSV exports to tall fact tables, combining monthly and quarterly snapshots with PeriodType flag, and Excel file variant"
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Star schema design, tall vs wide format, unpivot M code, MetricDim dimension, MoM/YoY DAX, dynamic RAG thresholds, combining monthly+quarterly snapshots"
     },
     {
       "id": "sentinel-rest-api-direct-http-patterns",

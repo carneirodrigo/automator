@@ -1,254 +1,69 @@
 {
   "id": "powerbi-power-query-m-reference",
-  "title": "Power BI - Power Query M Language Reference",
-  "description": "M language syntax, SharePoint functions, CSV parsing, table/text/date functions, complete templates",
-  "tags": ["power-bi", "power-query", "m-language", "sharepoint", "csv"],
-  "source": "web-research",
-  "references": [
+  "title": "Power Query M Language Reference — Syntax, Functions, SharePoint CSV Patterns",
+  "source_family": "power-bi",
+  "coverage_type": "reference",
+  "applies_to": ["Power Query M authoring", "SharePoint CSV loading", "Data transformation in Power BI", "Combining multiple files"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "M queries use let/in structure: each line in 'let' is a named step (lazy evaluation), 'in' specifies the final output. Steps are named expressions, not sequential instructions.",
+      "source_url": "https://learn.microsoft.com/en-us/powerquery-m/power-query-m-language-specification",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "'each' is shorthand for (_) => where _ is the implicit parameter. Inside 'each', [ColumnName] accesses the current row's field. each [Amount] > 100 is equivalent to (_) => _[Amount] > 100.",
+      "source_url": "https://learn.microsoft.com/en-us/powerquery-m/power-query-m-language-specification",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "SharePoint.Files(url, [ApiVersion=15]) connects to a SharePoint site and returns ALL files in ALL document libraries recursively. URL must be root site only (no library path). Returns columns: Content (binary), Name, Extension, Date modified, Folder Path.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/connectors/sharepoint-folder",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Csv.Document(binary, [Delimiter, Columns, Encoding, QuoteStyle]) parses CSV binary into a table. Encoding 65001=UTF-8, 1252=Windows Latin-1. QuoteStyle.Csv handles quoted fields with commas.",
+      "source_url": "https://learn.microsoft.com/en-us/powerquery-m/csv-document",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Table.UnpivotOtherColumns(table, fixedColumns, attributeName, valueName) unpivots all columns except the fixed ones — robust when new metric columns appear in newer files.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/unpivot-column",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "M type system: text, number, Int64.Type, Currency.Type, date, datetime, datetimezone, duration, logical, list, table, record, binary, null. Date literals use #date(YYYY, M, D) syntax.",
+      "source_url": "https://learn.microsoft.com/en-us/powerquery-m/power-query-m-type-system",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Error handling: try expression otherwise defaultValue. Example: try Number.FromText([Value]) otherwise 0.",
+      "source_url": "https://learn.microsoft.com/en-us/powerquery-m/error-handling",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
     "https://learn.microsoft.com/en-us/powerquery-m/power-query-m-language-specification",
-    "https://learn.microsoft.com/en-us/powerquery-m/sharepoint-files",
-    "https://learn.microsoft.com/en-us/power-query/combine-files-csv",
     "https://learn.microsoft.com/en-us/power-query/connectors/sharepoint-folder"
   ],
-  "content": {
-    "m_syntax_basics": {
-      "let_in_block": "// All M queries use let/in structure\n// Each line in let is a 'step' — a named expression\n// Steps are evaluated lazily (only if needed)\n// 'in' specifies the final output value\nlet\n    Step1 = someExpression,\n    Step2 = transformStep1(Step1),\n    Step3 = anotherTransform(Step2)\nin\n    Step3",
-      "step_references": "Each step name refers to the result of that step. Steps are NOT sequential instructions — they are named expressions. Power Query only evaluates steps reachable from the 'in' expression.",
-      "each_keyword": "// 'each' is shorthand for (_) => where _ is the implicit parameter\n// These are equivalent:\nTable.SelectRows(Source, each [Amount] > 100)\nTable.SelectRows(Source, (_) => _[Amount] > 100)\n\n// Access a column by name with [ColumnName] inside 'each'\n// _ is the current row record",
-      "implicit_parameter": "// _ (underscore) is the implicit parameter in 'each' expressions\n// These all mean the same thing:\neach _ > 0\neach Number.IsPositive(_)\n(x) => x > 0",
-      "type_system": {
-        "text": "type text — string values, e.g. \"hello\"",
-        "number": "type number — decimal numbers, e.g. 3.14",
-        "int64": "Int64.Type — whole numbers (64-bit integer)",
-        "currency": "Currency.Type — fixed decimal with 4 decimal places",
-        "date": "type date — date without time, e.g. #date(2024, 1, 15)",
-        "datetime": "type datetime — date with time, e.g. #datetime(2024, 1, 15, 9, 30, 0)",
-        "datetimezone": "type datetimezone — datetime with timezone offset",
-        "duration": "type duration — time span, e.g. #duration(1, 0, 0, 0) = 1 day",
-        "logical": "type logical — TRUE/FALSE",
-        "list": "type list — ordered collection, e.g. {1, 2, 3}",
-        "table": "type table — tabular data",
-        "record": "type record — name-value pairs (like a row), e.g. [Name=\"Alice\", Age=30]",
-        "binary": "type binary — raw bytes (file content, images)",
-        "null": "null — absence of a value (equivalent to BLANK in DAX)"
-      },
-      "literals": {
-        "text": "\"hello world\"",
-        "number": "42  or  3.14",
-        "date": "#date(2024, 1, 15)",
-        "datetime": "#datetime(2024, 1, 15, 9, 30, 0)",
-        "duration": "#duration(days, hours, minutes, seconds)  // e.g. #duration(1, 0, 0, 0) = 1 day",
-        "logical": "true  or  false",
-        "list": "{1, 2, 3, \"a\", \"b\"}",
-        "record": "[Name = \"Alice\", Age = 30]",
-        "null_value": "null"
-      },
-      "accessing_record_fields": "// Access a field in a record using square brackets\nrecord[FieldName]\n// In 'each' context, _ is the row record:\neach _[Amount]\n// Same as:\neach [Amount]  // _ is implicit",
-      "accessing_list_elements": "// Access element by index (zero-based)\nmyList{0}   // first element\nmyList{2}   // third element\n// Access named record within a list:\nmyTable{[Name=\"Alice\"]}  // row where Name = \"Alice\"",
-      "error_handling": "// try/otherwise for error handling\ntry someExpression otherwise defaultValue\n// Example:\ntry Number.FromText([Value]) otherwise 0"
-    },
-    "sharepoint_functions": {
-      "sharepoint_files": {
-        "signature": "SharePoint.Files(url as text, [options as record]) as table",
-        "description": "Connects to a SharePoint site and returns a table listing ALL files in ALL document libraries on that site, recursively.",
-        "url_format": "Root site URL only, e.g. https://contoso.sharepoint.com/sites/MySite. Do NOT include the library or folder path.",
-        "options": "[ApiVersion=15] for SharePoint Online. 15 = REST API v15.",
-        "returned_columns": ["Content (binary)", "Name", "Extension", "Date accessed", "Date modified", "Date created", "Attributes", "Folder Path"],
-        "example": "Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/Reports\", [ApiVersion=15])",
-        "notes": "Returns metadata for all files. The Content column holds the binary file data needed for parsing."
-      },
-      "sharepoint_contents": {
-        "signature": "SharePoint.Contents(url as text, [options as record]) as table",
-        "description": "Returns a hierarchical folder/file structure rather than a flat file list. Useful for navigating to a specific library first.",
-        "example": "// Navigate to a specific library\nSource = SharePoint.Contents(\"https://contoso.sharepoint.com/sites/MySite\", [ApiVersion=15]),\nDocLib = Source{[Name=\"Shared Documents\"]}[Content],\nSubFolder = DocLib{[Name=\"Reports\"]}[Content]"
-      },
-      "filtering_files": "// After SharePoint.Files(), filter to specific folder:\nFilteredFiles = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Shared Documents/Reports/\")),\n\n// Filter to specific extension:\nCSVOnly = Table.SelectRows(FilteredFiles, each [Extension] = \".csv\"),\n\n// Filter to files modified after a date:\nRecentFiles = Table.SelectRows(Source, each [Date modified] >= #datetime(2024, 1, 1, 0, 0, 0))"
-    },
-    "csv_parsing": {
-      "csv_document_function": {
-        "signature": "Csv.Document(source as any, [columns as any], [delimiter as any], [extraValues as any], [encoding as any]) as table",
-        "description": "Parses a CSV binary into a table. The record form is preferred for explicit parameter naming.",
-        "record_form_example": "Csv.Document(\n    binaryContent,\n    [\n        Delimiter    = \",\",          // column separator\n        Columns      = null,          // null = auto-detect column count\n        Encoding     = 65001,         // 65001 = UTF-8; 1252 = Windows Latin-1\n        QuoteStyle   = QuoteStyle.None // or QuoteStyle.Csv (handles quoted fields with commas)\n    ]\n)",
-        "common_encoding_codes": {
-          "65001": "UTF-8 (recommended for SharePoint Online files)",
-          "1252": "Windows-1252 (Western European, legacy)",
-          "65000": "UTF-7",
-          "1200": "UTF-16 LE",
-          "20127": "US-ASCII"
-        },
-        "handle_semicolon_delimiter": "Csv.Document(binary, [Delimiter=\";\", Encoding=65001])",
-        "handle_tab_delimiter": "Csv.Document(binary, [Delimiter=\"#(tab)\", Encoding=65001])"
-      },
-      "parsing_within_table": "// Parse CSV binary in-place within a table column:\nParseCSV = Table.AddColumn(FilesTable, \"Data\",\n    each Csv.Document([Content], [Delimiter=\",\", Encoding=65001, QuoteStyle=QuoteStyle.None])\n)",
-      "promote_headers_in_each_csv": "// Promote first row to headers in each parsed table:\nWithHeaders = Table.TransformColumns(ParseCSV, {\n    \"Data\", each Table.PromoteHeaders(_, [PromoteAllScalars=true])\n})",
-      "skip_top_n_rows_before_headers": "// If CSV has 4 header/metadata rows before column names:\nSkipRows = Table.TransformColumns(ParseCSV, {\n    \"Data\", each\n        let\n            removed = Table.Skip(_, 4),          // skip first 4 rows\n            promoted = Table.PromoteHeaders(removed)\n        in promoted\n})"
-    },
-    "table_functions": {
-      "SelectRows": {
-        "signature": "Table.SelectRows(table as table, condition as function) as table",
-        "description": "Filter rows keeping only those where condition returns true",
-        "example": "// Keep rows where Amount > 0\nTable.SelectRows(Source, each [Amount] > 0)\n\n// Keep rows where Extension is .csv\nTable.SelectRows(Source, each [Extension] = \".csv\")\n\n// Multiple conditions\nTable.SelectRows(Source, each [Year] = 2024 and [Region] = \"EMEA\")"
-      },
-      "AddColumn": {
-        "signature": "Table.AddColumn(table, newColumnName as text, columnGenerator as function, [columnType as type]) as table",
-        "description": "Add a new computed column",
-        "example": "// Add a column squaring each value\nTable.AddColumn(Source, \"AmountSquared\", each [Amount] * [Amount], type number)\n\n// Add a date column from year and month\nTable.AddColumn(Source, \"MonthDate\", each #date([Year], [Month], 1), type date)"
-      },
-      "TransformColumnTypes": {
-        "signature": "Table.TransformColumnTypes(table, typeTransformations as list, [culture as nullable text]) as table",
-        "description": "Cast columns to specified types in one step",
-        "example": "Table.TransformColumnTypes(Source, {\n    {\"Date\",     type date},\n    {\"Amount\",   Currency.Type},\n    {\"Quantity\", Int64.Type},\n    {\"Name\",     type text},\n    {\"IsActive\", type logical}\n})"
-      },
-      "RenameColumns": {
-        "signature": "Table.RenameColumns(table, renames as list) as table",
-        "description": "Rename one or more columns",
-        "example": "Table.RenameColumns(Source, {\n    {\"old_name\", \"New Name\"},\n    {\"qty\", \"Quantity\"},\n    {\"amt\", \"Amount\"}\n})"
-      },
-      "SelectColumns": {
-        "signature": "Table.SelectColumns(table, columns as list) as table",
-        "description": "Keep only the specified columns (in the specified order)",
-        "example": "Table.SelectColumns(Source, {\"Date\", \"Category\", \"Amount\"})"
-      },
-      "RemoveColumns": {
-        "signature": "Table.RemoveColumns(table, columns as list) as table",
-        "description": "Remove specified columns",
-        "example": "Table.RemoveColumns(Source, {\"Content\", \"Extension\", \"Attributes\", \"Folder Path\"})"
-      },
-      "PromoteHeaders": {
-        "signature": "Table.PromoteHeaders(table, [options]) as table",
-        "description": "Make the first row the column headers",
-        "example": "Table.PromoteHeaders(Source, [PromoteAllScalars=true])"
-      },
-      "Combine": {
-        "signature": "Table.Combine(tables as list) as table",
-        "description": "Union / append multiple tables into one. All tables should have compatible schemas.",
-        "example": "// Combine a list of tables\nTable.Combine({Table1, Table2, Table3})\n\n// Combine from a column of tables:\nTable.Combine(ExpandedList[ParsedCSV])"
-      },
-      "ExpandTableColumn": {
-        "signature": "Table.ExpandTableColumn(table, column as text, columnNames as list, [newColumnNames as list]) as table",
-        "description": "Expand a column containing nested tables into multiple flat columns",
-        "example": "// Expand ParsedCSV column, keeping named columns\nTable.ExpandTableColumn(ParseCSV, \"ParsedCSV\", {\"Date\", \"Category\", \"Amount\"})\n\n// Dynamic: expand using column names from first parsed table\nTable.ExpandTableColumn(ParseCSV, \"ParsedCSV\", Table.ColumnNames(ParseCSV{0}[ParsedCSV]))"
-      },
-      "Group": {
-        "signature": "Table.Group(table, key as list, aggregatedColumns as list) as table",
-        "description": "Group rows by key columns and apply aggregation functions",
-        "example": "// Sum Amount by Year and Month\nTable.Group(Source, {\"Year\", \"Month\"}, {\n    {\"Total Amount\", each List.Sum([Amount]), type number},\n    {\"Row Count\",   each Table.RowCount(_), Int64.Type},\n    {\"Avg Amount\",  each List.Average([Amount]), type number}\n})"
-      },
-      "Sort": {
-        "signature": "Table.Sort(table, comparisonCriteria as list) as table",
-        "description": "Sort table rows",
-        "example": "Table.Sort(Source, {{\"Year\", Order.Ascending}, {\"Month\", Order.Ascending}})"
-      },
-      "Skip": {
-        "signature": "Table.Skip(table, countOrCondition as any) as table",
-        "description": "Skip the first N rows",
-        "example": "Table.Skip(Source, 4)  // skip first 4 rows"
-      },
-      "FirstN": {
-        "signature": "Table.FirstN(table, countOrCondition) as table",
-        "description": "Keep only the first N rows",
-        "example": "Table.FirstN(Source, 100)"
-      },
-      "Pivot": {
-        "signature": "Table.Pivot(table, pivotValues, attributeColumn, valueColumn, [aggregation]) as table",
-        "description": "Pivot a column of values into multiple columns",
-        "example": "// Turn month names into columns\nTable.Pivot(Source, List.Distinct(Source[MonthName]), \"MonthName\", \"Amount\", List.Sum)"
-      },
-      "Unpivot": {
-        "signature": "Table.Unpivot(table, pivotColumns, attributeNewColumnName, valueNewColumnName) as table",
-        "description": "Unpivot multiple columns into rows (opposite of pivot)",
-        "example": "// Turn month columns Jan, Feb, Mar into rows\nTable.Unpivot(Source, {\"Jan\", \"Feb\", \"Mar\"}, \"Month\", \"Amount\")"
-      },
-      "Join": {
-        "signature": "Table.Join(table1, key1, table2, key2, [joinKind]) as table",
-        "description": "Join two tables. JoinKind options: JoinKind.Inner (default), Left, Right, Full, LeftAnti, RightAnti",
-        "example": "Table.Join(\n    SalesTable,  \"ProductID\",\n    ProductTable, \"ProductID\",\n    JoinKind.Left\n)"
-      },
-      "TransformColumns": {
-        "signature": "Table.TransformColumns(table, transformations as list) as table",
-        "description": "Apply a transformation function to values in specified columns",
-        "example": "// Convert all text in Name column to uppercase, and parse Amount as number\nTable.TransformColumns(Source, {\n    {\"Name\",   Text.Upper,         type text},\n    {\"Amount\", Number.FromText,    type number}\n})"
-      }
-    },
-    "text_functions": {
-      "Contains": "Text.Contains(text as nullable text, substring as text, [comparer as nullable function]) as nullable logical\n// Example:\nText.Contains([Folder Path], \"/Reports/\")  // returns true/false",
-      "StartsWith": "Text.StartsWith(text, prefix)\n// Example: Text.StartsWith([Name], \"report_\")",
-      "EndsWith": "Text.EndsWith(text, suffix)\n// Example: Text.EndsWith([Name], \".csv\")",
-      "Middle": "Text.Middle(text, offset, count)\n// Zero-based offset. Example: extract year from 'report_2024_01.csv'\nText.Middle(\"report_2024_01.csv\", 7, 4)  // returns \"2024\"",
-      "Start": "Text.Start(text, count)\n// Example: Text.Start(\"report_2024\", 6)  // returns \"report\"",
-      "End": "Text.End(text, count)\n// Example: Text.End(\"report_2024\", 4)  // returns \"2024\"",
-      "Split": "Text.Split(text, delimiter) as list\n// Returns a list of substrings\n// Example: Text.Split(\"2024-01\", \"-\")  // returns {\"2024\", \"01\"}\n// Access element: Text.Split(\"2024-01\", \"-\"){0}  // \"2024\"",
-      "Length": "Text.Length(text)\n// Example: Text.Length(\"hello\")  // 5",
-      "Trim": "Text.Trim(text, [trimChars])\n// Remove leading/trailing whitespace\nText.Trim(\"  hello  \")  // \"hello\"",
-      "TrimStart": "Text.TrimStart(text, [trimChars])\n// Remove leading characters only",
-      "TrimEnd": "Text.TrimEnd(text, [trimChars])\n// Remove trailing characters only",
-      "Upper": "Text.Upper(text)\n// Example: Text.Upper(\"hello\")  // \"HELLO\"",
-      "Lower": "Text.Lower(text)\n// Example: Text.Lower(\"HELLO\")  // \"hello\"",
-      "PadStart": "Text.PadStart(text, count, [paddingCharacter])\n// Pad with character on the left to reach count length\n// Example: Text.PadStart(\"3\", 2, \"0\")  // \"03\"\n// Useful for month numbers: Text.PadStart(Text.From(5), 2, \"0\")  // \"05\"",
-      "PadEnd": "Text.PadEnd(text, count, [paddingCharacter])\n// Pad with character on the right",
-      "Replace": "Text.Replace(text, old, new)\n// Example: Text.Replace(\"hello-world\", \"-\", \"_\")  // \"hello_world\"",
-      "From": "Text.From(value, [culture])\n// Convert any value to text\n// Example: Text.From(2024)  // \"2024\"",
-      "BetweenDelimiters": "Text.BetweenDelimiters(text, startDelimiter, endDelimiter)\n// Extract text between two delimiters\n// Example: Text.BetweenDelimiters(\"[Category]\", \"[\", \"]\")  // \"Category\""
-    },
-    "number_functions": {
-      "FromText": "Number.FromText(text, [culture])\n// Parse text as a number. Returns error if not parseable.\n// Example: Number.FromText(\"42\")  // 42",
-      "From": "Number.From(value)\n// Convert value to number",
-      "RoundDown": "Number.RoundDown(number, [digits])\n// Floor function. Number.RoundDown(3.7)  // 3",
-      "RoundUp": "Number.RoundUp(number, [digits])\n// Ceiling function. Number.RoundUp(3.2)  // 4",
-      "Round": "Number.Round(number, [digits])\n// Standard rounding",
-      "Abs": "Number.Abs(number)\n// Absolute value",
-      "Mod": "Number.Mod(number, divisor)\n// Modulo: Number.Mod(7, 3)  // 1"
-    },
-    "date_functions": {
-      "Year": "Date.Year(date) as number\n// Example: Date.Year(#date(2024, 3, 15))  // 2024",
-      "Month": "Date.Month(date) as number\n// Example: Date.Month(#date(2024, 3, 15))  // 3",
-      "Day": "Date.Day(date) as number\n// Example: Date.Day(#date(2024, 3, 15))  // 15",
-      "QuarterOfYear": "Date.QuarterOfYear(date) as number\n// Example: Date.QuarterOfYear(#date(2024, 3, 15))  // 1 (Q1)",
-      "DayOfWeek": "Date.DayOfWeek(date, [firstDayOfWeek])\n// Returns 0-6. Default first day is Sunday (0).\n// Date.DayOfWeek(#date(2024, 1, 15), Day.Monday)  // 0 = Monday",
-      "DayOfWeekName": "Date.DayOfWeekName(date, [culture])\n// Example: Date.DayOfWeekName(#date(2024, 1, 15))  // \"Monday\"",
-      "From": "Date.From(value)\n// Convert datetime or text to date\n// Example: Date.From(DateTime.LocalNow())",
-      "FromText": "Date.FromText(text, [options])\n// Parse text as date. Example: Date.FromText(\"2024-01-15\")",
-      "ToText": "Date.ToText(date, [options])\n// Format date as text using .NET format strings\n// Example: Date.ToText(#date(2024, 3, 15), \"MMMM YYYY\")  // \"March 2024\"\n// Example: Date.ToText(#date(2024, 3, 15), \"MM-dd-yyyy\")  // \"03-15-2024\"\n// Example: Date.ToText(#date(2024, 3, 15), \"MMM\")        // \"Mar\"\n// For locale: Date.ToText(date, [Format=\"MMMM\", Culture=\"en-US\"])",
-      "LocalNow": "DateTime.LocalNow() as datetime\n// Current date and time in local timezone\n// Use Date.From(DateTime.LocalNow()) to get today's date",
-      "DateTimeZone_UtcNow": "DateTimeZone.UtcNow() as datetimezone\n// Current UTC datetime with timezone offset",
-      "List_Dates": "List.Dates(start as date, count as number, step as duration) as list\n// Generate a list of dates\n// Example: all dates in Jan 2024\nList.Dates(#date(2024, 1, 1), 31, #duration(1, 0, 0, 0))\n// All dates from 2023-01-01 to today:\nList.Dates(\n    #date(2023, 1, 1),\n    Duration.Days(Date.From(DateTime.LocalNow()) - #date(2023, 1, 1)) + 1,\n    #duration(1, 0, 0, 0)\n)",
-      "Duration_Days": "Duration.Days(duration as duration) as number\n// Get number of days from a duration\n// Example: Duration.Days(#date(2024,12,31) - #date(2024,1,1))  // 365",
-      "AddDays": "Date.AddDays(date, numberOfDays)\n// Example: Date.AddDays(#date(2024, 1, 31), 1)  // #date(2024, 2, 1)",
-      "AddMonths": "Date.AddMonths(date, numberOfMonths)\n// Example: Date.AddMonths(#date(2024, 1, 15), 1)  // #date(2024, 2, 15)",
-      "StartOfMonth": "Date.StartOfMonth(date)\n// Returns the first day of the month\n// Example: Date.StartOfMonth(#date(2024, 3, 15))  // #date(2024, 3, 1)",
-      "EndOfMonth": "Date.EndOfMonth(date)\n// Returns the last day of the month\n// Example: Date.EndOfMonth(#date(2024, 2, 1))  // #date(2024, 2, 29)"
-    },
-    "list_functions": {
-      "Contains": "List.Contains(list, value)\n// Example: List.Contains({\"a\", \"b\", \"c\"}, \"b\")  // true",
-      "Distinct": "List.Distinct(list)\n// Remove duplicates: List.Distinct({1, 2, 2, 3})  // {1, 2, 3}",
-      "Sum": "List.Sum(list)  // Example: List.Sum({1, 2, 3})  // 6",
-      "Average": "List.Average(list)",
-      "Min": "List.Min(list)",
-      "Max": "List.Max(list)",
-      "Count": "List.Count(list)  // Number of elements",
-      "Sort": "List.Sort(list, [comparisonCriteria])",
-      "Select": "List.Select(list, condition)\n// Filter list: List.Select({1,2,3,4}, each _ > 2)  // {3, 4}",
-      "Transform": "List.Transform(list, transform)\n// Apply function to each: List.Transform({1,2,3}, each _ * 2)  // {2, 4, 6}",
-      "FromTable": "Table.ToColumns(table) or List.Combine(Table.ToRows(table))",
-      "First": "List.First(list, [defaultValue])\n// First element: List.First({5, 6, 7})  // 5"
-    },
-    "record_functions": {
-      "Field": "Record.Field(record, fieldName)\n// Get field value by name (dynamic, useful when name is a variable)\n// Example: Record.Field([Name=\"Alice\", Age=30], \"Name\")  // \"Alice\"",
-      "FieldNames": "Record.FieldNames(record) as list\n// Returns list of field names",
-      "FieldValues": "Record.FieldValues(record) as list\n// Returns list of field values",
-      "HasFields": "Record.HasFields(record, fields)\n// Check if record has specified field(s)",
-      "FromList": "Record.FromList(list, fields)\n// Create record from parallel lists of values and field names"
-    },
-    "complete_monthly_template": {
-      "description": "Complete production-ready M query for combining monthly CSVs from SharePoint. Handles UTF-8 encoding, extracts year/month from filename, casts types, and builds a MonthDate column.",
-      "filename_convention": "report_YYYY_MM.csv (e.g. report_2024_01.csv)",
-      "query": "// ============================================================\n// Power Query M Template: Monthly SharePoint CSV Combiner\n// Filename convention: report_YYYY_MM.csv\n// SharePoint site: update SiteUrl\n// Folder path filter: update FolderPath\n// CSV column names: update ColumnNames and TypeCasting step\n// ============================================================\nlet\n    // ── CONFIG ─────────────────────────────────────────────\n    SiteUrl    = \"https://contoso.sharepoint.com/sites/MySite\",\n    FolderPath = \"/Shared Documents/Monthly-Reports/\",\n    // Prefix before YYYY in filename: \"report_\" is 7 chars\n    YearOffset  = 7,\n    MonthOffset = 12,\n\n    // ── 1. CONNECT ────────────────────────────────────────\n    RawFiles = SharePoint.Files(SiteUrl, [ApiVersion=15]),\n\n    // ── 2. FILTER TO FOLDER ───────────────────────────────\n    InFolder = Table.SelectRows(RawFiles,\n        each Text.Contains([Folder Path], FolderPath)),\n\n    // ── 3. CSV FILES ONLY ─────────────────────────────────\n    CSVFiles = Table.SelectRows(InFolder,\n        each [Extension] = \".csv\"\n        and not Text.StartsWith([Name], \"~\")  // skip temp files\n    ),\n\n    // ── 4. ADD FILENAME COLUMN ────────────────────────────\n    WithFilename = Table.AddColumn(CSVFiles, \"SourceFile\", each [Name], type text),\n\n    // ── 5. EXTRACT YEAR ───────────────────────────────────\n    WithYear = Table.AddColumn(WithFilename, \"FileYear\",\n        each try Number.FromText(Text.Middle([SourceFile], YearOffset, 4)) otherwise null,\n        Int64.Type),\n\n    // ── 6. EXTRACT MONTH ──────────────────────────────────\n    WithMonth = Table.AddColumn(WithYear, \"FileMonth\",\n        each try Number.FromText(Text.Middle([SourceFile], MonthOffset, 2)) otherwise null,\n        Int64.Type),\n\n    // ── 7. DROP FILES WITH BAD NAMES ──────────────────────\n    ValidFiles = Table.SelectRows(WithMonth,\n        each [FileYear] <> null and [FileMonth] <> null),\n\n    // ── 8. PARSE EACH CSV ─────────────────────────────────\n    Parsed = Table.AddColumn(ValidFiles, \"_Data\",\n        each Csv.Document([Content], [\n            Delimiter  = \",\",\n            Columns    = null,\n            Encoding   = 65001,\n            QuoteStyle = QuoteStyle.Csv\n        ])\n    ),\n\n    // ── 9. PROMOTE HEADERS ────────────────────────────────\n    Headers = Table.TransformColumns(Parsed, {\n        \"_Data\", each Table.PromoteHeaders(_, [PromoteAllScalars=true])\n    }),\n\n    // ── 10. GET COLUMN NAMES FROM FIRST FILE ──────────────\n    SampleCols = Table.ColumnNames(Headers{0}[_Data]),\n\n    // ── 11. EXPAND ALL ROWS ───────────────────────────────\n    Expanded = Table.ExpandTableColumn(Headers, \"_Data\", SampleCols),\n\n    // ── 12. BUILD DATE COLUMN ────────────────────────────\n    WithDate = Table.AddColumn(Expanded, \"MonthDate\",\n        each try #date([FileYear], [FileMonth], 1) otherwise null,\n        type date),\n\n    // ── 13. REMOVE CONNECTOR METADATA COLUMNS ─────────────\n    Trimmed = Table.RemoveColumns(WithDate, {\n        \"Content\", \"Extension\", \"Date accessed\",\n        \"Date modified\", \"Date created\", \"Attributes\", \"Folder Path\"\n    }),\n\n    // ── 14. CAST TYPES ────────────────────────────────────\n    // Update column names and types to match your CSV schema\n    Typed = Table.TransformColumnTypes(Trimmed, {\n        {\"SourceFile\",  type text},\n        {\"FileYear\",    Int64.Type},\n        {\"FileMonth\",   Int64.Type},\n        {\"MonthDate\",   type date}\n        // Add your CSV columns here:\n        // {\"Category\",   type text},\n        // {\"Amount\",     Currency.Type},\n        // {\"Quantity\",   Int64.Type}\n    })\nin\n    Typed"
-    },
-    "custom_function_pattern": {
-      "description": "Define a reusable M function query that transforms a single CSV binary. The combining query calls this function for each file row.",
-      "function_query_name": "fnParseMonthlyCSV",
-      "function_definition": "// Query named: fnParseMonthlyCSV\n// This function takes one CSV binary and one filename, returns a table\n(csvBinary as binary, fileName as text) as table =>\nlet\n    Raw      = Csv.Document(csvBinary, [Delimiter=\",\", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),\n    Headers  = Table.PromoteHeaders(Raw, [PromoteAllScalars=true]),\n    AddFile  = Table.AddColumn(Headers, \"SourceFile\",  each fileName,                               type text),\n    AddYear  = Table.AddColumn(AddFile,  \"FileYear\",   each Number.FromText(Text.Middle(fileName, 7, 4)), Int64.Type),\n    AddMonth = Table.AddColumn(AddYear,  \"FileMonth\",  each Number.FromText(Text.Middle(fileName, 12, 2)), Int64.Type),\n    AddDate  = Table.AddColumn(AddMonth, \"MonthDate\",  each #date([FileYear], [FileMonth], 1),       type date)\nin\n    AddDate",
-      "main_query_using_function": "// Main combining query — calls fnParseMonthlyCSV for each file\nlet\n    Source    = SharePoint.Files(\"https://contoso.sharepoint.com/sites/MySite\", [ApiVersion=15]),\n    Filtered  = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Reports/\") and [Extension] = \".csv\"),\n    Invoked   = Table.AddColumn(Filtered, \"_Parsed\", each fnParseMonthlyCSV([Content], [Name])),\n    Expanded  = Table.Combine(Invoked[_Parsed])\nin\n    Expanded"
-    }
-  }
+  "implementation_notes": [
+    "Essential table functions:\n```m\n// Filter rows\nTable.SelectRows(Source, each [Amount] > 0 and [Region] = \"EMEA\")\n\n// Add computed column\nTable.AddColumn(Source, \"MonthDate\", each #date([Year], [Month], 1), type date)\n\n// Cast types in one step\nTable.TransformColumnTypes(Source, {\n    {\"Date\", type date}, {\"Amount\", Currency.Type},\n    {\"Quantity\", Int64.Type}, {\"Name\", type text}\n})\n\n// Rename columns\nTable.RenameColumns(Source, {{\"old_name\", \"New Name\"}, {\"qty\", \"Quantity\"}})\n\n// Keep/remove columns\nTable.SelectColumns(Source, {\"Date\", \"Category\", \"Amount\"})\nTable.RemoveColumns(Source, {\"Content\", \"Extension\", \"Attributes\"})\n\n// Promote first row to headers\nTable.PromoteHeaders(Source, [PromoteAllScalars=true])\n\n// Combine multiple tables\nTable.Combine({Table1, Table2, Table3})\n\n// Group and aggregate\nTable.Group(Source, {\"Year\", \"Month\"}, {\n    {\"Total\", each List.Sum([Amount]), type number},\n    {\"Count\", each Table.RowCount(_), Int64.Type}\n})\n\n// Join two tables\nTable.Join(Sales, \"ProductID\", Products, \"ProductID\", JoinKind.Left)\n\n// Sort\nTable.Sort(Source, {{\"Year\", Order.Ascending}, {\"Month\", Order.Ascending}})\n\n// Unpivot wide to tall\nTable.UnpivotOtherColumns(Source, {\"Date\", \"SourceFile\"}, \"MetricName\", \"Value\")\n\n// Expand nested table column\nTable.ExpandTableColumn(Source, \"Data\", Table.ColumnNames(Source{0}[Data]))\n```",
+    "Text functions:\n```m\nText.Contains([Folder Path], \"/Reports/\")     // substring check\nText.StartsWith([Name], \"report_\")             // prefix check\nText.Split(\"2024-01\", \"-\")                     // returns {\"2024\", \"01\"}\nText.Middle(\"report_2024_01.csv\", 7, 4)         // returns \"2024\" (zero-based offset)\nText.PadStart(Text.From(5), 2, \"0\")            // returns \"05\"\nText.Replace(\"hello-world\", \"-\", \"_\")          // returns \"hello_world\"\nText.BetweenDelimiters(\"[Category]\", \"[\", \"]\") // returns \"Category\"\nText.From(2024)                                // number to text: \"2024\"\n```",
+    "Date functions:\n```m\nDate.Year(#date(2024, 3, 15))          // 2024\nDate.Month(#date(2024, 3, 15))         // 3\nDate.QuarterOfYear(#date(2024, 3, 15)) // 1\nDate.StartOfMonth(#date(2024, 3, 15))  // #date(2024, 3, 1)\nDate.EndOfMonth(#date(2024, 2, 1))     // #date(2024, 2, 29)\nDate.AddMonths(#date(2024, 1, 15), 1)  // #date(2024, 2, 15)\nDate.FromText(\"2024-01-15\")\nDate.ToText(#date(2024, 3, 15), \"MMM YYYY\") // \"Mar 2024\"\nDate.From(DateTime.LocalNow())         // today's date\n\n// Generate list of all dates\nList.Dates(#date(2023, 1, 1), 365, #duration(1, 0, 0, 0))\n\n// Days between two dates\nDuration.Days(#date(2024,12,31) - #date(2024,1,1))  // 365\n```",
+    "SharePoint CSV combine template (report_YYYY_MM.csv):\n```m\nlet\n    Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/MySite\", [ApiVersion=15]),\n    InFolder = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Shared Documents/Reports/\")),\n    CSVFiles = Table.SelectRows(InFolder, each [Extension] = \".csv\" and not Text.StartsWith([Name], \"~\")),\n    WithFile = Table.AddColumn(CSVFiles, \"SourceFile\", each [Name], type text),\n    WithYear = Table.AddColumn(WithFile, \"FileYear\",\n        each try Number.FromText(Text.Middle([SourceFile], 7, 4)) otherwise null, Int64.Type),\n    WithMonth = Table.AddColumn(WithYear, \"FileMonth\",\n        each try Number.FromText(Text.Middle([SourceFile], 12, 2)) otherwise null, Int64.Type),\n    Valid = Table.SelectRows(WithMonth, each [FileYear] <> null and [FileMonth] <> null),\n    Parsed = Table.AddColumn(Valid, \"_Data\",\n        each Csv.Document([Content], [Delimiter=\",\", Encoding=65001, QuoteStyle=QuoteStyle.Csv])),\n    Headers = Table.TransformColumns(Parsed, {\"_Data\", each Table.PromoteHeaders(_, [PromoteAllScalars=true])}),\n    Expanded = Table.ExpandTableColumn(Headers, \"_Data\", Table.ColumnNames(Headers{0}[_Data])),\n    WithDate = Table.AddColumn(Expanded, \"MonthDate\",\n        each try #date([FileYear], [FileMonth], 1) otherwise null, type date),\n    Trimmed = Table.RemoveColumns(WithDate,\n        {\"Content\", \"Extension\", \"Date accessed\", \"Date modified\", \"Date created\", \"Attributes\", \"Folder Path\"})\nin\n    Trimmed\n```",
+    "Custom function pattern for reusable CSV parsing:\n```m\n// Query named: fnParseMonthlyCSV\n(csvBinary as binary, fileName as text) as table =>\nlet\n    Raw     = Csv.Document(csvBinary, [Delimiter=\",\", Encoding=65001, QuoteStyle=QuoteStyle.Csv]),\n    Headers = Table.PromoteHeaders(Raw, [PromoteAllScalars=true]),\n    AddFile = Table.AddColumn(Headers, \"SourceFile\", each fileName, type text),\n    AddYear = Table.AddColumn(AddFile, \"FileYear\",\n        each Number.FromText(Text.Middle(fileName, 7, 4)), Int64.Type),\n    AddMonth= Table.AddColumn(AddYear, \"FileMonth\",\n        each Number.FromText(Text.Middle(fileName, 12, 2)), Int64.Type),\n    AddDate = Table.AddColumn(AddMonth, \"MonthDate\",\n        each #date([FileYear], [FileMonth], 1), type date)\nin\n    AddDate\n\n// Main query calls it:\nlet\n    Source   = SharePoint.Files(\"https://contoso.sharepoint.com/sites/MySite\", [ApiVersion=15]),\n    Filtered = Table.SelectRows(Source,\n        each Text.Contains([Folder Path], \"/Reports/\") and [Extension] = \".csv\"),\n    Invoked  = Table.AddColumn(Filtered, \"_Parsed\", each fnParseMonthlyCSV([Content], [Name])),\n    Combined = Table.Combine(Invoked[_Parsed])\nin\n    Combined\n```"
+  ],
+  "caveats": [
+    "SharePoint.Files URL must be root site only — including library path causes authentication errors",
+    "Filenames containing # % $ cause truncation in SharePoint URLs — rename files to remove these characters",
+    "Encoding 65001 (UTF-8) is correct for SharePoint Online files — use 1252 only for legacy Windows files",
+    "Table.UnpivotOtherColumns is preferred over Table.Unpivot when new metric columns may appear in future files",
+    "ExpandTableColumn requires all files to have matching schemas — varying column names cause errors",
+    "Text.Middle uses zero-based offsets — 'report_' is 7 chars, so year starts at offset 7",
+    "SharePoint folder connector returns files from all subfolders — always filter by Folder Path"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-sharepoint-csv-datasource", "powerbi-monthly-dynamic-reports", "powerbi-snapshot-data-modeling", "powerbi-visualizations-and-dax"],
+  "source_projects": ["shared-seed"]
 }

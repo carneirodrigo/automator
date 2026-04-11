@@ -1,102 +1,60 @@
 {
   "id": "powerbi-security-dashboard-layout-patterns",
-  "title": "Power BI - Security Metrics Dashboard Layout Patterns",
-  "description": "Production patterns for security reporting dashboards: KPI cards with prior-period comparison, traffic light RAG status columns, multi-metric matrix layouts, sparklines as trend indicators, and drill-through from summary to detail tables",
-  "tags": ["power-bi", "security-reporting", "kpi", "rag", "dashboard-layout", "sparkline", "drill-through", "conditional-formatting", "vulnerability-reporting"],
-  "source": "web-research",
-  "references": [
-    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualization-card",
-    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualizations-overview",
-    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-drillthrough",
-    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-conditional-table-formatting",
-    "https://learn.microsoft.com/en-us/dax/switch-function-dax"
+  "title": "Power BI Security Dashboard Layout — KPI Cards, RAG Status, Matrix, Trend Charts, Drill-Through",
+  "source_family": "power-bi",
+  "coverage_type": "patterns",
+  "applies_to": ["Security dashboard design", "KPI card patterns", "RAG traffic light formatting", "Security metrics visualization"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Recommended security dashboard page hierarchy: (1) Summary — KPI cards header, trend charts, metric matrix. (2) Monthly Detail — full matrix with MoM deltas, drill-through target. (3) Quarterly/YoY — quarterly comparison. (4) Metric Detail — drill-through for individual metrics with raw data table.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/service-dashboards",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "New Card visual (2023+) supports main measure plus reference labels and secondary values in a compact card. KPI visual shows value + sparkline + vs-target with auto-coloring. Set Direction = 'Low is good' for security metrics where decreasing counts are positive.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualization-card",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Conditional formatting icon sets: Format pane > Cell elements > Icons > Rules. Layout = 'Data only' shows icon without number. Use integer measures (0=Green, 1=Amber, 2=Red) mapped to circle/flag icons.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-conditional-table-formatting",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Drill-through: target page fields placed in Drill through field well (not Filters pane) define what context is passed. Power BI auto-generates a Back button on the detail page.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-drillthrough",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Power BI natively supports sparklines in Table and Matrix visuals (since 2022). Each row gets a small trend line. Configure Y-axis min/max in Format pane > Sparklines for consistent scaling across rows.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/visuals/desktop-matrix-visual",
+      "verified_date": "2026-04-11"
+    }
   ],
-  "content": {
-    "page_layout": {
-      "recommended_structure": "Security dashboard page hierarchy:\n1. Summary page — KPI cards in a header row, trend charts below, metric matrix in the main body\n2. Monthly Detail page — full matrix of all metrics × all months, with MoM deltas, drill-through target\n3. Quarterly/YoY page — quarterly comparison matrix, YoY change column\n4. Individual Metric Detail page — drill-through target for a single metric showing raw data table and trend",
-      "summary_page_zones": [
-        "Zone 1 (top header): KPI cards — one per key metric showing current value + vs prior month",
-        "Zone 2 (upper middle): Trend line chart — last 12 months, multiple metrics as series",
-        "Zone 3 (lower middle): Multi-metric matrix — rows=metric, columns=last 6 months, with RAG icons",
-        "Zone 4 (bottom): Period slicer (dropdown) + metric filter slicer"
-      ],
-      "visual_sizing": "KPI cards: 160×100px each, arranged in a single row. Trend chart: full width, ~280px tall. Matrix: full width, ~320px tall. Slicers: 200×40px in a header strip."
-    },
-    "kpi_card_patterns": {
-      "basic_new_card": {
-        "description": "The 'New card' visual (2023+) supports showing a main measure plus a reference label and comparison value in a single compact card.",
-        "field_wells": [
-          "Data fields: drop [VulnCount] (main value)",
-          "Callout value: shows prominently",
-          "Reference label: text descriptor",
-          "Additional measures can be added as secondary values"
-        ],
-        "format_settings": "Format pane > Callout value: font size 28-32pt, bold. Reference labels: smaller font. Background: white or light brand colour. Border: subtle shadow."
-      },
-      "kpi_card_with_comparison_dax": "// KPI Card showing current value and vs prior month\n// Two measures: one for display, one for reference\nSev5 Count Current =\n    CALCULATE(\n        [VulnCount],\n        MetricDim[MetricName] = \"Sev5\"\n    )\n\nSev5 vs PM =\nVAR _Current = [Sev5 Count Current]\nVAR _Prior   = CALCULATE([Sev5 Count Current], PREVIOUSMONTH('DateTable'[Date]))\nVAR _Chg     = IF(ISBLANK(_Prior) || _Prior = 0, BLANK(), DIVIDE(_Current - _Prior, ABS(_Prior)))\nRETURN\n    IF(ISBLANK(_Chg), \"No prior\",\n    IF(_Chg > 0, \"▲ \" & FORMAT(ABS(_Chg), \"0.0%\") & \" vs PM\",\n                 \"▼ \" & FORMAT(ABS(_Chg), \"0.0%\") & \" vs PM\"))\n// Display: card showing [Sev5 Count Current] prominently,\n// with [Sev5 vs PM] as subtitle text",
-      "kpi_visual": {
-        "description": "The built-in KPI visual shows value, trend sparkline, and vs-target comparison. More structured than a card.",
-        "field_wells": [
-          "Value: [VulnCount] — the measure to track",
-          "Trend axis: DateTable[MonthYear] — draws the sparkline",
-          "Target goals: [VulnCount PM] — prior month as the target line"
-        ],
-        "color_coding": "KPI visual auto-colors green when current > target (or < target if set to 'Low is good'). Format pane > Direction = 'Low is good' for security metrics where decreasing counts are positive.",
-        "limitation": "KPI visual does not support right-click drill-through. For drill-through from a KPI, use a card with a button overlay instead."
-      },
-      "card_rag_background": "// Conditional formatting on a card based on metric value:\n// Use a measure to return the card background color\nSev5 Card Color =\nVAR _Val = [Sev5 Count Current]\nRETURN\n    IF(ISBLANK(_Val), \"#FFFFFF\",\n    IF(_Val >= 100, \"#FF4444\",  -- Red\n    IF(_Val >= 50,  \"#FFC000\",  -- Amber\n    \"#70AD47\")))                -- Green\n// In Format pane > Background > Conditional formatting > Field value > [Sev5 Card Color]",
-      "multi_metric_kpi_row": "Build one card per key metric in a horizontal row:\n- Sev5 Count | Sev4 Count | External Vulns | Internal Vulns | Open Alerts | Avg CVSS\nEach card: current value, RAG background color, vs-prior-month text label.\nAll cards use the same MoM % logic with different metric name filters."
-    },
-    "traffic_light_rag_column": {
-      "overview": "A RAG (Red-Amber-Green) status column in a table shows a coloured indicator for each row based on current value vs threshold. Used for at-a-glance risk status.",
-      "icon_approach": {
-        "description": "Use conditional formatting icons (circle, diamond, flag) set to Layout = 'Data only' (icon fills the cell with no number).",
-        "rag_measure": "RAG Icon Value =\nVAR _Val  = [Metric Value]\nVAR _Chg  = [MoM Change %]\n-- Higher number = worse (drives icon set: 0=green, 1=amber, 2=red)\nRETURN\n    IF(ISBLANK(_Val), BLANK(),\n    SWITCH(TRUE(),\n        _Val >= 100 || _Chg > 0.10, 2,     -- Red: high count or >10% increase\n        _Val >= 50  || _Chg > 0,    1,     -- Amber: moderate or any increase\n        0                                  -- Green\n    ))",
-        "setup_steps": [
-          "1. In the table visual, add [RAG Icon Value] as a column",
-          "2. Format pane > Cell elements > Icons > turn on > click fx",
-          "3. Format by: Rules, Based on field: [RAG Icon Value]",
-          "4. Add 3 rules: If value = 2 → Red circle, = 1 → Amber circle, = 0 → Green circle",
-          "5. Layout = 'Data only' (shows only icon, hides the number)",
-          "6. Optionally hide the [RAG Icon Value] numeric column from the table (set to hidden in the field well, or just don't add it as a separate visible column)"
-        ]
-      },
-      "background_color_approach": {
-        "description": "Color the text or background of the count cell itself rather than using a separate icon column.",
-        "setup": "In the table, select the count column > Format pane > Cell elements > Background color > Rules:\n  If [Metric Value] >= 100 → #FF4444 (red)\n  If [Metric Value] >= 50  → #FFC000 (amber)\n  Otherwise                → #70AD47 (green)"
-      },
-      "combined_pattern": "Production RAG column in security table:\n| Metric | Current Count | MoM % | RAG | Trend |\nWhere RAG = icon-only conditional formatting, Trend = sparkline. This gives analysts the full picture in a scannable row."
-    },
-    "multi_metric_matrix_layout": {
-      "structure": "Rows: MetricDim[MetricName] — one row per security metric\nColumns: DateTable[MonthYear] — periods as columns\nValues: [Metric Value] (count), optionally [MoM Change %] as second value\nConditional formatting: background color on count column, icon on change column",
-      "metric_dimension_example": "// MetricDim table (small dimension, manually created or loaded from CSV)\n// Columns: MetricID, MetricName, MetricCategory, SortOrder, RedThreshold, AmberThreshold\n// Example rows:\n// 1, Sev5 Vulns,   Vulnerability, 1, 100, 50\n// 2, Sev4 Vulns,   Vulnerability, 2, 200, 100\n// 3, External,     Exposure,      3, 30,  15\n// 4, Internal,     Exposure,      4, 50,  25\n// 5, Open Alerts,  Alert,         5, 20,  10\n// 6, Critical CVE, Vulnerability, 6, 5,   2\n\n// Use MetricDim[SortOrder] as Sort by Column for MetricDim[MetricName]",
-      "threshold_driven_rag": "// Dynamic RAG that uses per-metric thresholds from MetricDim:\nRAG Status =\nVAR _Val   = [Metric Value]\nVAR _Red   = SELECTEDVALUE(MetricDim[RedThreshold], 100)\nVAR _Amber = SELECTEDVALUE(MetricDim[AmberThreshold], 50)\nRETURN\n    IF(ISBLANK(_Val), BLANK(),\n    SWITCH(TRUE(),\n        _Val >= _Red,   2,   -- Red\n        _Val >= _Amber, 1,   -- Amber\n        0                   -- Green\n    ))\n// SELECTEDVALUE works because the matrix row context filters MetricDim to one metric",
-      "category_subtotals": "Group metrics by category (Vulnerability / Alert / Exposure) using a hierarchy in MetricDim: MetricCategory > MetricName. Add subtotals at category level using Format pane > Row subtotals > Per row level.",
-      "column_count_guidance": "Show 6 months for a quick-view summary matrix, 13 months for a 'rolling year plus current' matrix. Add a column for 'YoY Change %' as the rightmost column to give full context without scrolling."
-    },
-    "trend_chart_design": {
-      "multi_metric_line_chart": {
-        "description": "Line chart with months on X-axis and multiple metrics as separate lines. Good for showing which metrics are trending up vs down.",
-        "field_wells": "X axis: DateTable[MonthYear], Y axis: [Metric Value], Legend: MetricDim[MetricName]",
-        "issue_with_legend": "When MetricDim[MetricName] is on the legend, one line per metric is shown. If metrics have very different scales (Sev4 count=800, Alert count=5), the chart is unusable. Solution: either normalise to % of max, or show only one metric per chart and use a slicer to switch.",
-        "secondary_axis": "For metrics with very different scales, use a Combo chart (Line + Column). Put the high-volume metric on the column Y axis and the low-volume metric on the line Y axis. The dual axis makes both readable."
-      },
-      "normalised_trend_measure": "// Normalise each metric to 0-100 scale for a comparable multi-metric trend\nMetric Normalised =\nVAR _Val = [Metric Value]\nVAR _Max = CALCULATE(\n    MAX(SecuritySnapshots[Value]),\n    ALL('DateTable'),\n    ALLSELECTED(MetricDim)\n)\nRETURN\n    IF(_Max = 0, BLANK(), DIVIDE(_Val, _Max) * 100)",
-      "reference_line": "Add target/threshold reference lines: Analytics pane > Constant line > Value = 50 (e.g. amber threshold). Label it 'Amber threshold'. This gives visual context without cluttering data labels."
-    },
-    "dashboard_title_and_context": {
-      "dynamic_title_measure": "// Dynamic title showing selected period range\nDashboard Title =\nVAR _MinPeriod = MIN('DateTable'[MonthYear])\nVAR _MaxPeriod = MAX('DateTable'[MonthYear])\nRETURN\n    \"Security KPI Dashboard — \" & _MinPeriod & \" to \" & _MaxPeriod",
-      "last_refresh_card": "// Show when data was last refreshed\nLast Refresh =\n    FORMAT(NOW(), \"DD MMM YYYY HH:MM\")\n// In a card visual at the bottom of the report page",
-      "data_as_of_measure": "// For snapshot data: show the latest period in the model\nData As Of =\n    FORMAT(MAX('DateTable'[Date]), \"MMMM YYYY\")\n// Useful when the slicer shows 'All' — confirms the latest data period"
-    },
-    "common_mistakes": [
-      "Placing KPI cards without any comparison value — analysts cannot judge whether the current number is good or bad without context. Always add vs-prior-month or vs-threshold.",
-      "Using the same threshold for all metrics (e.g. red >= 100) — different metrics have different scales. Build per-metric thresholds into MetricDim and use SELECTEDVALUE in the RAG measure.",
-      "Trend chart with all metrics on the same Y-axis when scales differ significantly — use a field parameter slicer to show one metric at a time, or normalise.",
-      "Not adding MetricDim[SortOrder] Sort by Column — metric rows appear alphabetically instead of by risk priority.",
-      "KPI visual with 'Low is good' not set for vulnerability counts — it celebrates red (high values) when it should show red as bad.",
-      "Drill-through configured but no 'Back' button or navigation indicator on the detail page — users get lost. Always include a Back button and a breadcrumb title ('← Back to Summary').",
-      "Cards showing BLANK when the slicer has no selection or the metric has no data — add a COALESCE or IF(ISBLANK) to show 0 or a message instead of an empty card."
-    ]
-  }
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-conditional-table-formatting"
+  ],
+  "implementation_notes": [
+    "Summary page layout zones:\n- Zone 1 (top): KPI cards — one per key metric (Sev5, Sev4, External, Internal, Alerts)\n- Zone 2 (upper middle): Trend line chart — last 12 months, multiple metrics as series\n- Zone 3 (lower middle): Multi-metric matrix — rows=metric, columns=last 6 months, RAG icons\n- Zone 4 (bottom): Period slicer (dropdown) + metric filter slicer",
+    "KPI card with vs-prior-month comparison:\n```dax\nSev5 Count Current = CALCULATE([VulnCount], MetricDim[MetricName] = \"Sev5\")\n\nSev5 vs PM =\n    VAR _Current = [Sev5 Count Current]\n    VAR _Prior   = CALCULATE([Sev5 Count Current], PREVIOUSMONTH('DateTable'[Date]))\n    VAR _Chg     = IF(ISBLANK(_Prior) || _Prior = 0, BLANK(), DIVIDE(_Current - _Prior, ABS(_Prior)))\n    RETURN\n        IF(ISBLANK(_Chg), \"No prior\",\n        IF(_Chg > 0, \"▲ \" & FORMAT(ABS(_Chg), \"0.0%\") & \" vs PM\",\n                     \"▼ \" & FORMAT(ABS(_Chg), \"0.0%\") & \" vs PM\"))\n\n// Card background color based on value\nSev5 Card Color =\n    VAR _Val = [Sev5 Count Current]\n    RETURN IF(ISBLANK(_Val), \"#FFFFFF\",\n           IF(_Val >= 100, \"#FF4444\",\n           IF(_Val >= 50,  \"#FFC000\", \"#70AD47\")))\n// Format pane > Background > Conditional formatting > Field value > [Sev5 Card Color]\n```",
+    "Dynamic RAG with per-metric thresholds from MetricDim:\n```dax\nRAG Status =\n    VAR _Val   = [Metric Value]\n    VAR _Red   = SELECTEDVALUE(MetricDim[RedThreshold], 100)\n    VAR _Amber = SELECTEDVALUE(MetricDim[AmberThreshold], 50)\n    RETURN IF(ISBLANK(_Val), BLANK(),\n           SWITCH(TRUE(), _Val >= _Red, 2, _Val >= _Amber, 1, 0))\n// SELECTEDVALUE works because matrix row context filters MetricDim to one metric\n// Use with icon conditional formatting: 2=Red circle, 1=Amber circle, 0=Green circle\n```",
+    "Normalised trend measure for multi-metric comparison:\n```dax\n// When metrics have different scales (Sev4=800, Alerts=5)\nMetric Normalised =\n    VAR _Val = [Metric Value]\n    VAR _Max = CALCULATE(MAX(SecuritySnapshots[Value]), ALL('DateTable'), ALLSELECTED(MetricDim))\n    RETURN IF(_Max = 0, BLANK(), DIVIDE(_Val, _Max) * 100)\n// Or use Combo chart: column Y axis for high-volume, line Y axis for low-volume\n```",
+    "Dynamic dashboard title and context:\n```dax\nDashboard Title =\n    VAR _Min = MIN('DateTable'[MonthYear])\n    VAR _Max = MAX('DateTable'[MonthYear])\n    RETURN \"Security KPI Dashboard — \" & _Min & \" to \" & _Max\n\nLast Refresh = FORMAT(NOW(), \"DD MMM YYYY HH:MM\")\n\nData As Of = FORMAT(MAX('DateTable'[Date]), \"MMMM YYYY\")\n```",
+    "Drill-through setup:\n1. Create 'Detail' report page\n2. Drag MetricDim[MetricName] and DateTable[MonthYear] to Drill through field well\n3. Add table visual with individual records filtered by drilled context\n4. Power BI auto-adds Back button (if deleted, re-add with Action > Type = Back)\n5. On Summary page matrix: right-click cell > Drill through > Detail\n\nNote: drill-through fields go in the Drill through field well, NOT the Filters pane — they look similar but are different.",
+    "Sparklines in matrix rows:\n1. Select Table/Matrix visual > Visualizations pane > Add sparkline (chart icon in Values)\n2. Select measure ([VulnCount]) and axis (DateTable[MonthYear])\n3. Format pane > Sparklines > Y-axis > Range: set fixed min=0, max=500 for consistent scaling\n4. Typical layout: Metric | Latest Count | MoM% | Trend (sparkline)"
+  ],
+  "caveats": [
+    "KPI cards without comparison values are useless — always add vs-prior-month or vs-threshold for context",
+    "Same threshold for all metrics (e.g. red >= 100) doesn't work — build per-metric thresholds into MetricDim",
+    "Trend chart with all metrics on same Y-axis is unusable when scales differ — use field parameter slicer or normalise",
+    "MetricDim[SortOrder] Sort by Column must be set — otherwise metric rows appear alphabetically instead of by priority",
+    "KPI visual with 'Low is good' not set for vulnerability counts celebrates high values as green",
+    "Drill-through pages without a Back button leave users stranded — always include one",
+    "Cards showing BLANK for no selection — add COALESCE or IF(ISBLANK) to show 0 or a message"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-matrix-table-advanced-patterns", "powerbi-visualizations-and-dax", "powerbi-snapshot-data-modeling", "powerbi-time-intelligence-mom-qoq-yoy"],
+  "source_projects": ["shared-seed"]
 }

@@ -1,252 +1,78 @@
 {
   "id": "powerbi-rest-api-and-deployment",
-  "title": "Power BI - REST API, Deployment and .pbix Structure",
-  "description": "REST API endpoints for import/refresh/credentials, authentication, .pbix file format internals, workspace concepts",
-  "tags": ["power-bi", "rest-api", "deployment", "pbix", "automation"],
-  "source": "web-research",
-  "references": [
-    "https://learn.microsoft.com/en-us/rest/api/power-bi/imports/post-import-in-group",
-    "https://learn.microsoft.com/en-us/rest/api/power-bi/",
-    "https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-overview",
-    "https://learn.microsoft.com/en-us/power-bi/enterprise/service-premium-connect-tools"
-  ],
-  "content": {
-    "api_base_url": "https://api.powerbi.com/v1.0/myorg/",
-    "workspace_concepts": {
-      "hierarchy": "workspace → dataset (semantic model) → report (visualizations) → dashboard (pinned tiles from reports)",
-      "workspace": "A container for Power BI content. Also called 'group'. Has a groupId (UUID). 'My Workspace' is personal and uses /myorg/ paths without a groupId.",
-      "dataset": "The semantic model — contains the data model, Power Query transformations, DAX measures, and data. Reports are built on top of a dataset.",
-      "report": "A collection of pages with visualizations. Always references exactly one dataset. Multiple reports can use the same dataset.",
-      "dashboard": "A single page of tiles pinned from reports. Read-only, no editing.",
-      "app": "A published bundle of workspace content (reports, dashboards) shared with end users. Separate from the workspace itself.",
-      "workspace_roles": {
-        "Admin": "Full control: add/remove members, publish, delete",
-        "Member": "Can publish content, create reports",
-        "Contributor": "Can create/edit content but not manage workspace",
-        "Viewer": "Read-only access to reports"
-      }
+  "title": "Power BI REST API — Import, Refresh, Credentials, Workspace Management, Python Patterns",
+  "source_family": "power-bi",
+  "coverage_type": "endpoint",
+  "applies_to": ["Power BI REST API automation", "PBIX import and refresh", "Power BI workspace management", "Power BI deployment automation"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI REST API base URL: https://api.powerbi.com/v1.0/myorg/. Workspace-scoped endpoints use /groups/{workspaceId}/. Auth scope: https://analysis.windows.net/powerbi/api/.default",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/",
+      "verified_date": "2026-04-11"
     },
-    "authentication": {
-      "scope": "https://analysis.windows.net/powerbi/api/.default",
-      "token_endpoint": "POST https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token",
-      "service_principal_flow": {
-        "description": "Register an Azure AD application, grant Power BI permissions, add service principal to the target workspace.",
-        "steps": [
-          "1. Register app in Entra ID (Azure AD): App registrations > New registration",
-          "2. Create a client secret: App > Certificates & secrets > New client secret",
-          "3. In Power BI Admin Portal: Tenant settings > Developer settings > 'Allow service principals to use Power BI APIs' > Enable for specific security group",
-          "4. Add the service principal to the workspace: Workspace > Manage access > Add the app by name > assign Member or Admin role",
-          "5. Acquire token: POST to token endpoint with grant_type=client_credentials"
-        ],
-        "token_request": "POST https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token\nContent-Type: application/x-www-form-urlencoded\n\ngrant_type=client_credentials\n&client_id={appId}\n&client_secret={clientSecret}\n&scope=https%3A%2F%2Fanalysis.windows.net%2Fpowerbi%2Fapi%2F.default"
-      },
-      "required_permissions": {
-        "Dataset.ReadWrite.All": "Required for importing .pbix files and managing datasets",
-        "Report.ReadWrite.All": "Required for creating and managing reports",
-        "Workspace.ReadWrite.All": "Required for managing workspace membership and content"
-      },
-      "important_limitation": "Service principals CANNOT authenticate to SharePoint Online for scheduled refresh of SharePoint-sourced datasets. The dataset's data source credentials must use an OAuth2 service account (a licensed Microsoft 365 user) in Power BI Service settings.",
-      "header_format": "Authorization: Bearer {access_token}"
+    {
+      "fact": "Service principal auth requires: (1) Entra ID app registration with client secret, (2) Power BI Admin Portal > 'Allow service principals to use Power BI APIs' enabled for a security group, (3) SP added to target workspace as Member or Admin.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/developer/embedded/embed-service-principal",
+      "verified_date": "2026-04-11"
     },
-    "key_endpoints": {
-      "import_pbix": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/imports?datasetDisplayName={name}&nameConflict=Overwrite",
-        "description": "Upload a .pbix file to a workspace. Returns 202 Accepted immediately; poll the Get Import endpoint to check status.",
-        "nameConflict_options": ["Ignore (default — creates a new dataset with the same name)", "Overwrite (replace existing)", "Abort (fail if exists)", "CreateOrOverwrite"],
-        "content_type": "multipart/form-data",
-        "note": "File must be sent as multipart/form-data body. Max file size via this endpoint is 1 GB. For 1-10 GB files, use Create Temporary Upload Location first."
-      },
-      "get_import_status": {
-        "method": "GET",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/imports/{importId}",
-        "description": "Poll until importState = 'Succeeded' or 'Failed'",
-        "response_states": ["Publishing", "Succeeded", "Failed"]
-      },
-      "list_reports": {
-        "method": "GET",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/reports",
-        "description": "List all reports in a workspace. Returns report id, name, datasetId, embedUrl."
-      },
-      "list_datasets": {
-        "method": "GET",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets",
-        "description": "List all datasets in a workspace. Returns dataset id, name, isRefreshable, configuredBy."
-      },
-      "trigger_refresh": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/refreshes",
-        "description": "Trigger an on-demand refresh of the dataset.",
-        "body": "{}",
-        "response": "202 Accepted (empty body). Get refresh history to track completion.",
-        "note": "Refresh counts against the daily limit: 8/day (Pro), 48/day (Premium)."
-      },
-      "get_refresh_history": {
-        "method": "GET",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/refreshes",
-        "description": "Get recent refresh history. Returns array of refresh objects with status, startTime, endTime, serviceExceptionJson."
-      },
-      "update_datasource_credentials": {
-        "method": "PATCH",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/datasources/{datasourceId}/Default.UpdateDatasourceCredentials",
-        "description": "Update credentials for a specific datasource within a dataset. Required after importing a .pbix before the first refresh.",
-        "body_oauth2": "{\n  \"credentialDetails\": {\n    \"credentialType\": \"OAuth2\",\n    \"credentials\": \"{\\\"credentialData\\\":[{\\\"name\\\":\\\"accessToken\\\",\\\"value\\\":\\\"{token}\\\"}]}\",\n    \"encryptedConnection\": \"Encrypted\",\n    \"encryptionAlgorithm\": \"None\",\n    \"privacyLevel\": \"Organizational\"\n  }\n}"
-      },
-      "get_datasources": {
-        "method": "GET",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/datasources",
-        "description": "Get datasource details for a dataset, including datasourceId and connection details. Use this to find the datasourceId needed for credential updates."
-      },
-      "update_parameters": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/Default.UpdateParameters",
-        "description": "Update Power Query parameter values in a published dataset. Useful for changing the SharePoint site URL without re-publishing.",
-        "body": "{\n  \"updateDetails\": [\n    {\n      \"name\": \"SharePointSiteUrl\",\n      \"newValue\": \"https://contoso.sharepoint.com/sites/NewSite\"\n    }\n  ]\n}"
-      },
-      "bind_to_gateway": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/Default.BindToGateway",
-        "description": "Bind a dataset to an on-premises data gateway. Not needed for SharePoint Online sources.",
-        "body": "{\n  \"gatewayObjectId\": \"{gatewayId}\",\n  \"datasourceObjectIds\": [\"{datasourceId}\"]\n}"
-      },
-      "export_report_pdf": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/reports/{reportId}/ExportTo",
-        "description": "Export a report to PDF, PPTX, PNG, or XLSX",
-        "body": "{\n  \"format\": \"PDF\",\n  \"paginatedReportConfiguration\": null,\n  \"powerBIReportConfiguration\": {\n    \"pages\": [\n      {\"pageName\": \"ReportSection1\"}\n    ]\n  }\n}"
-      }
+    {
+      "fact": "Import PBIX: POST /groups/{workspaceId}/imports?datasetDisplayName={name}&nameConflict=Overwrite — multipart/form-data. Returns 202, poll GET /imports/{importId} until importState = Succeeded|Failed. Max 1GB via direct upload.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/imports/post-import-in-group",
+      "verified_date": "2026-04-11"
     },
-    "import_pbix_full_example": {
-      "description": "Complete Python example for importing a .pbix file via the REST API",
-      "python_code": "import requests\nimport time\n\ndef get_access_token(tenant_id, client_id, client_secret):\n    url = f\"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token\"\n    data = {\n        \"grant_type\": \"client_credentials\",\n        \"client_id\": client_id,\n        \"client_secret\": client_secret,\n        \"scope\": \"https://analysis.windows.net/powerbi/api/.default\"\n    }\n    resp = requests.post(url, data=data)\n    resp.raise_for_status()\n    return resp.json()[\"access_token\"]\n\n\ndef import_pbix(workspace_id, report_name, pbix_path, token):\n    \"\"\"Upload .pbix file to Power BI workspace. Returns import ID.\"\"\"\n    url = (\n        f\"https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/imports\"\n        f\"?datasetDisplayName={report_name}&nameConflict=Overwrite\"\n    )\n    headers = {\"Authorization\": f\"Bearer {token}\"}\n    with open(pbix_path, \"rb\") as f:\n        files = {\"file\": (report_name + \".pbix\", f, \"application/octet-stream\")}\n        resp = requests.post(url, headers=headers, files=files)\n    resp.raise_for_status()\n    return resp.json()[\"id\"]\n\n\ndef wait_for_import(workspace_id, import_id, token, timeout_seconds=300):\n    \"\"\"Poll import status until Succeeded or Failed.\"\"\"\n    url = f\"https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/imports/{import_id}\"\n    headers = {\"Authorization\": f\"Bearer {token}\"}\n    start = time.time()\n    while time.time() - start < timeout_seconds:\n        resp = requests.get(url, headers=headers)\n        resp.raise_for_status()\n        state = resp.json().get(\"importState\")\n        if state == \"Succeeded\":\n            return resp.json()\n        if state == \"Failed\":\n            raise RuntimeError(f\"Import failed: {resp.json()}\")\n        time.sleep(5)\n    raise TimeoutError(\"Import did not complete within timeout\")\n\n\ndef trigger_refresh(workspace_id, dataset_id, token):\n    \"\"\"Trigger an on-demand dataset refresh.\"\"\"\n    url = f\"https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/refreshes\"\n    headers = {\"Authorization\": f\"Bearer {token}\", \"Content-Type\": \"application/json\"}\n    resp = requests.post(url, headers=headers, json={})\n    resp.raise_for_status()  # 202 Accepted\n    return True\n\n\n# Usage example:\nif __name__ == \"__main__\":\n    TOKEN = get_access_token(\n        tenant_id=\"your-tenant-id\",\n        client_id=\"your-app-id\",\n        client_secret=\"your-client-secret\"\n    )\n    WORKSPACE_ID = \"your-workspace-guid\"\n\n    import_id = import_pbix(WORKSPACE_ID, \"MonthlyReport\", \"./MonthlyReport.pbix\", TOKEN)\n    result = wait_for_import(WORKSPACE_ID, import_id, TOKEN)\n    dataset_id = result[\"datasets\"][0][\"id\"]\n    print(f\"Imported dataset ID: {dataset_id}\")\n\n    trigger_refresh(WORKSPACE_ID, dataset_id, TOKEN)\n    print(\"Refresh triggered\")"
+    {
+      "fact": "Trigger refresh: POST /groups/{workspaceId}/datasets/{datasetId}/refreshes with empty JSON body. Returns 202. Poll GET /datasets/{datasetId}/refreshes for status. Limits: 8/day (Pro), 48/day (Premium).",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset-in-group",
+      "verified_date": "2026-04-11"
     },
-    "pbix_file_structure": {
-      "description": "A .pbix file is a ZIP archive. You can rename it to .zip and unzip to inspect the contents.",
-      "contents": [
-        {
-          "path": "DataModel",
-          "description": "Compressed binary containing the Tabular model (VertiPaq/ABF format). Contains all tables, relationships, DAX measures, column hierarchies. This is the core semantic model data."
-        },
-        {
-          "path": "Report/Layout",
-          "description": "JSON file describing all report pages, visuals, their positions, sizes, field mappings, format settings. This is the report layout definition."
-        },
-        {
-          "path": "Report/StaticResources/SharedResources/BaseThemes/",
-          "description": "Built-in theme JSON files"
-        },
-        {
-          "path": "Report/StaticResources/RegisteredResources/",
-          "description": "Custom images and other static assets embedded in the report"
-        },
-        {
-          "path": "Connections",
-          "description": "JSON containing datasource connection strings (server, database, SharePoint URL, etc.). Contains the M expressions that connect to external data."
-        },
-        {
-          "path": "SecurityBindings",
-          "description": "Row-Level Security (RLS) role definitions and table filters"
-        },
-        {
-          "path": "[Content_Types].xml",
-          "description": "MIME type manifest listing the content type for each part of the ZIP"
-        },
-        {
-          "path": "Version",
-          "description": "Plain text file containing the Power BI Desktop version that created the file"
-        },
-        {
-          "path": "Settings",
-          "description": "Additional report settings in JSON/binary format"
-        }
-      ],
-      "important_notes": [
-        "The DataModel is a compressed binary (Analysis Services VertiPaq format) — not human-readable JSON",
-        "The Report/Layout is human-readable JSON but the schema is not publicly documented for direct editing",
-        "Direct programmatic creation of .pbix files from scratch is NOT supported via official APIs",
-        "Power BI Desktop is required to create .pbix files"
-      ]
+    {
+      "fact": "Service principals CANNOT authenticate to SharePoint Online for scheduled refresh. Dataset credentials for SharePoint sources must use a licensed M365 user with OAuth2 configured in Power BI Service settings.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/connect-data/refresh-data",
+      "verified_date": "2026-04-11"
     },
-    "pbip_format": {
-      "description": "Power BI Project (.pbip) is an open, text-based alternative to .pbix. Introduced in Power BI Desktop as a preview feature. Better for source control and programmatic editing.",
-      "enable": "File > Options and settings > Options > Preview features > Power BI Project (.pbip) save option",
-      "folder_structure": "MyReport/\n├── MyReport.pbip               -- pointer file that opens the project\n├── .gitignore                  -- auto-generated, excludes cache files\n├── MyReport.Report/\n│   ├── definition.pbir         -- report item pointer (JSON)\n│   ├── report.json             -- report layout (not publicly documented schema)\n│   ├── mobileState.json        -- mobile layout\n│   └── StaticResources/        -- embedded images\n└── MyReport.SemanticModel/\n    ├── definition.pbism        -- semantic model pointer (JSON)\n    ├── model.bim               -- tabular model in BIM format (JSON, documented)\n    └── definition/\n        ├── tables/             -- one .tmdl file per table\n        ├── relationships.tmdl  -- all relationship definitions\n        └── expressions.tmdl   -- named M expressions (data sources)",
-      "tmdl_format": "Tabular Model Definition Language (TMDL) is the text format for semantic model objects. Each table, relationship, measure, and M expression has a corresponding .tmdl file. These are editable with VS Code + the TMDL extension.",
-      "programmatic_editing": "The Tabular Object Model (TOM) .NET library (Microsoft.AnalysisServices.Tabular NuGet package) can deserialise TMDL metadata, make programmatic modifications, and serialise back. This is the official way to programmatically create or modify Power BI semantic models.",
-      "limitations": [
-        "Cannot programmatically convert .pbix <-> .pbip (must use File > Save As in Power BI Desktop)",
-        "report.json schema is not publicly documented — manual editing unsupported",
-        "Maximum path length 260 chars on Windows (keep folder paths short)",
-        "Sensitivity labels not supported",
-        "Cannot save directly to OneDrive/SharePoint"
-      ]
+    {
+      "fact": "Workspace hierarchy: workspace → dataset (semantic model) → report (visualizations) → dashboard (pinned tiles). Roles: Admin, Member, Contributor, Viewer.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/groups",
+      "verified_date": "2026-04-11"
     },
-    "programmatic_creation_options": {
-      "option_1_pbix_via_api": {
-        "approach": "Create the .pbix in Power BI Desktop, then upload via REST API Import endpoint",
-        "when_to_use": "When you have a template .pbix that just needs data refreshed or parameters updated",
-        "automation_pattern": "1. Maintain a template .pbix in source control\n2. Use REST API to import it (nameConflict=Overwrite)\n3. Use Update Parameters API to set SharePoint URL or other connection params\n4. Trigger refresh via API"
-      },
-      "option_2_xmla_endpoint": {
-        "approach": "Use XMLA endpoint with TMSL (Tabular Model Scripting Language) or TOM to create/modify datasets directly in Premium workspaces",
-        "when_to_use": "When you need to create or modify a dataset (tables, measures, relationships) programmatically without a .pbix file",
-        "limitations": "Premium/Premium Per User or Fabric capacity required. Creates the dataset only — report visuals must still be created in Power BI Desktop.",
-        "connection_string": "powerbi://api.powerbi.com/v1.0/myorg/{workspaceId}",
-        "tools": ["SQL Server Management Studio (SSMS)", "Tabular Editor (open-source)", "Python with pyodbc or Analysis Services client libraries", ".NET with Microsoft.AnalysisServices.Tabular"]
-      },
-      "option_3_push_datasets": {
-        "approach": "Use Push Datasets API to stream data into a Power BI dataset without a .pbix",
-        "when_to_use": "Real-time streaming scenarios. Data is pushed row-by-row from external systems.",
-        "limitation": "No complex M queries or Power Query transformations. Limited DAX. Reports built on push datasets have limited functionality."
-      },
-      "option_4_fabric_rest_api": {
-        "approach": "Use Fabric REST API (api.fabric.microsoft.com) with PBIP item definitions to create reports and semantic models in Fabric-enabled workspaces",
-        "documentation": "https://learn.microsoft.com/en-us/rest/api/fabric/"
-      }
+    {
+      "fact": "PBIX file is a ZIP archive containing: DataModel (VertiPaq binary), Report/Layout (JSON), Connections (JSON with M expressions), SecurityBindings (RLS definitions), Version. DataModel is not human-readable. Direct programmatic creation of .pbix is NOT supported.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-overview",
+      "verified_date": "2026-04-11"
     },
-    "scheduled_refresh_via_api": {
-      "description": "Configure scheduled refresh programmatically using the PATCH datasets endpoint",
-      "update_refresh_schedule": {
-        "method": "PATCH",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/datasets/{datasetId}/refreshSchedule",
-        "body": "{\n  \"value\": {\n    \"enabled\": true,\n    \"notifyOption\": \"MailOnFailure\",\n    \"days\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"],\n    \"times\": [\"06:00\", \"18:00\"],\n    \"localTimeZoneId\": \"UTC\"\n  }\n}",
-        "notes": "Times are in HH:MM format. Days array accepts: Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday."
-      },
-      "refresh_frequency_limits": {
-        "Pro": "Up to 8 scheduled refreshes per day",
-        "PPU_or_Premium": "Up to 48 scheduled refreshes per day",
-        "inactivity_pause": "Scheduled refresh is automatically paused after 2 months of no user activity on reports/dashboards built on the dataset"
-      }
+    {
+      "fact": "Scheduled refresh: PATCH /datasets/{datasetId}/refreshSchedule. Days array: [\"Monday\",\"Tuesday\",...]. Times in HH:MM. Inactivity pause: auto-paused after 2 months of no user activity on reports/dashboards.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/update-refresh-schedule-in-group",
+      "verified_date": "2026-04-11"
     },
-    "workspace_management": {
-      "create_workspace": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups",
-        "body": "{\"name\": \"My New Workspace\"}"
-      },
-      "list_workspaces": {
-        "method": "GET",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups",
-        "note": "Returns workspaces the authenticated user/SP is a member of"
-      },
-      "add_user_to_workspace": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/groups/{workspaceId}/users",
-        "body": "{\n  \"identifier\": \"user@contoso.com\",\n  \"principalType\": \"User\",\n  \"groupUserAccessRight\": \"Member\"\n}"
-      }
-    },
-    "embed_tokens": {
-      "description": "Generate embed tokens for embedding Power BI reports in custom applications",
-      "generate_embed_token": {
-        "method": "POST",
-        "url": "https://api.powerbi.com/v1.0/myorg/GenerateToken",
-        "body": "{\n  \"reports\": [{\"id\": \"{reportId}\"}],\n  \"datasets\": [{\"id\": \"{datasetId}\"}],\n  \"targetWorkspaces\": [{\"id\": \"{workspaceId}\"}]\n}",
-        "note": "Embed token is short-lived (default 1 hour). Embed using Power BI JavaScript SDK in your web app."
-      }
-    },
-    "common_automation_patterns": {
-      "monthly_report_pipeline": "// Monthly report automation pattern:\n// 1. Upload new CSV to SharePoint (separate process)\n// 2. Trigger Power BI refresh via REST API\n// 3. Wait for refresh completion\n// 4. Export report to PDF\n// 5. Send PDF via email or upload to SharePoint\n\n// Step 2 - Trigger refresh:\n// POST /groups/{workspaceId}/datasets/{datasetId}/refreshes\n\n// Step 3 - Poll refresh history until latest = Completed:\n// GET /groups/{workspaceId}/datasets/{datasetId}/refreshes\n// Check refreshes[0].status == \"Completed\"\n\n// Step 4 - Export to file (async):\n// POST /groups/{workspaceId}/reports/{reportId}/ExportTo\n// Then GET /groups/{workspaceId}/reports/{reportId}/exports/{exportId}\n// Then GET /groups/{workspaceId}/reports/{reportId}/exports/{exportId}/file",
-      "deploy_new_report_version": "// Continuous deployment pattern for .pbix updates:\n// 1. CI pipeline builds/validates the .pbix\n// 2. POST /groups/{workspaceId}/imports?nameConflict=Overwrite\n// 3. Poll GET /groups/{workspaceId}/imports/{importId} until Succeeded\n// 4. New report is live — existing report/dataset replaced in-place"
+    {
+      "fact": "Export report: POST /reports/{reportId}/ExportTo with format (PDF, PPTX, PNG, XLSX). Async — poll GET /reports/{reportId}/exports/{exportId}, then download file.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/power-bi/reports/export-to-file-in-group",
+      "verified_date": "2026-04-11"
     }
-  }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/power-bi/"
+  ],
+  "implementation_notes": [
+    "Complete Python: authenticate, import PBIX, trigger refresh:\n```python\nimport requests\nimport time\n\ndef get_pbi_token(tenant_id, client_id, client_secret):\n    url = f'https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token'\n    resp = requests.post(url, data={\n        'grant_type': 'client_credentials',\n        'client_id': client_id,\n        'client_secret': client_secret,\n        'scope': 'https://analysis.windows.net/powerbi/api/.default',\n    })\n    resp.raise_for_status()\n    return resp.json()['access_token']\n\ndef import_pbix(workspace_id, name, pbix_path, token):\n    url = (f'https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/imports'\n           f'?datasetDisplayName={name}&nameConflict=Overwrite')\n    with open(pbix_path, 'rb') as f:\n        resp = requests.post(url,\n            headers={'Authorization': f'Bearer {token}'},\n            files={'file': (f'{name}.pbix', f, 'application/octet-stream')})\n    resp.raise_for_status()\n    return resp.json()['id']\n\ndef wait_import(workspace_id, import_id, token, timeout=300):\n    url = f'https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/imports/{import_id}'\n    start = time.time()\n    while time.time() - start < timeout:\n        resp = requests.get(url, headers={'Authorization': f'Bearer {token}'})\n        resp.raise_for_status()\n        state = resp.json().get('importState')\n        if state == 'Succeeded':\n            return resp.json()\n        if state == 'Failed':\n            raise RuntimeError(f'Import failed: {resp.json()}')\n        time.sleep(5)\n    raise TimeoutError('Import timed out')\n\ndef trigger_refresh(workspace_id, dataset_id, token):\n    url = f'https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/refreshes'\n    resp = requests.post(url,\n        headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'},\n        json={})\n    resp.raise_for_status()  # 202 Accepted\n```",
+    "Check refresh status:\n```python\ndef get_refresh_status(workspace_id, dataset_id, token):\n    url = f'https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/refreshes'\n    resp = requests.get(url, headers={'Authorization': f'Bearer {token}'})\n    resp.raise_for_status()\n    refreshes = resp.json().get('value', [])\n    if refreshes:\n        latest = refreshes[0]\n        return latest.get('status'), latest.get('startTime'), latest.get('endTime')\n    return None, None, None\n```",
+    "Update dataset parameters (e.g. change SharePoint site URL without re-publishing):\n```python\ndef update_parameters(workspace_id, dataset_id, token, params):\n    url = f'https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/Default.UpdateParameters'\n    body = {'updateDetails': [{'name': k, 'newValue': v} for k, v in params.items()]}\n    resp = requests.post(url,\n        headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'},\n        json=body)\n    resp.raise_for_status()\n```",
+    "Configure scheduled refresh:\n```python\ndef set_refresh_schedule(workspace_id, dataset_id, token, days, times, timezone='UTC'):\n    url = f'https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/refreshSchedule'\n    body = {'value': {\n        'enabled': True,\n        'notifyOption': 'MailOnFailure',\n        'days': days,           # ['Monday', 'Wednesday', 'Friday']\n        'times': times,         # ['06:00', '18:00']\n        'localTimeZoneId': timezone,\n    }}\n    resp = requests.patch(url,\n        headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'},\n        json=body)\n    resp.raise_for_status()\n```",
+    "Monthly automation pattern:\n1. Upload new CSV to SharePoint (separate process or Logic App)\n2. Trigger Power BI refresh via POST /datasets/{id}/refreshes\n3. Poll GET /datasets/{id}/refreshes until status = 'Completed'\n4. Export report to PDF: POST /reports/{id}/ExportTo\n5. Poll GET /reports/{id}/exports/{exportId} until status = 'Succeeded'\n6. Download: GET /reports/{id}/exports/{exportId}/file\n7. Send PDF via email or upload to SharePoint"
+  ],
+  "caveats": [
+    "nameConflict=Overwrite replaces both dataset AND report — existing report bookmarks and subscriptions may be lost",
+    "Max PBIX upload via direct POST is 1GB — for 1-10GB use Create Temporary Upload Location first",
+    "Refresh limits are strict: 8/day Pro, 48/day Premium — exceeding returns 400 error",
+    "Scheduled refresh auto-pauses after 2 months of no user activity on reports/dashboards",
+    "Service principals cannot set SharePoint Online OAuth credentials — must use a licensed user account",
+    "Import is async (202) — must poll for completion before triggering refresh or reading dataset ID",
+    "Power BI API permissions (Dataset.ReadWrite.All, etc.) must be set in Entra ID AND the SP must be added to the workspace"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-sharepoint-csv-datasource", "powerbi-monthly-dynamic-reports", "ms-graph-oauth2-client-credentials", "powerbi-visualizations-and-dax"],
+  "source_projects": ["shared-seed"]
 }

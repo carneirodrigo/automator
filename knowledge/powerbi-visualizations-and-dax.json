@@ -1,368 +1,76 @@
 {
   "id": "powerbi-visualizations-and-dax",
-  "title": "Power BI - Visualizations, Charts, and DAX Measures",
-  "description": "All visual types, how to configure them, DAX measure patterns including time intelligence",
-  "tags": ["power-bi", "dax", "charts", "visualizations", "measures"],
-  "source": "web-research",
-  "references": [
-    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualizations-overview",
-    "https://learn.microsoft.com/en-us/dax/time-intelligence-functions-dax",
-    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualization-slicers"
-  ],
-  "content": {
-    "visual_types": [
-      {
-        "name": "Clustered Bar Chart",
-        "category": "Comparison",
-        "use_case": "Compare values across categories; categories on Y-axis, values on X-axis. Best when category labels are long.",
-        "field_wells": ["Y axis (category)", "X axis (value)", "Legend (optional sub-grouping)"],
-        "notes": "Horizontal orientation. Use when you have many categories that would crowd a column chart."
-      },
-      {
-        "name": "Stacked Bar Chart",
-        "category": "Comparison / Part-to-whole",
-        "use_case": "Show both total and segment composition. Each bar is divided by Legend field.",
-        "field_wells": ["Y axis", "X axis", "Legend"],
-        "notes": "Harder to compare individual segments across categories; use when total is as important as breakdown."
-      },
-      {
-        "name": "100% Stacked Bar Chart",
-        "category": "Part-to-whole",
-        "use_case": "Show proportional composition without regard for absolute totals. Always fills to 100%.",
-        "field_wells": ["Y axis", "X axis", "Legend"]
-      },
-      {
-        "name": "Clustered Column Chart",
-        "category": "Comparison",
-        "use_case": "Compare values across categories or time periods; categories on X-axis. Best for time-based comparisons.",
-        "field_wells": ["X axis (category or date)", "Y axis (value)", "Legend"],
-        "notes": "Vertical orientation. Most common chart type for monthly totals by category."
-      },
-      {
-        "name": "Stacked Column Chart",
-        "category": "Comparison / Part-to-whole",
-        "use_case": "Show total and breakdown by segment over time.",
-        "field_wells": ["X axis", "Y axis", "Legend"]
-      },
-      {
-        "name": "100% Stacked Column Chart",
-        "category": "Part-to-whole",
-        "use_case": "Show proportional composition over time. Good for showing share shifts month-over-month.",
-        "field_wells": ["X axis", "Y axis", "Legend"]
-      },
-      {
-        "name": "Line Chart",
-        "category": "Trend",
-        "use_case": "Show continuous change over time. Ideal for monthly trends, moving averages, multiple KPIs on one chart.",
-        "field_wells": ["X axis (date/time)", "Y axis (measure)", "Legend (optional multiple lines)", "Secondary Y axis (optional)", "Tooltips"],
-        "notes": "Best for continuous data. Add forecast or anomaly detection via Analytics pane."
-      },
-      {
-        "name": "Area Chart",
-        "category": "Trend",
-        "use_case": "Line chart with filled area under the line. Emphasizes magnitude of change and cumulative values.",
-        "field_wells": ["X axis", "Y axis", "Legend"],
-        "notes": "Stacked area chart useful for showing component contributions to a total trend."
-      },
-      {
-        "name": "Combo Chart (Line + Column)",
-        "category": "Comparison",
-        "use_case": "Compare two measures with different scales on one visual. Common pattern: bars for volume, line for rate/percentage.",
-        "field_wells": ["X axis", "Column Y axis", "Line Y axis", "Legend"],
-        "notes": "Has two independent Y axes. Use when one measure dominates scale and hides the other in separate charts."
-      },
-      {
-        "name": "Ribbon Chart",
-        "category": "Trend / Ranking",
-        "use_case": "Show rank changes over time. The category with highest value always appears at top for each period.",
-        "field_wells": ["X axis (time)", "Y axis (value)", "Legend (categories being ranked)"]
-      },
-      {
-        "name": "Waterfall Chart",
-        "category": "Variance",
-        "use_case": "Show how an initial value is affected by positive and negative changes, arriving at a final value. Ideal for budget variance, P&L bridges.",
-        "field_wells": ["Category", "Y axis (value)"],
-        "notes": "Automatically colors increases green, decreases red, and totals blue (configurable)."
-      },
-      {
-        "name": "Funnel Chart",
-        "category": "Process",
-        "use_case": "Show sequential stages of a process with drop-off between stages. Sales pipeline, conversion rates.",
-        "field_wells": ["Group (stage)", "Values (count or amount)"]
-      },
-      {
-        "name": "Pie Chart",
-        "category": "Part-to-whole",
-        "use_case": "Show proportion of a whole for a small number of categories (< 6 ideally).",
-        "field_wells": ["Legend (slices)", "Values"],
-        "notes": "Avoid for many categories or similar-sized slices — use Treemap or Bar chart instead."
-      },
-      {
-        "name": "Donut Chart",
-        "category": "Part-to-whole",
-        "use_case": "Same as Pie but with a hollow center that can show a total or label.",
-        "field_wells": ["Legend", "Values"]
-      },
-      {
-        "name": "Treemap",
-        "category": "Part-to-whole / Hierarchy",
-        "use_case": "Display hierarchical data as nested rectangles. Size = value. Good for many categories.",
-        "field_wells": ["Group (category)", "Details (sub-category)", "Values"]
-      },
-      {
-        "name": "Scatter Chart",
-        "category": "Correlation",
-        "use_case": "Show relationship/correlation between two numerical measures. Each point is one entity.",
-        "field_wells": ["X axis (measure)", "Y axis (measure)", "Legend", "Size (bubble size)", "Play axis (animation over time)"],
-        "notes": "Add a Bubble chart by placing a measure in Size. Add trend line via Analytics pane."
-      },
-      {
-        "name": "Card",
-        "category": "KPI / Single Value",
-        "use_case": "Display a single key metric prominently. No axes or categories.",
-        "field_wells": ["Fields (one measure)"],
-        "notes": "Use for KPIs at the top of a dashboard. Apply conditional formatting to change color based on value."
-      },
-      {
-        "name": "Multi-row Card",
-        "category": "KPI",
-        "use_case": "Show multiple measures or a category list in a compact card layout.",
-        "field_wells": ["Fields (multiple measures or category + measure)"]
-      },
-      {
-        "name": "KPI Visual",
-        "category": "Progress",
-        "use_case": "Show a measure, its trend over time, and progress toward a target. Displays current value, trend indicator, and target.",
-        "field_wells": ["Value (measure)", "Trend axis (date)", "Target goals (measure)"]
-      },
-      {
-        "name": "Gauge Chart",
-        "category": "Progress",
-        "use_case": "Show a single value's progress between minimum and maximum, with a target needle.",
-        "field_wells": ["Value", "Minimum value", "Maximum value", "Target value"],
-        "notes": "Good for showing current attainment vs target (e.g. 72% of monthly quota)."
-      },
-      {
-        "name": "Table",
-        "category": "Detailed Data",
-        "use_case": "Display exact values in rows and columns. Best for precise comparisons where exact numbers matter.",
-        "field_wells": ["Columns (any number of dimensions and measures)"],
-        "notes": "Add conditional formatting for data bars, background colors, or icons per column."
-      },
-      {
-        "name": "Matrix",
-        "category": "Pivot Table",
-        "use_case": "Cross-tab showing measures broken down by two dimensions (rows and columns). Supports drill-down hierarchies.",
-        "field_wells": ["Rows", "Columns", "Values"],
-        "notes": "Equivalent to a pivot table. Supports subtotals, grand totals, and conditional formatting."
-      },
-      {
-        "name": "Slicer",
-        "category": "Filtering",
-        "use_case": "On-canvas filter control that updates all other visuals on the page (or synced pages).",
-        "field_wells": ["Field (dimension or date)"],
-        "styles": ["List", "Dropdown", "Tile/Button", "Date range slider", "Relative date"]
-      },
-      {
-        "name": "Map / Filled Map",
-        "category": "Geographic",
-        "use_case": "Show data by geographic location. Map = bubble markers. Filled Map = shaded regions by country/state.",
-        "field_wells": ["Location (place name, lat/long, or geographic hierarchy)", "Bubble size (measure)", "Color saturation"]
-      },
-      {
-        "name": "Decomposition Tree",
-        "category": "AI / Exploration",
-        "use_case": "Interactively drill down into a measure by dimensions in any order. AI auto-selects highest-impact next split.",
-        "field_wells": ["Analyze (measure)", "Explain by (dimensions)"]
-      },
-      {
-        "name": "Key Influencers",
-        "category": "AI",
-        "use_case": "Automatically identify which factors most influence a selected metric or outcome.",
-        "field_wells": ["Analyze (target metric)", "Explain by (potential influencers)"]
-      },
-      {
-        "name": "Smart Narrative",
-        "category": "AI / Text",
-        "use_case": "Auto-generated text summary of the report data. Updates dynamically with slicer selections.",
-        "field_wells": ["Any fields from the data model"]
-      },
-      {
-        "name": "R Visual / Python Visual",
-        "category": "Custom / Advanced Analytics",
-        "use_case": "Run R or Python scripts to create any visualisation, statistical model, or forecast.",
-        "field_wells": ["Values (passed as dataframe to the script)"]
-      }
-    ],
-    "visual_configuration": {
-      "adding_visual": "Click the visual icon in the Visualizations pane. A placeholder appears on the canvas. Drag fields from the Data pane onto the field wells in the Visualizations pane, or drag directly onto the canvas placeholder.",
-      "field_wells": {
-        "axis": "The categorical or time dimension on the X or Y axis (e.g. DateTable[YearMonth], Product[Category])",
-        "values": "The numeric measures to display (e.g. [Total Sales], [MoM Change %])",
-        "legend": "Groups the values into coloured series (e.g. Region, Product Category)",
-        "tooltips": "Additional measures shown in the hover tooltip but not plotted on the chart",
-        "filters": "Visual-level filters applied only to this visual (not the page)"
-      },
-      "format_pane": {
-        "description": "Access via the paint roller icon in the Visualizations pane. Controls all styling.",
-        "key_sections": [
-          "General: title, subtitle, background, border, shadow, responsive",
-          "Visual: X/Y axis, data labels, legend, plot area, data colors, reference lines",
-          "X Axis: title, range (min/max), gridlines, label rotation",
-          "Y Axis: title, range, gridlines, scale (linear vs logarithmic)",
-          "Data labels: position, font size, format",
-          "Legend: position (top/bottom/left/right/none), title",
-          "Title: text, font, alignment",
-          "Conditional formatting: rules for colors, icons, data bars based on measure values"
-        ]
-      },
-      "filters_pane": "Apply Filters at three levels: Visual level (only this visual), Page level (all visuals on this page), Report level (all visuals in all pages). Drag any field into the Filters pane and configure filter type (Basic, Advanced, Top N).",
-      "cross_filtering": "By default, selecting a data point in one visual cross-filters all other visuals on the page. Control this in Format > Edit interactions (Pro feature): choose Filter, Highlight, or None for each visual pair.",
-      "drill_through": "Right-click a data point > Drill through > target page. The target page shows data filtered to the selected value. Add drill-through filters on the target page by dragging fields to the Drill through field well.",
-      "bookmarks": "Capture current state of visuals/filters as a bookmark. Use buttons linked to bookmarks for interactive storytelling or reset-filter buttons."
+  "title": "Power BI Visualizations, Charts, and DAX Measure Patterns",
+  "source_family": "power-bi",
+  "coverage_type": "patterns",
+  "applies_to": ["Power BI visual selection", "DAX measure authoring", "Chart configuration", "Dashboard visual design"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Power BI visual types by category: Comparison (Clustered Bar/Column, Stacked, Combo, Ribbon), Trend (Line, Area), Part-to-whole (Pie, Donut, Treemap, 100% Stacked), Correlation (Scatter/Bubble), KPI (Card, Multi-row Card, KPI Visual, Gauge), Detailed Data (Table, Matrix), Filtering (Slicer), Geographic (Map, Filled Map), AI (Decomposition Tree, Key Influencers, Smart Narrative)",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualizations-overview",
+      "verified_date": "2026-04-11"
     },
-    "dax_fundamentals": {
-      "measure_syntax": "// Measures are calculated at query time, adapt to filter context\nMeasureName = EXPRESSION\n// Example:\nTotal Sales = SUM(Sales[Amount])\n\n// Measures live in tables but are computed values, not stored columns\n// Create via: Modeling tab > New Measure, or right-click table > New Measure",
-      "calculated_column_syntax": "// Calculated columns are computed row-by-row at data refresh time, stored in model\n// Create via: Modeling tab > New Column\nSales[Margin %] = DIVIDE(Sales[Profit], Sales[Revenue])\nSales[Full Name] = Sales[FirstName] & \" \" & Sales[LastName]",
-      "measure_vs_column": "Use MEASURES for aggregations and calculations that depend on filter context (what's selected in slicers). Use CALCULATED COLUMNS for row-level lookups and transformations that don't depend on report filters.",
-      "aggregation_functions": {
-        "SUM": "SUM(table[column]) — sum of all values",
-        "COUNT": "COUNT(table[column]) — count of non-blank values",
-        "COUNTA": "COUNTA(table[column]) — count of non-blank values (any data type)",
-        "COUNTROWS": "COUNTROWS(table) — count rows in table (often used with FILTER)",
-        "DISTINCTCOUNT": "DISTINCTCOUNT(table[column]) — count unique values",
-        "AVERAGE": "AVERAGE(table[column]) — arithmetic mean",
-        "MIN": "MIN(table[column]) — minimum value",
-        "MAX": "MAX(table[column]) — maximum value",
-        "SUMX": "SUMX(table, expression) — row-by-row evaluation then sum. Example: SUMX(Sales, Sales[Qty] * Sales[Price])",
-        "AVERAGEX": "AVERAGEX(table, expression) — row-by-row then average",
-        "COUNTX": "COUNTX(table, expression) — row-by-row then count non-blank results"
-      },
-      "calculate": {
-        "description": "CALCULATE is the most important DAX function. It evaluates an expression in a modified filter context.",
-        "syntax": "CALCULATE(expression, [filter1], [filter2], ...)",
-        "examples": {
-          "simple_filter": "// Sales for Electronics category only\nElectronics Sales = CALCULATE([Total Sales], Product[Category] = \"Electronics\")",
-          "date_filter": "// Sales in 2024\nSales 2024 = CALCULATE([Total Sales], YEAR('DateTable'[Date]) = 2024)",
-          "remove_filter": "// Sales ignoring any Region slicer selection\nAll Regions Sales = CALCULATE([Total Sales], ALL(Sales[Region]))",
-          "multiple_filters": "// 2024 Electronics Sales\nElectronics 2024 = CALCULATE([Total Sales], Product[Category] = \"Electronics\", YEAR('DateTable'[Date]) = 2024)"
-        }
-      },
-      "filter_removal_functions": {
-        "ALL": "ALL(table) or ALL(table[column]) — removes all filters from a table or column. Used for % of total calculations.",
-        "ALLEXCEPT": "ALLEXCEPT(table, table[col1], table[col2]) — removes all filters EXCEPT the specified columns",
-        "ALLSELECTED": "ALLSELECTED([table/column]) — removes filters from visuals while keeping slicer/filter selections",
-        "REMOVEFILTERS": "REMOVEFILTERS(table/column) — explicit alias for ALL, more readable",
-        "example_percent_of_total": "% of Total =\n    DIVIDE(\n        [Total Sales],\n        CALCULATE([Total Sales], ALL(Sales))\n    )",
-        "example_percent_of_category": "% of Category =\n    DIVIDE(\n        [Total Sales],\n        CALCULATE([Total Sales], ALLEXCEPT(Sales, Sales[Category]))\n    )"
-      },
-      "logical_and_conditional": {
-        "IF": "IF(condition, value_if_true, value_if_false)\nExample: IF([MoM Change %] > 0, \"Growing\", \"Declining\")",
-        "SWITCH": "SWITCH(expression, value1, result1, value2, result2, ..., else_result)\nExample: SWITCH(TRUE(), [Score] >= 90, \"A\", [Score] >= 80, \"B\", \"C\")",
-        "ISBLANK": "ISBLANK(value) — returns TRUE if value is blank",
-        "COALESCE": "COALESCE(value1, value2, ...) — returns first non-blank value",
-        "IFERROR": "IFERROR(expression, alternate) — returns alternate if expression errors",
-        "AND_OR": "AND(condition1, condition2) or use && operator\nOR(condition1, condition2) or use || operator"
-      },
-      "text_and_format_functions": {
-        "FORMAT": "FORMAT(value, format_string) — converts to text with formatting\nFORMAT([Total Sales], \"$#,##0\")  -- $1,234\nFORMAT([MoM Change %], \"0.0%\")   -- 12.3%\nFORMAT(MAX('DateTable'[Date]), \"MMMM YYYY\")  -- January 2024",
-        "CONCATENATE": "CONCATENATE(text1, text2) or text1 & text2",
-        "LEFT_RIGHT_MID": "LEFT(text, n), RIGHT(text, n), MID(text, start, length)",
-        "UPPER_LOWER": "UPPER(text), LOWER(text)",
-        "LEN": "LEN(text) — string length",
-        "TRIM": "TRIM(text) — remove leading/trailing spaces",
-        "SUBSTITUTE": "SUBSTITUTE(text, old, new) — replace substring"
-      },
-      "relationship_functions": {
-        "RELATED": "RELATED(table[column]) — follows a many-to-one relationship to bring a value from a related table into the current row context. Used in calculated columns.\nExample (in Sales table): Sales[Category] = RELATED(Product[Category])",
-        "RELATEDTABLE": "RELATEDTABLE(table) — returns all rows in a related table that match the current row context. Used in measures.\nExample: OrderCount = COUNTROWS(RELATEDTABLE(OrderDetails))",
-        "USERELATIONSHIP": "CALCULATE([Total Sales], USERELATIONSHIP(Sales[ShipDate], 'DateTable'[Date])) — activates an inactive relationship"
-      },
-      "variable_usage": {
-        "description": "VAR/RETURN makes DAX measures more readable and can improve performance by evaluating an expression once.",
-        "syntax": "MeasureName =\nVAR variable1 = expression1\nVAR variable2 = expression2\nRETURN\n    IF(ISBLANK(variable1), BLANK(), DIVIDE(variable1 - variable2, variable2))",
-        "best_practice": "Use VAR for any value referenced more than once in a measure. Avoids recalculation and improves readability."
-      }
+    {
+      "fact": "CALCULATE is the most important DAX function — evaluates an expression in a modified filter context. Syntax: CALCULATE(expression, [filter1], [filter2], ...). Filters are AND-combined.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "verified_date": "2026-04-11"
     },
-    "dax_time_intelligence": {
-      "requirement": "Requires a Date table marked as a Date Table, with a continuous Date column covering full calendar years.",
-      "complete_measures": {
-        "total_sales": "Total Sales = SUM(Sales[Amount])",
-        "previous_month": "Sales Previous Month =\n    CALCULATE(\n        [Total Sales],\n        PREVIOUSMONTH('DateTable'[Date])\n    )",
-        "mom_change_pct": "MoM Change % =\n    VAR CurrentMonth = [Total Sales]\n    VAR PrevMonth    = [Sales Previous Month]\n    RETURN\n        IF(\n            ISBLANK(PrevMonth) || PrevMonth = 0,\n            BLANK(),\n            DIVIDE(CurrentMonth - PrevMonth, PrevMonth)\n        )",
-        "ytd": "Sales YTD =\n    TOTALYTD([Total Sales], 'DateTable'[Date])\n// Equivalent to:\n// CALCULATE([Total Sales], DATESYTD('DateTable'[Date]))",
-        "qtd": "Sales QTD = TOTALQTD([Total Sales], 'DateTable'[Date])",
-        "mtd": "Sales MTD = TOTALMTD([Total Sales], 'DateTable'[Date])",
-        "same_period_last_year": "Sales SPLY =\n    CALCULATE(\n        [Total Sales],\n        SAMEPERIODLASTYEAR('DateTable'[Date])\n    )",
-        "yoy_pct": "YoY Growth % =\n    VAR Current = [Total Sales]\n    VAR Prior   = [Sales SPLY]\n    RETURN\n        IF(\n            ISBLANK(Prior) || Prior = 0,\n            BLANK(),\n            DIVIDE(Current - Prior, Prior)\n        )",
-        "last_3_months": "Sales Last 3 Months =\n    CALCULATE(\n        [Total Sales],\n        DATESINPERIOD(\n            'DateTable'[Date],\n            LASTDATE('DateTable'[Date]),\n            -3,\n            MONTH\n        )\n    )",
-        "running_total": "Sales Running Total =\n    CALCULATE(\n        [Total Sales],\n        FILTER(\n            ALL('DateTable'[YearMonth]),\n            'DateTable'[YearMonth] <= MAX('DateTable'[YearMonth])\n        )\n    )",
-        "previous_year_ytd": "Sales PY YTD =\n    CALCULATE(\n        [Sales YTD],\n        SAMEPERIODLASTYEAR('DateTable'[Date])\n    )",
-        "moving_average_3m": "3-Month Moving Avg =\n    VAR AvgResult = AVERAGEX(\n        DATESINPERIOD('DateTable'[Date], LASTDATE('DateTable'[Date]), -3, MONTH),\n        [Total Sales]\n    )\n    RETURN IF(ISBLANK([Total Sales]), BLANK(), AvgResult)"
-      },
-      "time_intelligence_function_reference": [
-        {"function": "PREVIOUSMONTH(dates)", "returns": "Table", "description": "All dates from the previous month"},
-        {"function": "PREVIOUSQUARTER(dates)", "returns": "Table", "description": "All dates from the previous quarter"},
-        {"function": "PREVIOUSYEAR(dates)", "returns": "Table", "description": "All dates from the previous year"},
-        {"function": "NEXTMONTH(dates)", "returns": "Table", "description": "All dates from the next month"},
-        {"function": "SAMEPERIODLASTYEAR(dates)", "returns": "Table", "description": "Same period shifted back 1 year"},
-        {"function": "DATEADD(dates, n, interval)", "returns": "Table", "description": "Shift dates by n intervals (DAY, MONTH, QUARTER, YEAR)"},
-        {"function": "DATESINPERIOD(dates, startDate, n, interval)", "returns": "Table", "description": "Dates in a rolling window of n intervals"},
-        {"function": "DATESBETWEEN(dates, start, end)", "returns": "Table", "description": "Dates between two fixed dates"},
-        {"function": "DATESYTD(dates, [fiscal_year_end])", "returns": "Table", "description": "Year-to-date dates"},
-        {"function": "DATESMTD(dates)", "returns": "Table", "description": "Month-to-date dates"},
-        {"function": "DATESQTD(dates)", "returns": "Table", "description": "Quarter-to-date dates"},
-        {"function": "TOTALYTD(expr, dates)", "returns": "Scalar", "description": "Year-to-date aggregate. Shortcut for CALCULATE(expr, DATESYTD(dates))"},
-        {"function": "TOTALMTD(expr, dates)", "returns": "Scalar", "description": "Month-to-date aggregate"},
-        {"function": "TOTALQTD(expr, dates)", "returns": "Scalar", "description": "Quarter-to-date aggregate"},
-        {"function": "CLOSINGBALANCEMONTH(expr, dates)", "returns": "Scalar", "description": "Value at last date of the current month"},
-        {"function": "OPENINGBALANCEMONTH(expr, dates)", "returns": "Scalar", "description": "Value at first date of the current month"},
-        {"function": "FIRSTDATE(dates)", "returns": "Table (one row)", "description": "First date in current context"},
-        {"function": "LASTDATE(dates)", "returns": "Table (one row)", "description": "Last date in current context"},
-        {"function": "STARTOFMONTH(dates)", "returns": "Table (one row)", "description": "First date of the current month"},
-        {"function": "ENDOFMONTH(dates)", "returns": "Table (one row)", "description": "Last date of the current month"}
-      ]
+    {
+      "fact": "Measures vs Calculated Columns: Measures are computed at query time and adapt to filter context (slicers, visual axes). Calculated columns are computed row-by-row at data refresh time and stored in the model. Use measures for aggregations, columns for row-level lookups.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-measures",
+      "verified_date": "2026-04-11"
     },
-    "relationships": {
-      "description": "Relationships link tables so filters propagate from one table to another.",
-      "types": [
-        {
-          "type": "Many-to-one (*:1)",
-          "direction": "Single — filters flow from the 'one' side to the 'many' side",
-          "example": "DateTable[Date] (1) -> Sales[OrderDate] (*). Slicing by month in a report filters Sales rows.",
-          "recommendation": "This is the standard pattern in a star schema. Always preferred."
-        },
-        {
-          "type": "One-to-one (1:1)",
-          "direction": "Single or Bidirectional",
-          "example": "Customer[CustomerID] <-> CustomerExtended[CustomerID]"
-        },
-        {
-          "type": "Many-to-many (*:*)",
-          "direction": "Bidirectional by default",
-          "example": "Used for bridge tables (e.g. products that belong to multiple categories)",
-          "warning": "Avoid bidirectional many-to-many where possible — causes unexpected cross-filtering and ambiguity errors."
-        }
-      ],
-      "setup_steps": [
-        "1. Open Model view in Power BI Desktop",
-        "2. Drag DateTable[Date] onto FactTable[MonthDate]",
-        "3. Power BI creates the relationship. Verify cardinality (many-to-one) and cross-filter direction (single)",
-        "4. Active relationships are shown as solid lines; inactive as dashed lines",
-        "5. Only one relationship can be active between two tables — use USERELATIONSHIP() to activate others in specific measures"
-      ],
-      "star_schema_pattern": "Best practice: use a star schema with one or more fact tables (large, many rows: Sales, Events) connected to dimension tables (smaller, lookup tables: Date, Product, Customer, Geography). All relationships radiate outward from fact tables to dimensions like a star."
+    {
+      "fact": "VAR/RETURN syntax makes DAX more readable and performant by evaluating an expression once and reusing it. VAR is evaluated in the filter context where it is defined, not where it is used in RETURN.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "verified_date": "2026-04-11"
     },
-    "report_design_tips": {
-      "layout": "Use a consistent grid. Title at top, KPI cards below, main chart in the middle, detail table or filters at bottom. Align visuals using Format > Align.",
-      "color_palette": "Limit to 3-5 colors. Use one highlight color for the current period, one for comparison. Apply a theme JSON for consistency across all visuals.",
-      "titles": "Every visual should have a descriptive title. Consider dynamic titles using DAX: Visual Title = \"Sales by Month — \" & SELECTEDVALUE('DateTable'[Year], \"All Years\")",
-      "data_labels": "Show data labels only on key visuals (cards, KPIs). Hide labels on dense charts to avoid clutter.",
-      "conditional_formatting": "Apply to tables and matrices: green/red background or arrows for MoM Change %. Format > Cell elements > Icon or Background color > Rules.",
-      "tooltips": "Add a second report page as a tooltip page. Set its size to Tooltip in Page Information. Then assign it to visuals via Format > Tooltips > Page.",
-      "accessibility": "Use alt text on visuals (Format > General > Alt text). Ensure color contrast meets WCAG guidelines. Provide a table as an alternative to charts for screen reader users.",
-      "performance": "Avoid calculated columns on large tables — use measures instead. Avoid DISTINCTCOUNT on large high-cardinality columns. Use Import mode over DirectQuery for better performance.",
-      "bookmarks_and_buttons": "Create a 'Reset filters' button: add a bookmark with no filters active, create a Button visual, set Action > Bookmark to the reset bookmark."
+    {
+      "fact": "ALL() removes all filters from a table or column — used for % of total calculations. ALLEXCEPT() removes all filters except specified columns. ALLSELECTED() removes visual-level filters while keeping slicer selections.",
+      "source_url": "https://learn.microsoft.com/en-us/dax/all-function-dax",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "RELATED() follows a many-to-one relationship to bring a value from a related table into the current row context (calculated columns). RELATEDTABLE() returns all rows in a related table matching the current row context (measures).",
+      "source_url": "https://learn.microsoft.com/en-us/dax/related-function-dax",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Star schema is the recommended data model: fact tables (large, many rows) connected to dimension tables (small, lookup) via many-to-one relationships. All relationships radiate outward from fact tables to dimensions. Single cross-filter direction preferred.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Cross-filtering: by default, selecting a data point in one visual cross-filters all other visuals on the page. Control via Format > Edit Interactions: choose Filter, Highlight, or None for each visual pair.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/create-reports/service-reports-visual-interactions",
+      "verified_date": "2026-04-11"
     }
-  }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/visuals/power-bi-visualizations-overview",
+    "https://learn.microsoft.com/en-us/dax/time-intelligence-functions-dax"
+  ],
+  "implementation_notes": [
+    "Visual selection guide for security dashboards:\n- KPI cards (top row): Card or New Card visual — one per key metric, show current value + vs-prior comparison\n- Trend over time: Line chart — X axis = DateTable[MonthYear], Y axis = [Metric Value], Legend = MetricDim[MetricName]\n- Severity distribution: Stacked Column or Donut — group by severity level, value = count\n- Multi-metric comparison matrix: Matrix visual — Rows = MetricDim[MetricName], Columns = DateTable[MonthYear], Values = [Metric Value]\n- Detail drill-down: Table visual with conditional formatting, linked via drill-through\n- Period selection: Slicer (Dropdown style for compact header)",
+    "Core DAX aggregation functions:\n```dax\n// Basic aggregations\nTotal Sales = SUM(Sales[Amount])\nUnique Hosts = DISTINCTCOUNT(Detections[host_id])\nRow Count = COUNTROWS(FactTable)\n\n// Iterator aggregations (row-by-row evaluation then aggregate)\nWeighted Score = SUMX(Detections, Detections[severity] * Detections[qds])\nAvg Per Host = AVERAGEX(VALUES(Detections[host_id]), [Total Vulns])\n```",
+    "CALCULATE with filter manipulation:\n```dax\n// Filter to specific value\nCritical Vulns = CALCULATE([Total Vulns], Detections[severity] = 5)\n\n// Remove all filters (% of total)\n% of Total = DIVIDE([Total Vulns], CALCULATE([Total Vulns], ALL(Detections)))\n\n// Remove filters except one column (% within category)\n% of Category = DIVIDE([Total Vulns], CALCULATE([Total Vulns], ALLEXCEPT(Detections, Detections[category])))\n\n// Activate inactive relationship\nBy Ship Date = CALCULATE([Total Sales], USERELATIONSHIP(Sales[ShipDate], DateTable[Date]))\n```",
+    "Conditional logic in DAX:\n```dax\n// IF for simple branching\nTrend Label = IF([MoM Change %] > 0, \"Growing\", \"Declining\")\n\n// SWITCH for multi-value branching\nSeverity Label = SWITCH([severity], 1, \"Minimal\", 2, \"Medium\", 3, \"Serious\", 4, \"Critical\", 5, \"Urgent\", \"Unknown\")\n\n// SWITCH(TRUE()) for range-based logic\nRisk Band = SWITCH(TRUE(), [Score] >= 90, \"Critical\", [Score] >= 70, \"High\", [Score] >= 40, \"Medium\", \"Low\")\n\n// COALESCE for first non-blank\nSafe Value = COALESCE([Metric Value], 0)\n```",
+    "FORMAT function for display:\n```dax\nFORMAT([Total Sales], \"$#,##0\")          -- $1,234\nFORMAT([MoM Change %], \"0.0%\")           -- 12.3%\nFORMAT(MAX(DateTable[Date]), \"MMMM YYYY\") -- January 2026\nFORMAT([Count], \"#,##0\")                 -- 1,234\n```",
+    "Conditional formatting setup for tables/matrices:\n- Background color: Format pane > Cell elements > Background color > Rules or Gradient\n- Icon sets: Format pane > Cell elements > Icons > Rules (Layout = 'Data only' for icon-only columns)\n- Data bars: Format pane > Cell elements > Data bars (in-cell proportional bars)\n- RAG thresholds: If value >= Red → #FF4444, If value >= Amber → #FFC000, else → #70AD47",
+    "Report design best practices:\n- Consistent grid layout: Title top, KPI cards below, main chart middle, detail table/filters bottom\n- Limit to 3-5 colors; use one highlight color for current period, one for comparison\n- Dynamic titles: Title Measure = \"Dashboard — \" & SELECTEDVALUE(DateTable[MonthYear], \"All Periods\")\n- Drill-through: right-click data point → navigate to detail page filtered to that context\n- Bookmarks: capture visual/filter state for reset buttons or view switching\n- Tooltip pages: create a small report page (set size to Tooltip), assign to visuals via Format > Tooltips > Page"
+  ],
+  "caveats": [
+    "Avoid calculated columns on large tables — use measures instead for better performance",
+    "DISTINCTCOUNT on large high-cardinality columns is expensive — consider pre-aggregating",
+    "Avoid bidirectional many-to-many relationships — causes unexpected cross-filtering and ambiguity errors",
+    "Only one relationship can be active between two tables — use USERELATIONSHIP() for alternatives",
+    "Pie charts work poorly with >6 categories or similar-sized slices — use Treemap or Bar chart instead",
+    "Cross-filtering defaults may confuse users — explicitly set Edit Interactions for each visual pair",
+    "R/Python visuals require a local R/Python installation and do not work in Power BI Service without a gateway"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-time-intelligence-mom-qoq-yoy", "powerbi-date-calendar-table-patterns", "powerbi-matrix-table-advanced-patterns", "powerbi-security-dashboard-layout-patterns", "powerbi-snapshot-data-modeling"],
+  "source_projects": ["shared-seed"]
 }

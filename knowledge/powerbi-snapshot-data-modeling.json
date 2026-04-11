@@ -1,98 +1,65 @@
 {
   "id": "powerbi-snapshot-data-modeling",
-  "title": "Power BI - Data Modeling for Security Snapshot Data: Star Schema, Unpivoting, and Period Combination",
-  "description": "Production modeling patterns for periodic security snapshot data: star schema design, unpivoting wide CSV tables to tall fact tables in Power Query, combining monthly and quarterly snapshots in one model, and the 'this month vs change' pattern",
-  "tags": ["power-bi", "data-modeling", "star-schema", "power-query", "unpivot", "security-reporting", "snapshot-data", "fact-table", "sharepoint-csv"],
-  "source": "web-research",
-  "references": [
-    "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
-    "https://learn.microsoft.com/en-us/power-query/unpivot-column",
-    "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-one-to-one",
-    "https://learn.microsoft.com/en-us/power-query/table-unpivot-other-columns",
-    "https://learn.microsoft.com/en-us/power-bi/guidance/model-date-tables"
+  "title": "Power BI Data Modeling for Security Snapshots — Star Schema, Unpivoting, Period Combination",
+  "source_family": "power-bi",
+  "coverage_type": "patterns",
+  "applies_to": ["Power BI star schema design", "Security snapshot data modeling", "Unpivoting wide CSV to tall format", "Combining monthly and quarterly snapshots"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Star schema for security snapshots: one fact table (SecuritySnapshots — one row per period per metric) with dimensions DateTable and MetricDim. Relationships radiate from fact to dimensions, single cross-filter direction.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Fact table grain: one row per period per metric with raw value only. Never store MoM delta or % change as columns — compute in DAX. Storing pre-computed deltas creates circular dependencies and breaks time intelligence.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Wide format (one column per metric) cannot use a MetricDim dimension. Tall format (one row per metric per period) enables: filter by metric name, sort by SortOrder, per-metric thresholds, single set of DAX measures for all metrics.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/unpivot-column",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Table.UnpivotOtherColumns keeps fixed columns (Date, SourceFile) and pivots everything else into rows. More robust than Table.Unpivot when new metric columns appear in newer files.",
+      "source_url": "https://learn.microsoft.com/en-us/power-query/table-unpivot-other-columns",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "MetricDim dimension stores per-metric thresholds (RedThreshold, AmberThreshold), LowIsGood flag, SortOrder, and category. SELECTEDVALUE(MetricDim[RedThreshold]) works in matrix row context to drive dynamic RAG formatting.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Monthly and quarterly snapshots can coexist in one fact table with a PeriodType column ('Monthly'/'Quarterly'). Quarterly snapshots use first month of quarter as YearMonthKey: Q1=202601, Q2=202604.",
+      "source_url": "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema",
+      "verified_date": "2026-04-11"
+    }
   ],
-  "content": {
-    "star_schema_for_security_snapshots": {
-      "overview": "A star schema for security snapshot reporting has one central fact table (SecuritySnapshots) and two small dimension tables (DateTable, MetricDim). All relationships radiate from the fact table to dimensions.",
-      "fact_table_design": {
-        "columns": [
-          "SnapshotDate  — Date, first day of the period (2026-01-01, 2026-02-01…)",
-          "MetricID      — Integer foreign key to MetricDim",
-          "Value         — Integer or decimal, the count or score for this metric and period",
-          "PeriodType    — Text: 'Monthly' or 'Quarterly' (used when both granularities coexist)",
-          "SourceFile    — Text: original filename, useful for troubleshooting data gaps",
-          "YearMonthKey  — Integer YYYYMM, e.g. 202601 (join key to DateTable)"
-        ],
-        "example_rows": [
-          "{ SnapshotDate: 2026-01-01, MetricID: 1, Value: 142, PeriodType: 'Monthly', YearMonthKey: 202601 }",
-          "{ SnapshotDate: 2026-01-01, MetricID: 2, Value: 387, PeriodType: 'Monthly', YearMonthKey: 202601 }",
-          "{ SnapshotDate: 2026-01-01, MetricID: 3, Value:  28, PeriodType: 'Monthly', YearMonthKey: 202601 }"
-        ],
-        "grain": "One row per period per metric. Never store MoM delta or % change as columns in the fact table — compute these in DAX measures. Storing pre-computed deltas causes double-counting and makes time intelligence impossible."
-      },
-      "metric_dimension": {
-        "columns": [
-          "MetricID        — Integer primary key",
-          "MetricName      — Text: 'Sev5 Vulns', 'Sev4 Vulns', 'External', 'Internal', 'Open Alerts'",
-          "MetricCategory  — Text: 'Vulnerability', 'Alert', 'Exposure', 'Score'",
-          "SortOrder       — Integer for row ordering in matrix",
-          "RedThreshold    — Integer: value at which this metric is red",
-          "AmberThreshold  — Integer: value at which this metric is amber",
-          "LowIsGood       — Boolean: TRUE for counts (lower = better), FALSE for scores (higher = better)",
-          "Unit            — Text: 'Count', 'Score', 'Percent'"
-        ],
-        "loading_from_csv": "MetricDim can be a small static CSV uploaded to SharePoint or hardcoded in Power Query as a table literal:\n\n// Power Query M: inline dimension table\nMetricDim = Table.FromRows({\n    {1, \"Sev5 Vulns\",  \"Vulnerability\", 1, 100, 50, true,  \"Count\"},\n    {2, \"Sev4 Vulns\",  \"Vulnerability\", 2, 200, 100, true, \"Count\"},\n    {3, \"External\",    \"Exposure\",      3, 30,  15,  true, \"Count\"},\n    {4, \"Internal\",    \"Exposure\",      4, 50,  25,  true, \"Count\"},\n    {5, \"Open Alerts\", \"Alert\",         5, 20,  10,  true, \"Count\"}\n},\n{\"MetricID\",\"MetricName\",\"MetricCategory\",\"SortOrder\",\n \"RedThreshold\",\"AmberThreshold\",\"LowIsGood\",\"Unit\"})"
-      },
-      "relationships": "DateTable[YearMonthKey] (1) → SecuritySnapshots[YearMonthKey] (*) — single direction, DateTable filters SecuritySnapshots\nMetricDim[MetricID] (1) → SecuritySnapshots[MetricID] (*) — single direction, MetricDim filters SecuritySnapshots\n\nDo NOT create relationships between DateTable and MetricDim — they are independent dimensions.",
-      "why_not_wide_format": "A wide fact table (one column per metric: Sev5Count, Sev4Count, ExternalCount…) cannot be used with a MetricDim dimension. You cannot filter by metric name, sort by SortOrder, or apply per-metric thresholds. The tall format (one row per metric per period) is always preferred for flexible, reusable DAX measures."
-    },
-    "unpivoting_wide_csv_to_tall": {
-      "problem": "Logic App CSVs often export wide format: one row per period, one column per metric:\nDate       | Sev5 | Sev4 | External | Internal | Alerts\n2026-01-01 |  142 |  387 |       28 |       74 |     15\n\nThis must be unpivoted to tall format before loading.",
-      "power_query_unpivot_steps": [
-        "1. In Power Query, after loading and promoting headers, select all columns you want to KEEP fixed (e.g. Date, Region — these are NOT metrics)",
-        "2. Right-click the selected fixed columns > Unpivot Other Columns",
-        "3. Power Query creates two new columns: 'Attribute' (metric name) and 'Value' (the count)",
-        "4. Rename 'Attribute' to 'MetricName' and 'Value' to 'Count'",
-        "5. Change 'Count' column type to Int64.Type or Decimal.Type"
-      ],
-      "unpivot_m_code": "// Full M query: load wide CSV from SharePoint, unpivot to tall format\nlet\n    // ── 1. Connect to SharePoint folder ──────────────────────────────\n    Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/Security\", [ApiVersion=15]),\n    FilteredFiles = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Reports/Monthly/\")),\n    CSVOnly = Table.SelectRows(FilteredFiles, each [Extension] = \".csv\"),\n\n    // ── 2. Add filename metadata before expanding ─────────────────────\n    AddFileName = Table.AddColumn(CSVOnly, \"SourceFile\", each [Name], type text),\n\n    // ── 3. Parse and promote headers for each file ────────────────────\n    ParseCSV = Table.AddColumn(AddFileName, \"Data\",\n        each Table.PromoteHeaders(\n            Csv.Document([Content], [Delimiter=\",\", Encoding=65001])\n        )\n    ),\n\n    // ── 4. Expand all CSV rows ────────────────────────────────────────\n    SampleCols = Table.ColumnNames(ParseCSV{0}[Data]),\n    Expanded = Table.ExpandTableColumn(ParseCSV, \"Data\", SampleCols),\n\n    // ── 5. Remove SharePoint metadata columns ─────────────────────────\n    Cleaned = Table.RemoveColumns(Expanded,\n        {\"Content\",\"Extension\",\"Date accessed\",\"Date modified\",\n         \"Date created\",\"Attributes\",\"Folder Path\"}),\n\n    // ── 6. Set date column type ───────────────────────────────────────\n    TypedDate = Table.TransformColumnTypes(Cleaned, {{\"Date\", type date}}),\n\n    // ── 7. UNPIVOT: keep Date and SourceFile fixed, pivot everything else\n    Unpivoted = Table.UnpivotOtherColumns(TypedDate, {\"Date\", \"SourceFile\"}, \"MetricName\", \"Value\"),\n\n    // ── 8. Cast Value to integer ──────────────────────────────────────\n    TypedValue = Table.TransformColumnTypes(Unpivoted, {{\"Value\", Int64.Type}}),\n\n    // ── 9. Add YearMonthKey for join to DateTable ─────────────────────\n    AddKey = Table.AddColumn(TypedValue, \"YearMonthKey\",\n        each Date.Year([Date]) * 100 + Date.Month([Date]),\n        Int64.Type),\n\n    // ── 10. Add MetricID by lookup (join to MetricDim values) ──────────\n    // Option A: keep MetricName as text and join on name in the relationship\n    // Option B: replace MetricName with integer ID here (more efficient):\n    MetricIDLookup = [\n        #\"Sev5\" = 1, #\"Sev4\" = 2, #\"External\" = 3,\n        #\"Internal\" = 4, #\"Alerts\" = 5\n    ],\n    AddMetricID = Table.AddColumn(TypedValue, \"MetricID\",\n        each try Record.Field(MetricIDLookup, [MetricName]) otherwise null,\n        Int64.Type)\nin\n    AddMetricID",
-      "unpivot_other_columns_explanation": "Table.UnpivotOtherColumns(table, pivot_columns, attribute_column_name, value_column_name): keeps pivot_columns fixed, and for every other column creates one row per column with the column name in attribute_column_name and the cell value in value_column_name. This is the correct function when you know which columns to keep fixed.",
-      "selective_unpivot": "// Alternative: unpivot only specific columns by name\nUnpivoted = Table.Unpivot(\n    Source,\n    {\"Sev5\", \"Sev4\", \"External\", \"Internal\", \"Alerts\"},  -- columns to unpivot\n    \"MetricName\",  -- new attribute column name\n    \"Value\"        -- new value column name\n)\n// Use this when the CSV has both metric columns AND other non-metric columns\n// that should not be unpivoted (e.g. Region, Business Unit)"
-    },
-    "this_month_vs_change_model": {
-      "overview": "Never store MoM change as a column in the fact table. Calculate it in DAX from the raw values. The fact table contains only the raw snapshot value for each period.",
-      "why": "Storing computed deltas creates a circular dependency: the delta for March depends on February's value, which means you cannot modify February's data without recalculating all downstream deltas. DAX time intelligence handles this correctly and dynamically based on whatever filter context the visual applies.",
-      "measure_pattern": "// The complete measure set for one metric:\n// (With MetricDim[MetricName] on matrix rows, these work for ALL metrics)\n\nMetric Value =\n    SUM(SecuritySnapshots[Value])\n\nMetric PM =\n    CALCULATE([Metric Value], PREVIOUSMONTH('DateTable'[Date]))\n\nMetric MoM Change =\n    VAR _C = [Metric Value]\n    VAR _P = [Metric PM]\n    RETURN IF(NOT ISBLANK(_C) && NOT ISBLANK(_P), _C - _P, BLANK())\n\nMetric MoM % =\n    VAR _C = [Metric Value]\n    VAR _P = [Metric PM]\n    RETURN IF(ISBLANK(_P) || _P = 0, BLANK(), DIVIDE(_C - _P, ABS(_P)))\n\nMetric LY =\n    CALCULATE([Metric Value], SAMEPERIODLASTYEAR('DateTable'[Date]))\n\nMetric YoY % =\n    VAR _C = [Metric Value]\n    VAR _L = [Metric LY]\n    RETURN IF(ISBLANK(_L) || _L = 0, BLANK(), DIVIDE(_C - _L, ABS(_L)))"
-    },
-    "combining_monthly_and_quarterly_snapshots": {
-      "scenario": "You have two CSVs in SharePoint: monthly snapshots (fine-grained, all metrics) and quarterly snapshots (aggregated, including metrics not in monthly CSVs, e.g. quarter-end security scores).",
-      "approach_single_fact_table": {
-        "description": "Load both into the same SecuritySnapshots fact table with a PeriodType column. Use the PeriodType in measures to filter appropriately.",
-        "m_query_merge": "// Load monthly CSVs → unpivot → add PeriodType = \"Monthly\"\n// Load quarterly CSVs → unpivot → add PeriodType = \"Quarterly\"\n// Then combine:\nSecuritySnapshots = Table.Combine({MonthlyFact, QuarterlyFact})\n\n// Each fact row now has PeriodType which measures can filter by:\nQuarterly Score =\n    CALCULATE(\n        [Metric Value],\n        SecuritySnapshots[PeriodType] = \"Quarterly\"\n    )",
-        "date_key": "Both monthly and quarterly snapshots join to the same DateTable via YearMonthKey. Quarterly snapshots use the first month of the quarter: Q1 2026 = 202601, Q2 2026 = 202604."
-      },
-      "approach_separate_fact_tables": {
-        "description": "Keep monthly and quarterly snapshots in separate fact tables (MonthlySnapshots and QuarterlySnapshots). Both join to the same DateTable.",
-        "when_to_use": "Prefer this approach when quarterly snapshots contain completely different metrics from monthly snapshots, or when quarterly data has different schema.",
-        "relationship_setup": "DateTable[YearMonthKey] (1) → MonthlySnapshots[YearMonthKey] (*)\nDateTable[YearMonthKey] (1) → QuarterlySnapshots[YearMonthKey] (*)\n\nThe DateTable is reused for both. When user filters to Q1 2026 (months Jan, Feb, Mar), both fact tables are filtered to those months. Quarterly fact table typically only has data for month=start of quarter.",
-        "measure_scoping": "Monthly measures reference MonthlySnapshots, quarterly measures reference QuarterlySnapshots. Put them in the appropriate fact table in the Modeling pane."
-      },
-      "quarterly_aggregation_from_monthly": "// If you only have monthly data but want quarterly aggregates:\nQuarterly Count =\n    CALCULATE(\n        [Metric Value],\n        DATESQTD('DateTable'[Date])  -- quarter-to-date\n    )\n// Or for a full quarter total when viewing by quarter:\nQuarterly Total =\n    CALCULATE(\n        [Metric Value],\n        DATESINPERIOD(\n            'DateTable'[Date],\n            ENDOFQUARTER('DateTable'[Date]),\n            -1,\n            QUARTER\n        )\n    )"
-    },
-    "excel_files_vs_csv": {
-      "excel_as_source": "Logic Apps can write to Excel files in SharePoint instead of CSVs. Power BI connects to Excel with SharePoint.Files() + Excel.Workbook() instead of Csv.Document(). The M query structure is almost identical.",
-      "excel_m_snippet": "// Replace the Csv.Document step with Excel.Workbook:\nParseExcel = Table.AddColumn(FilteredFiles, \"Data\",\n    each let\n        wb    = Excel.Workbook([Content], true, true),  -- true = use headers, true = use column names from first row\n        sheet = wb{[Kind=\"Sheet\", Name=\"Data\"]}[Data]   -- get 'Data' sheet; use wb{0}[Data] for first sheet\n    in sheet\n),\n// Then ExpandTableColumn as before",
-      "excel_named_table": "// If Logic App writes to a named Excel Table (ListObject), reference it by name:\nsheet = wb{[Kind=\"Table\", Name=\"SecurityData\"]}[Data]\n// Named tables are more robust than sheet names if the sheet is reorganised",
-      "excel_vs_csv_for_logic_apps": "CSVs are simpler to generate from Logic Apps (just string concatenation or a JSON-to-CSV action) and are smaller in storage. Excel files are larger and require the Excel Online connector in Logic Apps, but support multiple named tables per file and preserve data types without manual parsing. For automated pipelines, CSVs are generally preferred."
-    },
-    "common_mistakes": [
-      "Storing pre-computed MoM deltas in the fact table — impossible to recompute if historical data changes, and breaks DAX time intelligence.",
-      "Wide format fact table (columns = metrics) — cannot be used with a metric dimension, makes adding new metrics require schema changes.",
-      "Not normalising SnapshotDate to the first of the month — dates like 2026-03-15 won't join correctly to DateTable where the expected match is 2026-03-01.",
-      "Loading quarterly and monthly snapshots without a PeriodType column — impossible to distinguish them in DAX, measures double-count.",
-      "Using Table.Unpivot on fixed metric column names when new metrics are added over time — the query breaks when a new metric column appears in newer CSVs. Use Table.UnpivotOtherColumns instead to pivot everything except the fixed identifier columns.",
-      "MetricDim as an in-memory Power Query table without a relationship to the fact table — dimensions must be in the data model with a relationship, not just loaded as loose tables.",
-      "Combining monthly and quarterly snapshots without aligning the YearMonthKey — quarterly Q2 2026 must use 202604 (April), not 202606 (June end)."
-    ]
-  }
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/power-bi/guidance/star-schema"
+  ],
+  "implementation_notes": [
+    "Fact table schema:\n- SnapshotDate (date, first of period)\n- MetricID (integer FK to MetricDim)\n- Value (integer or decimal, the raw count/score)\n- PeriodType (text: 'Monthly' or 'Quarterly')\n- SourceFile (text, original filename)\n- YearMonthKey (integer YYYYMM, join key to DateTable)",
+    "MetricDim as inline Power Query table:\n```m\nMetricDim = Table.FromRows({\n    {1, \"Sev5 Vulns\",  \"Vulnerability\", 1, 100, 50, true,  \"Count\"},\n    {2, \"Sev4 Vulns\",  \"Vulnerability\", 2, 200, 100, true, \"Count\"},\n    {3, \"External\",    \"Exposure\",      3, 30,  15,  true, \"Count\"},\n    {4, \"Internal\",    \"Exposure\",      4, 50,  25,  true, \"Count\"},\n    {5, \"Open Alerts\", \"Alert\",         5, 20,  10,  true, \"Count\"}\n},\n{\"MetricID\",\"MetricName\",\"MetricCategory\",\"SortOrder\",\n \"RedThreshold\",\"AmberThreshold\",\"LowIsGood\",\"Unit\"})\n```",
+    "Unpivot wide CSV to tall fact table:\n```m\nlet\n    Source = SharePoint.Files(\"https://contoso.sharepoint.com/sites/Security\", [ApiVersion=15]),\n    Filtered = Table.SelectRows(Source, each Text.Contains([Folder Path], \"/Reports/Monthly/\")),\n    CSVOnly = Table.SelectRows(Filtered, each [Extension] = \".csv\"),\n    AddFile = Table.AddColumn(CSVOnly, \"SourceFile\", each [Name], type text),\n    Parsed = Table.AddColumn(AddFile, \"Data\",\n        each Table.PromoteHeaders(Csv.Document([Content], [Delimiter=\",\", Encoding=65001]))),\n    Expanded = Table.ExpandTableColumn(Parsed, \"Data\", Table.ColumnNames(Parsed{0}[Data])),\n    Cleaned = Table.RemoveColumns(Expanded,\n        {\"Content\",\"Extension\",\"Date accessed\",\"Date modified\",\"Date created\",\"Attributes\",\"Folder Path\"}),\n    TypedDate = Table.TransformColumnTypes(Cleaned, {{\"Date\", type date}}),\n    // UNPIVOT: keep Date and SourceFile fixed, pivot everything else\n    Unpivoted = Table.UnpivotOtherColumns(TypedDate, {\"Date\", \"SourceFile\"}, \"MetricName\", \"Value\"),\n    TypedValue = Table.TransformColumnTypes(Unpivoted, {{\"Value\", Int64.Type}}),\n    AddKey = Table.AddColumn(TypedValue, \"YearMonthKey\",\n        each Date.Year([Date]) * 100 + Date.Month([Date]), Int64.Type)\nin\n    AddKey\n```",
+    "DAX measures for the 'this month vs change' pattern:\n```dax\n// One set of measures works for ALL metrics when MetricDim[MetricName] is on matrix rows\nMetric Value = SUM(SecuritySnapshots[Value])\n\nMetric PM = CALCULATE([Metric Value], PREVIOUSMONTH('DateTable'[Date]))\n\nMetric MoM Change =\n    VAR _C = [Metric Value]\n    VAR _P = [Metric PM]\n    RETURN IF(NOT ISBLANK(_C) && NOT ISBLANK(_P), _C - _P, BLANK())\n\nMetric MoM % =\n    VAR _C = [Metric Value]\n    VAR _P = [Metric PM]\n    RETURN IF(ISBLANK(_P) || _P = 0, BLANK(), DIVIDE(_C - _P, ABS(_P)))\n\nMetric LY = CALCULATE([Metric Value], SAMEPERIODLASTYEAR('DateTable'[Date]))\n\nMetric YoY % =\n    VAR _C = [Metric Value]\n    VAR _L = [Metric LY]\n    RETURN IF(ISBLANK(_L) || _L = 0, BLANK(), DIVIDE(_C - _L, ABS(_L)))\n```",
+    "Dynamic RAG using per-metric thresholds:\n```dax\nRAG Status =\nVAR _Val   = [Metric Value]\nVAR _Red   = SELECTEDVALUE(MetricDim[RedThreshold], 100)\nVAR _Amber = SELECTEDVALUE(MetricDim[AmberThreshold], 50)\nRETURN\n    IF(ISBLANK(_Val), BLANK(),\n    SWITCH(TRUE(), _Val >= _Red, 2, _Val >= _Amber, 1, 0))\n// 2=Red, 1=Amber, 0=Green — use with icon conditional formatting\n```",
+    "Combining monthly + quarterly snapshots:\n```m\n// Load monthly → unpivot → add PeriodType = \"Monthly\"\n// Load quarterly → unpivot → add PeriodType = \"Quarterly\"\nSecuritySnapshots = Table.Combine({MonthlyFact, QuarterlyFact})\n```\n\nDAX to scope quarterly-only metrics:\n```dax\nQuarterly Score = CALCULATE([Metric Value], SecuritySnapshots[PeriodType] = \"Quarterly\")\n```",
+    "Excel source variant (instead of CSV):\n```m\n// Replace Csv.Document with Excel.Workbook:\nParseExcel = Table.AddColumn(FilteredFiles, \"Data\",\n    each let\n        wb = Excel.Workbook([Content], true, true),\n        sheet = wb{[Kind=\"Sheet\", Name=\"Data\"]}[Data]\n    in sheet)\n// Or reference named table: wb{[Kind=\"Table\", Name=\"SecurityData\"]}[Data]\n```"
+  ],
+  "caveats": [
+    "Never store pre-computed MoM deltas in the fact table — breaks DAX time intelligence and creates maintenance burden",
+    "Wide format fact table (columns=metrics) makes it impossible to add new metrics without schema changes",
+    "Normalise SnapshotDate to first of month — dates like 2026-03-15 won't join correctly to DateTable where the match is 2026-03-01",
+    "Always include PeriodType column when mixing monthly and quarterly snapshots — otherwise measures double-count",
+    "Use Table.UnpivotOtherColumns (not Table.Unpivot with fixed names) to handle new metrics appearing in future files",
+    "MetricDim must be loaded into the data model with a relationship to the fact table — not just a loose Power Query table",
+    "Quarterly Q2 2026 must use YearMonthKey=202604 (April start), not 202606 (June end)"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["powerbi-date-calendar-table-patterns", "powerbi-time-intelligence-mom-qoq-yoy", "powerbi-matrix-table-advanced-patterns", "powerbi-security-dashboard-layout-patterns", "powerbi-power-query-m-reference"],
+  "source_projects": ["shared-seed"]
 }
