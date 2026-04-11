@@ -3173,6 +3173,133 @@
       "last_verified": "2026-04-11T00:00:00Z",
       "fresh_until": "2026-10-11T00:00:00Z",
       "summary": "List managed APIs, get connector swagger/operations, build connection references and ApiConnection actions. Common connector API names and key operations for Sentinel, SharePoint, Teams, Office365"
+    },
+    {
+      "id": "python-qualys-api-client-patterns",
+      "title": "Python Qualys API Client Patterns \u2014 Auth, Session, XML/CSV, Pagination, Rate Limits",
+      "file": "python-qualys-api-client-patterns.json",
+      "tags": [
+        "qualys",
+        "python",
+        "api-client",
+        "basic-auth",
+        "xml",
+        "pagination",
+        "rate-limit"
+      ],
+      "source_family": "qualys",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T00:00:00Z",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Python requests session with Basic auth, XML and CSV response modes, id_min pagination, 409 rate-limit handling, X-Requested-With header requirement"
+    },
+    {
+      "id": "qualys-vmdr-xml-response-parsing",
+      "title": "Qualys VMDR XML Response Parsing \u2014 Detection List, Host List, Flatten to Rows",
+      "file": "qualys-vmdr-xml-response-parsing.json",
+      "tags": [
+        "qualys",
+        "vmdr",
+        "xml-parsing",
+        "detection-list",
+        "flatten",
+        "pandas"
+      ],
+      "source_family": "qualys",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T00:00:00Z",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Parse HOST>DETECTION nested XML into flat rows, truncation detection, KB enrichment with CVEs/CVSS, QDS severity mapping, pandas conversion"
+    },
+    {
+      "id": "qualys-global-asset-inventory-v2-api",
+      "title": "Qualys Global Asset Inventory (GAV) v2 API \u2014 Asset Search, Fields, Python Patterns",
+      "file": "qualys-global-asset-inventory-v2-api.json",
+      "tags": [
+        "qualys",
+        "gav",
+        "asset-inventory",
+        "qql",
+        "json-api",
+        "pagination"
+      ],
+      "source_family": "qualys",
+      "coverage_type": "endpoint",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T00:00:00Z",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "GAV v2 JSON POST API, QQL query syntax, lastSeenAssetId cursor pagination, hostId linking to VMDR, asset count endpoint"
+    },
+    {
+      "id": "qualys-policy-compliance-api",
+      "title": "Qualys Policy Compliance (PC) API \u2014 Posture, Controls, Scan Results",
+      "file": "qualys-policy-compliance-api.json",
+      "tags": [
+        "qualys",
+        "policy-compliance",
+        "posture",
+        "controls",
+        "compliance-scan"
+      ],
+      "source_family": "qualys",
+      "coverage_type": "endpoint",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T00:00:00Z",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "PC posture info, control list, policy list, scan results fetch, compliance percentage calculation, exception handling"
+    },
+    {
+      "id": "qualys-api-rate-limits-pagination",
+      "title": "Qualys API Rate Limits, Concurrency, Pagination, and Truncation Reference",
+      "file": "qualys-api-rate-limits-pagination.json",
+      "tags": [
+        "qualys",
+        "rate-limit",
+        "pagination",
+        "truncation",
+        "concurrency",
+        "409"
+      ],
+      "source_family": "qualys",
+      "coverage_type": "reference",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T00:00:00Z",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "HTTP 409 rate limiting (not 429), 2 concurrent calls per subscription, id_min pagination, truncation detection, per-API-family pagination strategies"
+    },
+    {
+      "id": "qualys-data-pipeline-dashboard-patterns",
+      "title": "Qualys Data Pipeline Patterns \u2014 XML to Flat Rows, KPIs, Power BI Prep",
+      "file": "qualys-data-pipeline-dashboard-patterns.json",
+      "tags": [
+        "qualys",
+        "data-pipeline",
+        "kpi",
+        "power-bi",
+        "excel",
+        "dashboard",
+        "severity"
+      ],
+      "source_family": "qualys",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T00:00:00Z",
+      "updated": "2026-04-11T00:00:00Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Full pipeline API\u2192flatten\u2192enrich\u2192KPIs\u2192Excel, Qualys severity (1-5) vs CVSS, QDS distribution, MTTR calculation, Power BI data model"
     }
   ]
 }

@@ -1,0 +1,86 @@
+{
+  "id": "qualys-api-rate-limits-pagination",
+  "title": "Qualys API Rate Limits, Concurrency, Pagination, and Truncation Reference",
+  "source_family": "qualys",
+  "coverage_type": "reference",
+  "applies_to": ["Qualys API rate limiting", "Handling truncated responses", "Qualys pagination patterns", "Concurrent API call limits"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Concurrency limit: 2 simultaneous API calls per subscription (classic VM/PC APIs). Exceeding returns HTTP 409 Conflict.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Rate limit: varies by API — typically 300 calls per 24-hour rolling window for data-heavy endpoints (host detection, scan launch). Some read-only endpoints have higher limits.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Rate limit headers: X-RateLimit-Limit (total allowed), X-RateLimit-Window-Sec (window in seconds), X-RateLimit-Remaining (calls left), X-RateLimit-ToWait-Sec (seconds until reset when limited)",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "When rate limited: HTTP 409 with header X-RateLimit-ToWait-Sec indicating how long to wait. NOT 429 like most APIs.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Truncation (classic VM APIs): when results exceed the server-side limit, the XML response includes WARNING/TEXT containing 'Truncated' and WARNING/URL with the next-page URL containing id_min parameter.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "id_min pagination: set id_min to the last host ID + 1 from the current page. The server orders results by host ID ascending. Keep fetching until no WARNING/Truncated appears.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "truncation_limit parameter: set truncation_limit=0 to disable truncation on some endpoints (host list). Does NOT work on host detection list — detection list always truncates at server limit.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_list.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "GAV v2 pagination: uses lastSeenAssetId cursor + hasMore boolean in JSON response. pageSize max 10000.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "WAS API pagination: uses limit and offset parameters. Default limit=10, max varies by endpoint.",
+      "source_url": "https://docs.qualys.com/en/was/api/finding/search_finding.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "CSV mode truncation: the response ends with a line containing 'WARNING' and a URL with id_min — different format from XML truncation",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Concurrent request to the SAME endpoint while one is running: Qualys queues it or returns 409. Concurrent requests to DIFFERENT endpoints count towards the 2-call limit.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm"
+  ],
+  "implementation_notes": [
+    "Rate-limit-aware request wrapper:\n```python\nimport time\n\ndef qualys_post(session, url, data, max_retries=3, timeout=(10, 300)):\n    for attempt in range(max_retries):\n        resp = session.post(url, data=data, timeout=timeout)\n        \n        if resp.status_code == 409:\n            wait = int(resp.headers.get('X-RateLimit-ToWait-Sec', 60))\n            print(f'Rate limited, waiting {wait}s (attempt {attempt + 1})')\n            time.sleep(wait)\n            continue\n        \n        resp.raise_for_status()\n        return resp\n    \n    raise RuntimeError(f'Qualys API rate limited after {max_retries} retries')\n```",
+    "Full id_min pagination loop:\n```python\nimport xml.etree.ElementTree as ET\nimport re\n\ndef paginate_qualys_xml(session, url, params: dict) -> list:\n    all_elements = []\n    current_params = dict(params)\n    \n    while True:\n        resp = qualys_post(session, url, data=current_params)\n        root = ET.fromstring(resp.text)\n        \n        # Collect data elements (adjust tag for your endpoint)\n        elements = root.findall('.//HOST')\n        all_elements.extend(elements)\n        \n        # Check truncation\n        warning = root.find('.//WARNING')\n        if warning is None:\n            break\n        text = warning.findtext('TEXT', '')\n        if 'Truncated' not in text:\n            break\n        \n        next_url = warning.findtext('URL', '')\n        m = re.search(r'id_min=(\\d+)', next_url)\n        if not m:\n            break\n        current_params['id_min'] = m.group(1)\n    \n    return all_elements\n```",
+    "Log rate limit headers for debugging:\n```python\ndef log_rate_limits(resp):\n    headers = resp.headers\n    limit = headers.get('X-RateLimit-Limit', '?')\n    remaining = headers.get('X-RateLimit-Remaining', '?')\n    window = headers.get('X-RateLimit-Window-Sec', '?')\n    print(f'Rate limit: {remaining}/{limit} remaining (window: {window}s)')\n```",
+    "Pagination strategy by API family:\n\n| API Family | Pagination Method | Key Parameters |\n|---|---|---|\n| Classic VM (host detection) | id_min in truncation WARNING | id_min={last_host_id + 1} |\n| Classic VM (host list) | truncation_limit=0 or id_min | truncation_limit=0 disables it |\n| Classic VM (KB) | id_min on QID | id_min={last_qid + 1} |\n| GAV v2 | Cursor (lastSeenAssetId) | pageSize, lastSeenAssetId |\n| WAS | Offset/limit | limit, offset |\n| Reports | Not paginated | Single fetch per report |"
+  ],
+  "caveats": [
+    "Qualys uses 409 for rate limits, NOT 429 — standard retry libraries (urllib3 Retry) won't catch it unless you add 409 to status_forcelist",
+    "The 2-concurrent-call limit is per SUBSCRIPTION, not per user — parallel scripts under the same account will conflict",
+    "truncation_limit=0 does NOT work on the host detection endpoint — it always truncates. You MUST use id_min pagination.",
+    "id_min is the HOST ID (integer), not an offset or page number — it's a cursor-based approach",
+    "Long-running API calls (large detection exports) can take 5+ minutes — set read timeout to at least 300s",
+    "There is no 'next page' link in CSV mode — you must detect truncation from the response text and manually construct the next id_min request"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["qualys-api-auth-conventions", "qualys-vmdr-api-conventions", "python-qualys-api-client-patterns", "qualys-global-asset-inventory-v2-api"],
+  "source_projects": ["shared-seed"]
+}

@@ -1,0 +1,77 @@
+{
+  "id": "qualys-global-asset-inventory-v2-api",
+  "title": "Qualys Global Asset Inventory (GAV) v2 API — Asset Search, Fields, Python Patterns",
+  "source_family": "qualys",
+  "coverage_type": "endpoint",
+  "applies_to": ["Qualys asset inventory queries", "GAV v2 API", "Asset search and export", "Asset tagging and metadata"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "GAV v2 base URL: https://{platform}/rest/2.0/search/am/asset — uses JSON POST, NOT the classic XML API",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Auth: same Basic auth as other Qualys APIs. X-Requested-With header required.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Request body: JSON with 'filters' (Qualys QQL query string), 'fields' (list of field names to return), 'pageSize' (default 100, max 10000), 'lastSeenAssetId' (pagination cursor)",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "QQL (Qualys Query Language) syntax: field operator value. Operators: equals, not equals, contains, in, greater, lesser. Combine with and/or. Example: 'operatingSystem.category1: `Windows` and lastVulnScan: [`2026-01-01`..`2026-04-11`]'",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Key asset fields: assetId, name, address (IP), dnsHostName, netbiosName, operatingSystem (nested: category1, category2, osName), tags (list), lastVulnScan, lastComplianceScan, hostId (links to VMDR), created, modified",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Pagination: use lastSeenAssetId from the last asset in the response. When assetListData.hasMore is false, all pages are fetched.",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Response structure: {responseMessage, count, hasMore, lastSeenAssetId, assetListData: {asset: [{assetId, name, ...}]}}",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "hostId field links GAV assets to VMDR host detections — use this to join asset metadata with vulnerability data",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Asset count endpoint: POST /rest/2.0/count/am/asset with same filters — returns total count without fetching assets",
+      "source_url": "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://cdn2.qualys.com/docs/qualys-global-ai-api-v2-user-guide.pdf"
+  ],
+  "implementation_notes": [
+    "Search assets with QQL:\n```python\ndef search_assets(session, base_url, qql_filter, fields=None, page_size=1000):\n    url = f'{base_url}/rest/2.0/search/am/asset'\n    body = {\n        'filters': qql_filter,\n        'pageSize': page_size,\n    }\n    if fields:\n        body['fields'] = fields\n    \n    all_assets = []\n    while True:\n        resp = session.post(url, json=body, timeout=(10, 120))\n        resp.raise_for_status()\n        data = resp.json()\n        \n        asset_data = data.get('assetListData', {})\n        assets = asset_data.get('asset', [])\n        all_assets.extend(assets)\n        \n        if not asset_data.get('hasMore', False):\n            break\n        body['lastSeenAssetId'] = asset_data.get('lastSeenAssetId')\n    \n    return all_assets\n```",
+    "Get Windows servers scanned in the last 30 days:\n```python\nfrom datetime import datetime, timedelta, timezone\n\nnow = datetime.now(timezone.utc)\nsince = (now - timedelta(days=30)).strftime('%Y-%m-%d')\ntoday = now.strftime('%Y-%m-%d')\n\nassets = search_assets(\n    session, base_url,\n    qql_filter=f'operatingSystem.category1: `Windows Server` and lastVulnScan: [`{since}`..`{today}`]',\n    fields=['assetId', 'name', 'address', 'dnsHostName', 'operatingSystem', 'tags', 'lastVulnScan', 'hostId'],\n)\n```",
+    "Count assets matching a filter:\n```python\ndef count_assets(session, base_url, qql_filter):\n    url = f'{base_url}/rest/2.0/count/am/asset'\n    resp = session.post(url, json={'filters': qql_filter}, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json().get('count', 0)\n```",
+    "Join GAV assets with VMDR detections:\n```python\ndef join_assets_detections(assets, detection_rows):\n    \"\"\"Join GAV assets (by hostId) with flattened VMDR detection rows (by host_id).\"\"\"\n    asset_map = {str(a.get('hostId', '')): a for a in assets if a.get('hostId')}\n    for row in detection_rows:\n        asset = asset_map.get(row.get('host_id', ''))\n        if asset:\n            row['asset_name'] = asset.get('name', '')\n            row['dns_hostname'] = asset.get('dnsHostName', '')\n            row['os_name'] = (asset.get('operatingSystem') or {}).get('osName', '')\n            row['tags'] = ', '.join(t.get('name', '') for t in (asset.get('tags', []) or []))\n    return detection_rows\n```",
+    "Common QQL filters:\n- All assets: '' (empty string)\n- By tag: 'tags.name: `Production`'\n- By OS: 'operatingSystem.category1: `Linux`'\n- By IP range: 'address: [`10.0.0.0`..`10.0.255.255`]'\n- Unscanned in 90 days: 'lastVulnScan < `2026-01-11`'\n- By agent: 'agentInfo.agentVersion: CONTAINS `4.`'"
+  ],
+  "caveats": [
+    "GAV v2 uses JSON POST — different from classic VM APIs which use form-encoded POST with XML responses",
+    "QQL string values must be wrapped in backticks (`), not quotes — this is a common mistake",
+    "The assetId from GAV is NOT the same as the host ID from classic VMDR — use the hostId field in GAV to link them",
+    "pageSize max is 10000 — for very large inventories (>100K assets), pagination is mandatory",
+    "The 'fields' parameter controls what is returned — omitting it returns ALL fields which can be very large",
+    "Some fields (e.g., softwareList, openPort) are deeply nested and may significantly increase response size"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["qualys-global-asset-inventory-join-conventions", "qualys-vmdr-api-conventions", "python-qualys-api-client-patterns", "qualys-vmdr-xml-response-parsing"],
+  "source_projects": ["shared-seed"]
+}

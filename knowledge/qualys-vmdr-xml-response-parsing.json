@@ -1,0 +1,71 @@
+{
+  "id": "qualys-vmdr-xml-response-parsing",
+  "title": "Qualys VMDR XML Response Parsing — Detection List, Host List, Flatten to Rows",
+  "source_family": "qualys",
+  "coverage_type": "patterns",
+  "applies_to": ["Parsing Qualys VMDR XML responses", "Flattening host detections to tabular data", "Qualys XML to CSV/DataFrame conversion"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Host Detection List XML structure: ROOT > RESPONSE > HOST_LIST > HOST > (ID, IP, TRACKING_METHOD, DNS, NETBIOS, OS, LAST_SCAN_DATETIME, DETECTION_LIST > DETECTION[])",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "DETECTION element fields: QID, TYPE (Confirmed/Potential/Info), SEVERITY (1-5), PORT, PROTOCOL, SSL, STATUS (New/Active/Fixed/Reopened), FIRST_FOUND_DATETIME, LAST_FOUND_DATETIME, TIMES_FOUND, RESULTS, QDS (when show_qds=1)",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "One HOST element contains MULTIPLE DETECTION elements — the data model is host-nested-detections, NOT flat rows",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Host List XML structure (asset inventory): ROOT > RESPONSE > HOST_LIST > HOST > (ID, IP, TRACKING_METHOD, DNS, NETBIOS, OS, LAST_VULN_SCAN_DATETIME, TAGS > TAG[])",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_list.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "KnowledgeBase VULN element fields: QID, VULN_TYPE, SEVERITY_LEVEL, TITLE, CATEGORY, CVE_LIST > CVE > ID, CVSS > BASE (score), CVSS_V3 > BASE (score), SOLUTION, DIAGNOSIS",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-vuln/kb_list/kb_list.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "SEVERITY values: 1=Minimal, 2=Medium, 3=Serious, 4=Critical, 5=Urgent. This is the Qualys severity scale, NOT CVSS.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "QDS (Qualys Detection Score) ranges 1-100. QDS severity mapping: 90-100=Critical, 70-89=High, 40-69=Medium, 1-39=Low",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "RESULTS field contains verbose scan output text (banner grabs, version strings, etc.) — it can be very large. Skip it for summary exports to save memory.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm"
+  ],
+  "implementation_notes": [
+    "Parse host detection XML and flatten to rows:\n```python\nimport xml.etree.ElementTree as ET\n\ndef flatten_detections(xml_text: str) -> list[dict]:\n    \"\"\"Flatten nested HOST > DETECTION XML into one row per detection.\"\"\"\n    root = ET.fromstring(xml_text)\n    rows = []\n    for host in root.findall('.//HOST'):\n        host_data = {\n            'host_id': host.findtext('ID', ''),\n            'ip': host.findtext('IP', ''),\n            'dns': host.findtext('DNS', ''),\n            'netbios': host.findtext('NETBIOS', ''),\n            'os': host.findtext('OS', ''),\n            'last_scan': host.findtext('LAST_SCAN_DATETIME', ''),\n        }\n        for det in host.findall('.//DETECTION'):\n            row = {\n                **host_data,\n                'qid': det.findtext('QID', ''),\n                'type': det.findtext('TYPE', ''),\n                'severity': det.findtext('SEVERITY', ''),\n                'port': det.findtext('PORT', ''),\n                'protocol': det.findtext('PROTOCOL', ''),\n                'ssl': det.findtext('SSL', ''),\n                'status': det.findtext('STATUS', ''),\n                'first_found': det.findtext('FIRST_FOUND_DATETIME', ''),\n                'last_found': det.findtext('LAST_FOUND_DATETIME', ''),\n                'times_found': det.findtext('TIMES_FOUND', ''),\n                'qds': det.findtext('QDS', ''),\n            }\n            rows.append(row)\n    return rows\n```",
+    "Parse host detection XML from API response with truncation:\n```python\ndef parse_detection_response(xml_text: str) -> tuple[list, bool, str | None]:\n    \"\"\"Returns (host_elements, is_truncated, next_id_min).\"\"\"\n    root = ET.fromstring(xml_text)\n    hosts = root.findall('.//HOST')\n    \n    warning = root.find('.//WARNING')\n    is_truncated = False\n    next_id_min = None\n    if warning is not None:\n        text = warning.findtext('TEXT', '')\n        if 'Truncated' in text:\n            is_truncated = True\n            url = warning.findtext('URL', '')\n            import re\n            m = re.search(r'id_min=(\\d+)', url)\n            if m:\n                next_id_min = m.group(1)\n    \n    return hosts, is_truncated, next_id_min\n```",
+    "Enrich detections with KnowledgeBase data (add CVEs, titles):\n```python\ndef enrich_with_kb(rows: list[dict], kb_map: dict) -> list[dict]:\n    \"\"\"Add KB fields (title, cves, cvss) to flattened detection rows.\"\"\"\n    for row in rows:\n        qid = row.get('qid', '')\n        vuln = kb_map.get(qid)\n        if vuln is not None:\n            row['title'] = vuln.findtext('TITLE', '')\n            row['category'] = vuln.findtext('CATEGORY', '')\n            cves = [cve.findtext('ID', '') for cve in vuln.findall('.//CVE_LIST/CVE')]\n            row['cves'] = ', '.join(cves)\n            row['cvss_base'] = vuln.findtext('.//CVSS/BASE', '')\n            row['cvss3_base'] = vuln.findtext('.//CVSS_V3/BASE', '')\n            row['solution'] = vuln.findtext('SOLUTION', '')\n        else:\n            row['title'] = ''\n            row['cves'] = ''\n            row['cvss_base'] = ''\n            row['cvss3_base'] = ''\n            row['solution'] = ''\n    return rows\n```",
+    "Convert to pandas DataFrame:\n```python\nimport pandas as pd\n\ndef detections_to_dataframe(rows: list[dict]) -> pd.DataFrame:\n    df = pd.DataFrame(rows)\n    df['severity'] = pd.to_numeric(df['severity'], errors='coerce')\n    df['qds'] = pd.to_numeric(df['qds'], errors='coerce')\n    df['cvss_base'] = pd.to_numeric(df['cvss_base'], errors='coerce')\n    df['cvss3_base'] = pd.to_numeric(df['cvss3_base'], errors='coerce')\n    for col in ['first_found', 'last_found', 'last_scan']:\n        df[col] = pd.to_datetime(df[col], errors='coerce', utc=True)\n    return df\n```",
+    "QDS severity label mapping:\n```python\ndef qds_severity(qds: int | float) -> str:\n    if qds >= 90: return 'Critical'\n    if qds >= 70: return 'High'\n    if qds >= 40: return 'Medium'\n    return 'Low'\n```"
+  ],
+  "caveats": [
+    "ET.fromstring() loads entire XML into memory — for very large exports (>500MB), use iterparse with incremental processing",
+    "RESULTS field can contain HTML entities and very long text — exclude it from flattening unless specifically needed",
+    "Not all detections have QDS — older detections or Info-type may have no QDS value. Handle as NaN/empty.",
+    "HOST ID is Qualys-internal — it is NOT the same as the asset ID from Global Asset Inventory",
+    "Some hosts have zero detections (empty DETECTION_LIST) — these appear in host-only queries but produce no rows when flattened"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["qualys-vmdr-api-conventions", "qualys-knowledgebase-api-cve-cvss", "qualys-vmdr-detection-and-kb-metrics", "python-qualys-api-client-patterns"],
+  "source_projects": ["shared-seed"]
+}

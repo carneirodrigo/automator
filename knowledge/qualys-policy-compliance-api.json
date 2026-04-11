@@ -1,0 +1,81 @@
+{
+  "id": "qualys-policy-compliance-api",
+  "title": "Qualys Policy Compliance (PC) API — Posture, Controls, Scan Results",
+  "source_family": "qualys",
+  "coverage_type": "endpoint",
+  "applies_to": ["Qualys Policy Compliance reporting", "Compliance posture data", "PC scan results", "Control evaluation results"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "PC API base: /api/2.0/fo/compliance/ — same auth and platform URL as VMDR classic APIs (Basic auth, form-encoded POST, XML response)",
+      "source_url": "https://docs.qualys.com/en/pc/api/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List compliance posture: POST /api/2.0/fo/compliance/posture/info/?action=list — returns host-level compliance status per policy",
+      "source_url": "https://docs.qualys.com/en/pc/api/posture/posture_info.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Posture info fields: HOST_ID, IP, DNS, POLICY_ID, POLICY_TITLE, STATUS (Pass/Fail), CRITICALITY, CONTROLS_TOTAL, CONTROLS_PASSED, CONTROLS_FAILED",
+      "source_url": "https://docs.qualys.com/en/pc/api/posture/posture_info.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List compliance scan results: POST /api/2.0/fo/scan/compliance/?action=list — returns scan metadata (ref, title, date, status, type)",
+      "source_url": "https://docs.qualys.com/en/pc/api/scans/compliance_scans.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Fetch compliance scan results: POST /api/2.0/fo/scan/compliance/?action=fetch&scan_ref=scan/xxx — returns per-host per-control results",
+      "source_url": "https://docs.qualys.com/en/pc/api/scans/compliance_scans.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List policies: POST /api/2.0/fo/compliance/policy/?action=list — returns policy ID, title, creation/modification dates",
+      "source_url": "https://docs.qualys.com/en/pc/api/policies/policies.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Control list: POST /api/2.0/fo/compliance/control/?action=list — returns CID, statement, criticality, technology. Supports filtering by ids, technology, criticality.",
+      "source_url": "https://docs.qualys.com/en/pc/api/controls/controls.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Posture info supports scoping parameters: policy_id, host_ids, ip, asset_group_ids, compliance_enabled (1), status (Passed/Failed/Error)",
+      "source_url": "https://docs.qualys.com/en/pc/api/posture/posture_info.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "PC scan types: On-demand, Scheduled, API-launched. Launch compliance scan: POST /api/2.0/fo/scan/compliance/?action=launch with scan_title, option_id, ip/asset_group_ids",
+      "source_url": "https://docs.qualys.com/en/pc/api/scans/compliance_scans.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Exception list: POST /api/2.0/fo/compliance/exception/?action=list — returns approved exceptions with control ID, host, expiry, reason",
+      "source_url": "https://docs.qualys.com/en/pc/api/exceptions/exceptions.htm",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/pc/api/"
+  ],
+  "implementation_notes": [
+    "Get compliance posture for a policy:\n```python\nimport xml.etree.ElementTree as ET\n\ndef get_compliance_posture(session, base_url, policy_id=None, status=None):\n    url = f'{base_url}/api/2.0/fo/compliance/posture/info/'\n    params = {'action': 'list', 'compliance_enabled': '1'}\n    if policy_id:\n        params['policy_id'] = policy_id\n    if status:\n        params['status'] = status  # 'Passed', 'Failed', 'Error'\n    \n    resp = session.post(url, data=params, timeout=(10, 300))\n    resp.raise_for_status()\n    root = ET.fromstring(resp.text)\n    \n    rows = []\n    for info in root.findall('.//POSTURE_INFO'):\n        rows.append({\n            'host_id': info.findtext('HOST_ID', ''),\n            'ip': info.findtext('IP', ''),\n            'dns': info.findtext('DNS', ''),\n            'policy_id': info.findtext('POLICY_ID', ''),\n            'policy_title': info.findtext('POLICY_TITLE', ''),\n            'status': info.findtext('STATUS', ''),\n            'controls_total': info.findtext('CONTROLS_TOTAL', '0'),\n            'controls_passed': info.findtext('CONTROLS_PASSED', '0'),\n            'controls_failed': info.findtext('CONTROLS_FAILED', '0'),\n        })\n    return rows\n```",
+    "List all policies:\n```python\ndef list_policies(session, base_url):\n    url = f'{base_url}/api/2.0/fo/compliance/policy/'\n    resp = session.post(url, data={'action': 'list'}, timeout=(10, 60))\n    resp.raise_for_status()\n    root = ET.fromstring(resp.text)\n    return [{\n        'id': p.findtext('ID', ''),\n        'title': p.findtext('TITLE', ''),\n    } for p in root.findall('.//POLICY')]\n```",
+    "Calculate compliance percentage per policy:\n```python\ndef compliance_summary(posture_rows):\n    from collections import defaultdict\n    policies = defaultdict(lambda: {'total': 0, 'passed': 0, 'failed': 0})\n    for row in posture_rows:\n        pid = row['policy_id']\n        policies[pid]['title'] = row['policy_title']\n        policies[pid]['total'] += int(row['controls_total'] or 0)\n        policies[pid]['passed'] += int(row['controls_passed'] or 0)\n        policies[pid]['failed'] += int(row['controls_failed'] or 0)\n    \n    summary = []\n    for pid, data in policies.items():\n        total = data['total']\n        pct = (data['passed'] / total * 100) if total > 0 else 0\n        summary.append({\n            'policy_id': pid,\n            'policy_title': data['title'],\n            'total_controls': total,\n            'passed': data['passed'],\n            'failed': data['failed'],\n            'compliance_pct': round(pct, 1),\n        })\n    return summary\n```",
+    "Fetch detailed scan results for a specific scan:\n```python\ndef get_scan_results(session, base_url, scan_ref):\n    url = f'{base_url}/api/2.0/fo/scan/compliance/'\n    params = {'action': 'fetch', 'scan_ref': scan_ref, 'output_format': 'CSV_NO_METADATA'}\n    resp = session.post(url, data=params, timeout=(10, 300))\n    resp.raise_for_status()\n    import csv, io\n    reader = csv.DictReader(io.StringIO(resp.text))\n    return list(reader)\n```"
+  ],
+  "caveats": [
+    "PC APIs use the same auth and form-encoded POST as VMDR — same session and platform URL",
+    "Posture info can be very large for subscriptions with many policies and hosts — always filter by policy_id or status",
+    "Compliance scans must be explicitly configured for hosts — hosts not in a PC scan profile will have no posture data",
+    "The 'status' filter values are case-sensitive: 'Passed' not 'passed'",
+    "PC requires a separate Qualys subscription/module — not all Qualys customers have PC enabled",
+    "Exceptions (approved deviations) are NOT reflected in the posture pass/fail counts — check the exception list separately for accurate reporting"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["qualys-api-auth-conventions", "qualys-vmdr-api-conventions", "python-qualys-api-client-patterns", "qualys-vmdr-reporting-model"],
+  "source_projects": ["shared-seed"]
+}

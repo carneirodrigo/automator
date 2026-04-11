@@ -1,0 +1,75 @@
+{
+  "id": "python-qualys-api-client-patterns",
+  "title": "Python Qualys API Client — Auth, Session, XML/CSV Modes, Pagination, Rate Limits",
+  "source_family": "qualys",
+  "coverage_type": "patterns",
+  "applies_to": ["Python scripts calling Qualys APIs", "Qualys VMDR data export", "Qualys WAS automation", "Qualys API authentication"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Qualys API auth: Basic HTTP auth with username/password on every request. No OAuth2. Header: Authorization: Basic base64(user:pass)",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/authentication.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Platform URL varies by subscription: qualysapi.qualys.com (US1), qualysapi.qualys.eu (EU1), qualysapi.qg2.apps.qualys.eu (EU2), qualysapi.qg3.apps.qualys.com (US3), etc. Check X-Powered-By header or subscription assignment.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/platform_url.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "All classic VM/PC APIs use POST with form-encoded parameters (application/x-www-form-urlencoded). NOT JSON bodies.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/making_api_calls.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "API response format: XML by default. CSV via output_format=CSV or CSV_NO_METADATA. WAS/GAV APIs return JSON.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Rate limit headers: X-RateLimit-Limit (max per window), X-RateLimit-Remaining, X-RateLimit-ToWait-Sec (seconds to wait if limited). Concurrency: typically 2 concurrent API calls per subscription.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/rate_limits.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Truncation: large result sets are truncated with WARNING/TEXT 'Truncated' in XML. Use id_min parameter with the last host ID + 1 to fetch the next page.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Session: Qualys supports session-based auth via POST /api/2.0/fo/session/ with action=login. Returns a session cookie. Logout with action=logout. Using Basic auth per-request is simpler for scripts.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/authentication.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "The action parameter is required on most classic VM endpoints — e.g., action=list, action=fetch, action=launch. Missing it returns an error.",
+      "source_url": "https://docs.qualys.com/en/vm/api/get_started/making_api_calls.htm",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/api/",
+    "https://docs.qualys.com/en/vm/qweb-all-api/"
+  ],
+  "implementation_notes": [
+    "Standard Qualys session setup:\n```python\nimport requests\nfrom requests.adapters import HTTPAdapter\nfrom urllib3.util.retry import Retry\n\ndef create_qualys_session(username: str, password: str, platform: str = 'qualysapi.qualys.com') -> requests.Session:\n    session = requests.Session()\n    session.auth = (username, password)\n    session.headers.update({\n        'X-Requested-With': 'Python',  # Required by Qualys\n        'Accept': 'application/xml',\n    })\n    retry = Retry(total=3, backoff_factor=2, status_forcelist=[429, 500, 503])\n    session.mount('https://', HTTPAdapter(max_retries=retry))\n    session.base_url = f'https://{platform}'  # custom attr for convenience\n    return session\n```",
+    "Host detection list with truncation handling (id_min pagination):\n```python\nimport xml.etree.ElementTree as ET\n\ndef get_all_detections(session, base_url, params=None):\n    \"\"\"Fetch all host detections, handling truncation via id_min.\"\"\"\n    url = f'{base_url}/api/2.0/fo/asset/host/vm/detection/'\n    all_hosts = []\n    request_params = {'action': 'list', **(params or {})}\n    \n    while True:\n        resp = session.post(url, data=request_params, timeout=(10, 300))\n        resp.raise_for_status()\n        \n        root = ET.fromstring(resp.text)\n        hosts = root.findall('.//HOST')\n        all_hosts.extend(hosts)\n        \n        # Check for truncation\n        warning = root.find('.//WARNING')\n        if warning is not None and 'Truncated' in (warning.findtext('TEXT') or ''):\n            # Get the URL with id_min from the WARNING element\n            next_url = warning.findtext('URL', '')\n            if 'id_min=' in next_url:\n                import re\n                id_min = re.search(r'id_min=(\\d+)', next_url)\n                if id_min:\n                    request_params['id_min'] = id_min.group(1)\n                    continue\n        break\n    \n    return all_hosts\n```",
+    "CSV mode (simpler for data pipelines):\n```python\nimport csv\nimport io\n\ndef get_detections_csv(session, base_url, params=None):\n    url = f'{base_url}/api/2.0/fo/asset/host/vm/detection/'\n    request_params = {\n        'action': 'list',\n        'output_format': 'CSV_NO_METADATA',\n        **(params or {}),\n    }\n    resp = session.post(url, data=request_params, timeout=(10, 300))\n    resp.raise_for_status()\n    reader = csv.DictReader(io.StringIO(resp.text))\n    return list(reader)\n```",
+    "Rate limit handling:\n```python\nimport time\n\ndef qualys_request(session, url, data, timeout=(10, 300)):\n    resp = session.post(url, data=data, timeout=timeout)\n    if resp.status_code == 409:  # Rate limited\n        wait = int(resp.headers.get('X-RateLimit-ToWait-Sec', 60))\n        time.sleep(wait)\n        resp = session.post(url, data=data, timeout=timeout)\n    resp.raise_for_status()\n    return resp\n```",
+    "Host list (asset inventory):\n```python\ndef get_host_list(session, base_url, tag_name=None):\n    url = f'{base_url}/api/2.0/fo/asset/host/'\n    params = {'action': 'list', 'details': 'All', 'truncation_limit': '0'}\n    if tag_name:\n        params['use_tags'] = '1'\n        params['tag_set_include'] = tag_name\n    resp = session.post(url, data=params, timeout=(10, 300))\n    resp.raise_for_status()\n    return ET.fromstring(resp.text).findall('.//HOST')\n```",
+    "KnowledgeBase lookup (enrich QIDs with CVEs):\n```python\ndef get_kb_entries(session, base_url, qids: list[str]):\n    url = f'{base_url}/api/2.0/fo/knowledge_base/vuln/'\n    params = {'action': 'list', 'ids': ','.join(qids), 'details': 'All'}\n    resp = session.post(url, data=params, timeout=(10, 120))\n    resp.raise_for_status()\n    root = ET.fromstring(resp.text)\n    return {v.findtext('QID'): v for v in root.findall('.//VULN')}\n```"
+  ],
+  "caveats": [
+    "X-Requested-With header is REQUIRED — Qualys rejects requests without it with a 403",
+    "Classic VM APIs use POST with form data, NOT JSON — using json= instead of data= will fail",
+    "CSV mode does NOT include nested detection data (individual QIDs per host). Use XML for full detection detail, CSV for summary rows.",
+    "Truncation in CSV mode: check if the last line contains 'Truncated' text — CSV truncation is different from XML truncation",
+    "timeout must be generous (300s+) for large detection exports — Qualys can take minutes to generate results",
+    "The 2-concurrent-call limit is per subscription, not per user — multiple scripts hitting the same sub will throttle each other",
+    "tag_set_exclude REQUIRES tag_set_include to be present — using exclude alone returns error 1903"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["qualys-api-auth-conventions", "qualys-vmdr-api-conventions", "qualys-vmdr-host-detections-playbook", "python-requests-http-client-patterns"],
+  "source_projects": ["shared-seed"]
+}

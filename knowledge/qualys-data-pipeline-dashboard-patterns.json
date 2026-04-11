@@ -1,0 +1,57 @@
+{
+  "id": "qualys-data-pipeline-dashboard-patterns",
+  "title": "Qualys Data Pipeline Patterns — XML to Flat Rows, KPIs, Power BI Prep",
+  "source_family": "qualys",
+  "coverage_type": "patterns",
+  "applies_to": ["Qualys vulnerability dashboard", "VMDR data export to Power BI", "Qualys KPI calculation", "Severity distribution reporting"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Dashboard data flow: Qualys API (XML) → Python parse/flatten → CSV/Excel → Power BI / reporting. The Python layer does the heavy transformation.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard VMDR KPIs: total vulnerabilities, unique hosts affected, severity distribution (Sev 1-5), QDS distribution (Critical/High/Medium/Low), mean time to remediate, open vs fixed counts, age distribution",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Qualys severity is NOT CVSS: Sev 1=Minimal, 2=Medium, 3=Serious, 4=Critical, 5=Urgent. QDS (1-100) is Qualys's own risk score that factors in exploitability.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/assets/vulnerability_details.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Detection status values for trending: New (first seen), Active (still present), Fixed (remediated), Reopened (was fixed, now back). Track status transitions for remediation metrics.",
+      "source_url": "https://docs.qualys.com/en/vm/qweb-all-api/mergedProjects/qapi-assets/host_lists/host_detection.htm",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "For point-in-time snapshots: export detections daily/weekly, store with a snapshot_date column. Power BI can then show trend lines by comparing snapshots.",
+      "source_url": "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://docs.qualys.com/en/vm/latest/mergedProjects/analyze_reports_and_dashboards/"
+  ],
+  "implementation_notes": [
+    "Complete pipeline: API → flatten → enrich → KPIs → Excel:\n```python\nimport xml.etree.ElementTree as ET\nimport csv\nfrom datetime import datetime, timezone\n\ndef run_pipeline(session, base_url, output_path='qualys_report.xlsx'):\n    # 1. Fetch detections (with pagination)\n    from qualys_client import get_all_detections, flatten_detections\n    hosts = get_all_detections(session, base_url, params={\n        'status': 'New,Active,Reopened',\n        'show_qds': '1',\n    })\n    \n    # 2. Flatten to rows\n    xml_text = '<HOST_LIST>' + ''.join(ET.tostring(h, encoding='unicode') for h in hosts) + '</HOST_LIST>'\n    rows = flatten_detections(f'<ROOT><RESPONSE>{xml_text}</RESPONSE></ROOT>')\n    \n    # 3. Enrich with KB (titles, CVEs)\n    qids = list(set(r['qid'] for r in rows if r['qid']))\n    kb_map = get_kb_entries(session, base_url, qids)\n    rows = enrich_with_kb(rows, kb_map)\n    \n    # 4. Add computed fields\n    snapshot_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')\n    for row in rows:\n        row['snapshot_date'] = snapshot_date\n        row['qds_severity'] = qds_severity(float(row.get('qds') or 0))\n        row['qualys_severity_label'] = {\n            '1': 'Minimal', '2': 'Medium', '3': 'Serious',\n            '4': 'Critical', '5': 'Urgent',\n        }.get(row.get('severity', ''), 'Unknown')\n    \n    # 5. Write Excel\n    write_excel(rows, output_path)\n    return rows\n```",
+    "KPI calculation from flattened rows:\n```python\ndef calculate_kpis(rows):\n    import pandas as pd\n    df = pd.DataFrame(rows)\n    df['severity'] = pd.to_numeric(df['severity'], errors='coerce')\n    df['qds'] = pd.to_numeric(df['qds'], errors='coerce')\n    \n    kpis = {\n        'total_detections': len(df),\n        'unique_hosts': df['host_id'].nunique(),\n        'unique_qids': df['qid'].nunique(),\n        'severity_distribution': df['severity'].value_counts().sort_index().to_dict(),\n        'qds_distribution': {\n            'Critical (90-100)': len(df[df['qds'] >= 90]),\n            'High (70-89)': len(df[(df['qds'] >= 70) & (df['qds'] < 90)]),\n            'Medium (40-69)': len(df[(df['qds'] >= 40) & (df['qds'] < 70)]),\n            'Low (1-39)': len(df[(df['qds'] >= 1) & (df['qds'] < 40)]),\n        },\n        'status_distribution': df['status'].value_counts().to_dict(),\n        'top_10_qids': df.groupby(['qid', 'title']).size().nlargest(10).reset_index(name='count').to_dict('records'),\n    }\n    \n    # Mean time to remediate (for Fixed detections)\n    fixed = df[df['status'] == 'Fixed'].copy()\n    if not fixed.empty:\n        fixed['first_found'] = pd.to_datetime(fixed['first_found'], errors='coerce', utc=True)\n        fixed['last_found'] = pd.to_datetime(fixed['last_found'], errors='coerce', utc=True)\n        fixed['mttr_days'] = (fixed['last_found'] - fixed['first_found']).dt.days\n        kpis['mean_time_to_remediate_days'] = round(fixed['mttr_days'].mean(), 1)\n    \n    return kpis\n```",
+    "Excel output with formatting (for Power BI or manual review):\n```python\nfrom openpyxl import Workbook\nfrom openpyxl.styles import Font, PatternFill\n\ndef write_excel(rows, path):\n    wb = Workbook()\n    ws = wb.active\n    ws.title = 'Detections'\n    \n    columns = ['snapshot_date', 'host_id', 'ip', 'dns', 'os',\n               'qid', 'title', 'severity', 'qualys_severity_label',\n               'qds', 'qds_severity', 'status', 'type',\n               'first_found', 'last_found', 'times_found',\n               'cves', 'cvss_base', 'cvss3_base']\n    \n    # Header\n    header_fill = PatternFill('solid', fgColor='4472C4')\n    header_font = Font(bold=True, color='FFFFFF')\n    for col, name in enumerate(columns, 1):\n        cell = ws.cell(row=1, column=col, value=name)\n        cell.fill = header_fill\n        cell.font = header_font\n    \n    # Data\n    for row_data in rows:\n        ws.append([row_data.get(c, '') for c in columns])\n    \n    ws.auto_filter.ref = ws.dimensions\n    ws.freeze_panes = 'A2'\n    wb.save(path)\n```",
+    "CSV output for Power BI DirectQuery / scheduled refresh:\n```python\ndef write_csv(rows, path):\n    columns = ['snapshot_date', 'host_id', 'ip', 'dns', 'os',\n               'qid', 'title', 'severity', 'qualys_severity_label',\n               'qds', 'qds_severity', 'status', 'type',\n               'first_found', 'last_found', 'cves', 'cvss3_base']\n    with open(path, 'w', newline='', encoding='utf-8') as f:\n        writer = csv.DictWriter(f, fieldnames=columns, extrasaction='ignore')\n        writer.writeheader()\n        writer.writerows(rows)\n```",
+    "Recommended Power BI data model:\n- Fact table: Detections (one row per host+QID per snapshot)\n- Dimension: Calendar (date, week, month, quarter)\n- Dimension: Severity (severity_id, label, color)\n- Dimension: QDS Band (band_id, label, min, max)\n- Measures: Total Vulns, Unique Hosts, Critical Count, MTTR, Fixed Rate\n- Slicers: Snapshot Date, Severity, QDS Band, Status, OS, Tag"
+  ],
+  "caveats": [
+    "MTTR calculation from first_found→last_found on Fixed detections is approximate — it measures time from first scan detection to last scan confirmation, not actual patch application time",
+    "Snapshot-based trending requires storing historical exports — Qualys API returns current state, not historical state. Build your own time series by exporting regularly.",
+    "Large environments (50K+ hosts × 100+ QIDs) produce millions of rows — use CSV for Power BI instead of Excel (xlsx limit is ~1M rows)",
+    "QDS is not available for all detections — Info-type detections (TYPE=Info) and very old QIDs may have no QDS score",
+    "The severity field is Qualys severity (1-5), NOT CVSS — Power BI reports should label it clearly to avoid confusion with CVSS ratings",
+    "When joining with GAV assets, use host_id (from detections) = hostId (from GAV), NOT IP address — IPs can be reassigned"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["qualys-vmdr-xml-response-parsing", "qualys-vmdr-reporting-model", "qualys-vmdr-powerbi-playbook", "qualys-vmdr-detection-and-kb-metrics", "python-document-generation-patterns", "python-qualys-api-client-patterns"],
+  "source_projects": ["shared-seed"]
+}
