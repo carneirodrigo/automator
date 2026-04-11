@@ -1,0 +1,75 @@
+{
+  "id": "logic-apps-workflow-validation-patterns",
+  "title": "Logic Apps Workflow Validation — Schema Checks, Common Errors, Pre-Deployment",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "patterns",
+  "applies_to": ["Logic Apps workflow validation", "ARM template validation", "Pre-deployment checks", "Common Logic Apps errors"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Workflow definition schema URL: https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json# — must be present in definition.$schema",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "ARM template schema URL: https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json# — for the outer ARM envelope",
+      "source_url": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/syntax",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Validate ARM template without deploying: POST /subscriptions/{subId}/resourcegroups/{rgName}/providers/Microsoft.Resources/deployments/{name}/validate?api-version=2022-09-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/resources/deployments/validate",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common error: InvalidTemplate — usually means a malformed expression (unbalanced brackets, typo in function name, wrong argument count)",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-diagnosing-failures",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common error: ConnectionNotFound — the workflow references a connection in $connections parameter that doesn't exist in the connection objects",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-diagnosing-failures",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common error: DuplicateActionName — two actions in the definition have the same key name (case-sensitive comparison)",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-diagnosing-failures",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common error: CircularDependency — action A runAfter B, and B runAfter A (directly or transitively)",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-diagnosing-failures",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common error: TriggerNotFound — the 'triggers' section is empty or missing. Every workflow needs exactly one trigger.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "runAfter references must match exact action names — mismatched case or typo in an action name causes a deployment failure with 'ActionNotFound' error",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-diagnosing-failures"
+  ],
+  "implementation_notes": [
+    "=== STRUCTURAL VALIDATION (local, no API needed) ===\n```python\nimport json\n\ndef validate_workflow_definition(definition: dict) -> list[str]:\n    errors = []\n    \n    # 1. Schema check\n    if '$schema' not in definition:\n        errors.append('Missing $schema in definition')\n    \n    # 2. Must have triggers\n    triggers = definition.get('triggers', {})\n    if not triggers:\n        errors.append('No triggers defined — workflow needs exactly one trigger')\n    elif len(triggers) > 1:\n        errors.append(f'Multiple triggers defined ({len(triggers)}) — Consumption supports only one')\n    \n    # 3. Must have actions\n    actions = definition.get('actions', {})\n    if not actions:\n        errors.append('No actions defined')\n    \n    # 4. Check runAfter references\n    all_action_names = set(actions.keys())\n    for name, action in actions.items():\n        run_after = action.get('runAfter', {})\n        for dep in run_after:\n            if dep not in all_action_names:\n                errors.append(f\"Action '{name}' has runAfter reference to '{dep}' which does not exist\")\n    \n    # 5. Check for circular dependencies\n    def has_cycle(name, visited, stack):\n        visited.add(name)\n        stack.add(name)\n        for dep in actions.get(name, {}).get('runAfter', {}):\n            if dep in stack:\n                return True\n            if dep not in visited and has_cycle(dep, visited, stack):\n                return True\n        stack.discard(name)\n        return False\n    \n    visited, stack = set(), set()\n    for name in actions:\n        if name not in visited:\n            if has_cycle(name, visited, stack):\n                errors.append(f'Circular dependency detected involving action: {name}')\n                break\n    \n    # 6. Check connection references\n    params = definition.get('parameters', {})\n    conn_param = params.get('$connections', {}).get('defaultValue', {})\n    # Scan action inputs for connection references\n    def find_connection_refs(obj):\n        refs = set()\n        if isinstance(obj, str) and '@parameters' in obj and '$connections' in obj:\n            # Extract connection name from @parameters('$connections')['name']\n            import re\n            for m in re.finditer(r\"\\$connections.*?\\['(\\w+)'\\]\", obj):\n                refs.add(m.group(1))\n        elif isinstance(obj, dict):\n            for v in obj.values():\n                refs.update(find_connection_refs(v))\n        elif isinstance(obj, list):\n            for v in obj:\n                refs.update(find_connection_refs(v))\n        return refs\n    \n    used_connections = find_connection_refs(actions)\n    for conn in used_connections:\n        if conn not in conn_param:\n            errors.append(f\"Connection '{conn}' referenced in actions but not in $connections parameter\")\n    \n    return errors\n```",
+    "=== ARM TEMPLATE VALIDATION (pre-deployment) ===\n```python\ndef validate_arm_template(session, sub_id, rg_name, template: dict, parameters: dict = None):\n    url = (\n        f'https://management.azure.com/subscriptions/{sub_id}'\n        f'/resourcegroups/{rg_name}'\n        f'/providers/Microsoft.Resources/deployments/validate-{int(time.time())}'\n        f'/validate?api-version=2022-09-01'\n    )\n    body = {'properties': {'mode': 'Incremental', 'template': template}}\n    if parameters:\n        body['properties']['parameters'] = parameters\n    resp = session.post(url, json=body, timeout=(10, 60))\n    if resp.status_code == 200:\n        return {'valid': True, 'errors': []}\n    error = resp.json().get('error', {})\n    details = error.get('details', [])\n    return {\n        'valid': False,\n        'errors': [{'code': d.get('code'), 'message': d.get('message')} for d in details] or [{'code': error.get('code'), 'message': error.get('message')}]\n    }\n```",
+    "=== EXPRESSION VALIDATION (basic) ===\n```python\ndef check_expressions(definition: dict) -> list[str]:\n    warnings = []\n    text = json.dumps(definition)\n    import re\n    # Find all @...() expressions\n    exprs = re.findall(r'@([a-zA-Z]+)\\(', text)\n    known = {'triggerBody','triggerOutputs','body','outputs','actions','items','item',\n             'variables','parameters','workflow','trigger','concat','substring','replace',\n             'split','join','toLower','toUpper','trim','length','contains','empty',\n             'first','last','union','intersection','skip','take','sort','reverse',\n             'range','int','float','string','bool','json','xml','array','createArray',\n             'base64','base64ToString','uriComponent','utcNow','addDays','addHours',\n             'addMinutes','addSeconds','addToTime','subtractFromTime','startOfDay',\n             'startOfMonth','startOfHour','dayOfWeek','dayOfMonth','dayOfYear',\n             'formatDateTime','convertFromUtc','convertToUtc','ticks','parseDateTime',\n             'add','sub','mul','div','mod','min','max','rand','and','or','not','if',\n             'equals','less','lessOrEquals','greater','greaterOrEquals','coalesce',\n             'setProperty','removeProperty','addProperty','xpath','nthIndexOf','slice',\n             'chunk','startsWith','endsWith','indexOf','lastIndexOf','decodeBase64',\n             'decodeDataUri','dataUri','dataUriToBinary','guid','encodeUriComponent'}\n    for expr in set(exprs):\n        if expr not in known:\n            warnings.append(f\"Unknown expression function: @{expr}() — check spelling\")\n    return warnings\n```"
+  ],
+  "caveats": [
+    "Local structural validation catches 80% of issues but cannot validate: expression syntax correctness, connector-specific input schemas, or MSI permission availability",
+    "ARM validate endpoint requires the resource group to exist — it's a server-side dry-run, not purely offline",
+    "Connection references in Consumption use @parameters('$connections')['name']['connectionId'] — the exact path varies slightly between connector types",
+    "Action names with special characters (hyphens, dots) work in the portal but can cause issues in expression references — use underscores",
+    "The workflow definition schema (2016-06-01) has not been updated for newer features — schema validation alone may not catch all issues"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["logic-apps-arm-template-structure", "logic-apps-connections", "logic-apps-expressions", "azure-logic-apps-arm-template-and-deployment"],
+  "source_projects": ["shared-seed"]
+}

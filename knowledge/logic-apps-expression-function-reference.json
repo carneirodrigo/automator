@@ -1,0 +1,51 @@
+{
+  "id": "logic-apps-expression-function-reference",
+  "title": "Logic Apps Expression Functions — Complete Reference With Working Examples",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": ["Logic Apps workflow expressions", "Data transformation in Logic Apps", "Expression syntax for actions and conditions"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "All expressions use @{...} syntax inside action inputs (string interpolation) or @expression() when the entire value is an expression",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/workflow-definition-language-functions-reference",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "In workflow definition JSON, expressions are bare strings starting with @ — e.g., \"@triggerBody()\" not \"@{triggerBody()}\"",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/workflow-definition-language-functions-reference",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "To include a literal @ in a string, escape it with @@",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/workflow-definition-language-functions-reference",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/workflow-definition-language-functions-reference"
+  ],
+  "implementation_notes": [
+    "=== REFERENCING DATA ===\ntriggerBody() — full trigger output body\ntriggerOutputs() — full trigger outputs including headers\nbody('actionName') — output body of a named action\noutputs('actionName') — full outputs of a named action\nitems('ForEachName') — current item in a For_each loop\nitem() — current item when inside an implicit loop (e.g., Select)\nactions('actionName').outputs.body — alternative body access\nvariables('varName') — get variable value\nparameters('paramName') — get workflow parameter\ntrigger().outputs.headers['headerName'] — trigger response header\nworkflow().run.name — current run ID\nworkflow().name — workflow name",
+    "=== STRING FUNCTIONS ===\nconcat('a', 'b', 'c') → 'abc'\nsubstring('hello', 1, 3) → 'ell'\nindexOf('hello', 'l') → 2\nlastIndexOf('hello', 'l') → 3\nreplace('hello', 'l', 'r') → 'herro'\nsplit('a,b,c', ',') → ['a','b','c']\njoin(['a','b','c'], ',') → 'a,b,c'\ntoLower('ABC') → 'abc'\ntoUpper('abc') → 'ABC'\ntrim('  hi  ') → 'hi'\nstartsWith('hello', 'he') → true\nendsWith('hello', 'lo') → true\ncontains('hello', 'ell') → true\nlength('hello') → 5\nnthIndexOf('a.b.c', '.', 1) → 1\nslice('hello', 1, 3) → 'el'\nchunk('abcdef', 2) → ['ab','cd','ef']",
+    "=== COLLECTION FUNCTIONS ===\nfirst(['a','b','c']) → 'a'\nlast(['a','b','c']) → 'c'\nlength(['a','b']) → 2\ncontains(['a','b'], 'a') → true\nempty([]) → true\nunion(['a','b'], ['b','c']) → ['a','b','c']\nintersection(['a','b'], ['b','c']) → ['b']\nskip(['a','b','c'], 1) → ['b','c']\ntake(['a','b','c'], 2) → ['a','b']\nsort(['c','a','b']) → ['a','b','c']\nreverse(['a','b','c']) → ['c','b','a']\nrange(0, 5) → [0,1,2,3,4]",
+    "=== CONVERSION FUNCTIONS ===\nint('42') → 42\nfloat('3.14') → 3.14\nstring(42) → '42'\nbool('true') → true\njson('{\"a\":1}') → {a:1}\nxml('<r><a>1</a></r>') → XML object\narray('hello') → ['hello']\ncreateArray('a', 'b') → ['a','b']\nbase64('text') → base64 string\nbase64ToString('dGV4dA==') → 'text'\ndataUri('text') → data URI\ndataUriToBinary(uri) → binary\nuriComponent('a b') → 'a%20b'\nuriComponentToString('a%20b') → 'a b'\ndecodeBase64('dGV4dA==') → 'text'\ndecodeDataUri(uri) → binary",
+    "=== DATE AND TIME FUNCTIONS ===\nutcNow() → '2026-04-11T12:00:00.0000000Z'\nutcNow('yyyy-MM-dd') → '2026-04-11'\naddDays(utcNow(), -7) → 7 days ago\naddHours(utcNow(), 12) → 12 hours from now\naddMinutes(utcNow(), 30)\naddSeconds(utcNow(), 60)\naddToTime(utcNow(), 1, 'Month')\nsubtractFromTime(utcNow(), 1, 'Day')\nstartOfDay(utcNow()) → midnight today\nstartOfMonth(utcNow()) → first of month\nstartOfHour(utcNow())\ndayOfWeek(utcNow()) → 0-6 (Sunday=0)\ndayOfMonth(utcNow()) → 1-31\ndayOfYear(utcNow()) → 1-366\nformatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ssZ')\nconvertFromUtc(utcNow(), 'Pacific Standard Time', 'yyyy-MM-dd')\nconvertToUtc('2026-04-11', 'Pacific Standard Time')\nticks(utcNow()) → ticks count\nparseDateTime('2026-04-11') → datetime",
+    "=== MATH AND LOGICAL FUNCTIONS ===\nadd(1, 2) → 3\nsub(5, 2) → 3\nmul(3, 4) → 12\ndiv(10, 3) → 3 (integer division)\nmod(10, 3) → 1\nmin(1, 2, 3) → 1\nmax(1, 2, 3) → 3\nrand(1, 100) → random integer\nand(true, true) → true\nor(true, false) → true\nnot(false) → true\nif(true, 'yes', 'no') → 'yes'\nequals(1, 1) → true\nless(1, 2) → true\nlessOrEquals(1, 1) → true\ngreater(2, 1) → true\ngreaterOrEquals(2, 2) → true\ncoalesce(null, null, 'default') → 'default'",
+    "=== JSON PATH AND OBJECT ACCESS ===\nbody('action')?['property'] — safe property access (returns null if missing)\nbody('action')['property'] — throws if property missing\nbody('action')?['nested']?['deep'] — chained safe access\nsetProperty(object, 'key', 'value') — returns new object with key set\nremoveProperty(object, 'key') — returns new object without key\naddProperty(object, 'key', 'value') — returns new object with key added\nxpath(xml, '/root/element') — XPath query on XML",
+    "=== COMMON PATTERNS ===\n\nGet trigger body field safely:\n  @triggerBody()?['data']?['id']\n\nCurrent item property in ForEach:\n  @items('For_each')?['name']\n\nBuild ISO timestamp for API query:\n  @formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-ddTHH:mm:ssZ')\n\nConditional value:\n  @if(equals(body('HTTP')?['status'], 'active'), 'Yes', 'No')\n\nCoalesce null fields:\n  @coalesce(body('HTTP')?['displayName'], body('HTTP')?['mail'], 'Unknown')\n\nParse JSON string to object:\n  @json(body('HTTP'))\n\nGet array length:\n  @length(body('HTTP')?['value'])\n\nFormat number as string with padding:\n  @concat('000', string(variables('counter')))\n  (then use substring for fixed width)\n\nPrevious month first day:\n  @startOfMonth(addToTime(utcNow(), -1, 'Month'))\n\nQuarter calculation (1-4):\n  @add(div(sub(int(formatDateTime(utcNow(), 'MM')), 1), 3), 1)"
+  ],
+  "caveats": [
+    "Expression functions are case-sensitive: utcNow() works, UtcNow() does not",
+    "In JSON definition, use bare @ for full expressions: \"@triggerBody()\" — not \"@{triggerBody()}\" (interpolation syntax is only for string embedding)",
+    "The ?[] safe navigation only works with bracket notation, not dot notation",
+    "addToTime/subtractFromTime interval units are strings: 'Second', 'Minute', 'Hour', 'Day', 'Week', 'Month', 'Year'",
+    "division with div() is INTEGER division — use float() conversion for decimal results",
+    "formatDateTime uses .NET format strings, NOT Python strftime: yyyy not %Y, MM not %m, dd not %d, HH not %H",
+    "coalesce() skips null values but NOT empty strings — use if(empty(...), ..., ...) for empty string handling"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["logic-apps-expressions", "azure-logic-apps-expression-date-patterns", "azure-logic-apps-control-flow-and-state", "azure-logic-apps-data-operations-code-samples"],
+  "source_projects": ["shared-seed"]
+}

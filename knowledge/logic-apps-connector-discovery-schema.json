@@ -1,0 +1,83 @@
+{
+  "id": "logic-apps-connector-discovery-schema",
+  "title": "Logic Apps Connector Discovery — Find API IDs, Actions, Input Schemas via REST",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "endpoint",
+  "applies_to": ["Finding connector API IDs", "Discovering available actions for a connector", "Getting action input/output schemas", "Building dynamic workflow definitions"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "List all managed APIs (connectors) in a region: GET https://management.azure.com/subscriptions/{subId}/providers/Microsoft.Web/locations/{location}/managedApis?api-version=2016-06-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/managed-apis/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get a specific connector's metadata: GET .../managedApis/{apiName}?api-version=2016-06-01 — returns swagger, connectionParameters, and capabilities",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/managed-apis/get",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Common managed API names: azuresentinel, azuremonitorlogs, office365, sharepointonline, teams, azureblob, servicebus, keyvault, azuread, microsoftgraphsecurity",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/connector-reference/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Connection API reference ID format: /subscriptions/{subId}/providers/Microsoft.Web/locations/{location}/managedApis/{apiName} — this goes in the connection object's 'api.id' field",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List existing connections: GET /subscriptions/{subId}/resourceGroups/{rgName}/providers/Microsoft.Web/connections?api-version=2016-06-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/connections/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Each managed API response includes properties.swagger — a full OpenAPI spec with all operations (actions/triggers), their input schemas, and output schemas",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/managed-apis/get",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Action type in workflow definition for managed connectors: 'ApiConnection'. The 'inputs.host.$connection.name' references the connection name from $connections parameter.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "The action path format for managed connectors: inputs.path = '/api_operation_path' — find the exact path from the swagger spec's operation paths",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Built-in actions (HTTP, Compose, Variable, etc.) use 'type' directly (e.g., 'Http', 'Compose', 'InitializeVariable'). Managed connector actions use 'type': 'ApiConnection'.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-workflow-definition-language",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Connector connection parameters types: 'oauthSetting' (OAuth2 — Graph, SharePoint, Teams), 'managedIdentityAuthentication' (MSI), 'parameterSet' (API key, basic auth), 'none' (no auth)",
+      "source_url": "https://learn.microsoft.com/en-us/connectors/connector-reference/",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/logic/managed-apis/",
+    "https://learn.microsoft.com/en-us/connectors/connector-reference/"
+  ],
+  "implementation_notes": [
+    "List all available connectors in a region:\n```python\ndef list_connectors(session, sub_id, location='australiaeast'):\n    url = (f'https://management.azure.com/subscriptions/{sub_id}'\n           f'/providers/Microsoft.Web/locations/{location}/managedApis')\n    params = {'api-version': '2016-06-01'}\n    resp = session.get(url, params=params, timeout=(10, 30))\n    resp.raise_for_status()\n    return [{  \n        'name': api['name'],\n        'displayName': api['properties'].get('displayName', ''),\n        'tier': api['properties'].get('tier', ''),\n    } for api in resp.json().get('value', [])]\n```",
+    "Get a connector's available operations (actions and triggers):\n```python\ndef get_connector_operations(session, sub_id, location, api_name):\n    url = (f'https://management.azure.com/subscriptions/{sub_id}'\n           f'/providers/Microsoft.Web/locations/{location}'\n           f'/managedApis/{api_name}')\n    params = {'api-version': '2016-06-01'}\n    resp = session.get(url, params=params, timeout=(10, 30))\n    resp.raise_for_status()\n    swagger = resp.json()['properties'].get('swagger', {})\n    operations = []\n    for path, methods in swagger.get('paths', {}).items():\n        for method, spec in methods.items():\n            operations.append({\n                'operationId': spec.get('operationId', ''),\n                'summary': spec.get('summary', ''),\n                'method': method.upper(),\n                'path': path,\n            })\n    return operations\n```",
+    "Build the connection reference for an ARM template:\n```python\ndef build_connection_ref(sub_id, location, api_name, connection_name):\n    return {\n        api_name: {\n            'connectionId': f'/subscriptions/{sub_id}/resourceGroups/{{rgName}}/providers/Microsoft.Web/connections/{connection_name}',\n            'connectionName': connection_name,\n            'id': f'/subscriptions/{sub_id}/providers/Microsoft.Web/locations/{location}/managedApis/{api_name}',\n        }\n    }\n```",
+    "Build an ApiConnection action from connector swagger:\n```python\ndef build_api_action(action_name, connection_name, path, method='post', body=None):\n    action = {\n        'type': 'ApiConnection',\n        'inputs': {\n            'host': {\n                'connection': {'name': f\"@parameters('$connections')['{connection_name}']['connectionId']\"}\n            },\n            'method': method,\n            'path': path,\n        },\n        'runAfter': {},\n    }\n    if body:\n        action['inputs']['body'] = body\n    return {action_name: action}\n```",
+    "=== COMMON CONNECTOR API NAMES AND KEY OPERATIONS ===\n\nazuresentinel:\n  - Watchlists_-_Get: GET /Watchlists/{watchlistAlias}\n  - Watchlists_-_Get_Items: GET /Watchlists/{watchlistAlias}/WatchlistItems\n  - Entities_-_Get_Accounts: POST /entities/account\n  - Alert_-_Get_incident: GET /Incidents/{incidentId}\n  - Add_comment_to_incident_(V3): POST /Incidents/{incidentId}/Comments\n  - Update_incident: PUT /Incidents/{incidentId}\n\nsharepointonline:\n  - GetItems: GET /datasets/{dataset}/tables/{table}/items\n  - PostItem: POST /datasets/{dataset}/tables/{table}/items\n  - CreateFile: POST /datasets/{dataset}/files\n  - GetFileContent: GET /datasets/{dataset}/files/{id}/content\n\noffice365:\n  - SendEmailV2: POST /v2/Mail\n  - GetEmails_V3: GET /v3/Mail\n\nteams:\n  - PostMessageToChannel: POST /v1.0/teams/{groupId}/channels/{channelId}/messages\n\nazuread:\n  - GetUser_V2: GET /v2/users/{id}\n  - GetGroupMembers_V2: GET /v2/groups/{groupId}/members"
+  ],
+  "caveats": [
+    "Managed API names are region-scoped — the api.id in connection objects must match the region where the Logic App is deployed",
+    "Swagger specs from the managedApis endpoint may not include all dynamic schema operations — some connectors use dynamic value lookups at design time",
+    "Connection objects (Microsoft.Web/connections) must be deployed BEFORE the Logic App that references them — use dependsOn in ARM templates",
+    "OAuth-based connectors (SharePoint, Teams, Office365) require an interactive consent flow to create the connection — cannot be fully automated without a pre-authorized service principal",
+    "The api-version for managed APIs (2016-06-01) is old but still the correct version — do not use newer api-versions",
+    "Some connector operations use dynamic paths with {dynamicValue} segments — these are filled at runtime based on parameter selection in the designer"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["logic-apps-connections", "logic-apps-actions-connectors", "azure-logic-apps-built-in-connectors", "azure-logic-apps-sharepoint-connector-conventions", "logic-apps-arm-template-structure"],
+  "source_projects": ["shared-seed"]
+}

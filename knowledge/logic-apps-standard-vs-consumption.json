@@ -1,0 +1,93 @@
+{
+  "id": "logic-apps-standard-vs-consumption",
+  "title": "Logic Apps Standard vs Consumption — Hosting, Deployment, Networking, Pricing",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "reference",
+  "applies_to": ["Choosing Logic Apps hosting model", "Standard Logic Apps deployment", "VNET integration", "Stateful vs stateless workflows"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Consumption: multi-tenant, one workflow per resource, pay-per-execution (action + trigger + connector), auto-scales. Resource type: Microsoft.Logic/workflows",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview#resource-environment-differences",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard: single-tenant, multiple workflows per resource, runs on Azure App Service plan or ASE (WS1/WS2/WS3 plans). Resource type: Microsoft.Web/sites (kind: workflowapp)",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview#resource-environment-differences",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard supports VNET integration (outbound) and private endpoints (inbound) — Consumption does NOT support VNET integration natively (requires ISE, which is deprecated).",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard supports both stateful workflows (run history persisted, replay-able) and stateless workflows (in-memory only, much faster, no run history).",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare#stateful-and-stateless-workflows",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard workflow definitions are stored in files (workflow.json) — supports local development, version control, and CI/CD natively. Consumption stores definitions in the ARM resource.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard supports deployment slots (staging → production swap) — Consumption does not.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/set-up-deployment-slots",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard built-in connectors run in-process (same compute as the workflow) — much faster and no connector fees. Managed connectors still run out-of-process.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare#changed-limited-unavailable-or-unsupported-capabilities",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard can be developed locally using VS Code + Azure Logic Apps (Standard) extension. Run/debug workflows locally before deploying.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/create-single-tenant-workflows-visual-studio-code",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Consumption limits: 250 actions per workflow run, 100K actions per 5 min per subscription per region. Standard limits: 500 actions per workflow run (stateful), higher throughput.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-limits-and-config",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard uses connections.json and parameters.json files alongside workflow.json — separate from ARM template parameters. Connection strings use app settings references.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "ISE (Integration Service Environment) is deprecated — Microsoft recommends Standard for VNET-isolated workloads. ISE will be retired in August 2024.",
+      "source_url": "https://learn.microsoft.com/en-us/azure/logic-apps/ise-manage-integration-service-environment",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Standard pricing: base cost of the WS plan (WS1 ~$175/mo) + storage costs. No per-action fees for built-in connectors. Managed connector fees apply.",
+      "source_url": "https://azure.microsoft.com/en-us/pricing/details/logic-apps/",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/azure/logic-apps/single-tenant-overview-compare",
+    "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview"
+  ],
+  "implementation_notes": [
+    "=== WHEN TO USE CONSUMPTION ===\n- Simple, low-volume workflows (< 100 runs/day)\n- Quick prototyping with portal designer\n- Cost-sensitive workloads (pay-per-execution)\n- No VNET requirement\n- Single workflow per resource is acceptable",
+    "=== WHEN TO USE STANDARD ===\n- High-volume or latency-sensitive workloads\n- Need VNET integration or private endpoints\n- Multiple related workflows in one resource\n- CI/CD with deployment slots\n- Local development and testing required\n- Need stateless workflows for performance\n- ISE migration target",
+    "=== STANDARD PROJECT STRUCTURE ===\n```\nlogic-app-name/\n  host.json                    # runtime config\n  connections.json             # connection references\n  parameters.json              # workflow parameters\n  workflow1/\n    workflow.json              # workflow definition\n  workflow2/\n    workflow.json\n  .funcignore\n  .vscode/\n    settings.json              # local dev settings\n```",
+    "=== DEPLOYMENT DIFFERENCES ===\nConsumption: deploy via ARM template (PUT Microsoft.Logic/workflows)\nStandard: deploy via ZIP deploy to the App Service (az webapp deploy) or GitHub Actions\n\nConsumption ARM template:\n```json\n{\"type\": \"Microsoft.Logic/workflows\", \"apiVersion\": \"2019-05-01\", ...}\n```\n\nStandard: uses Microsoft.Web/sites with kind='workflowapp':\n```json\n{\"type\": \"Microsoft.Web/sites\", \"kind\": \"workflowapp,functionapp\", \"apiVersion\": \"2023-01-01\", ...}\n```",
+    "=== MANAGED IDENTITY DIFFERENCES ===\nConsumption: system-assigned MSI on the Logic App resource directly\nStandard: system-assigned MSI on the App Service (same as Azure Functions)\nBoth use the same pattern for HTTP actions with MSI authentication."
+  ],
+  "caveats": [
+    "Standard workflows use a DIFFERENT designer in the portal (and VS Code) — not all Consumption connectors are available in Standard yet",
+    "Standard managed connectors have different connection configuration (uses app settings, not $connections parameter)",
+    "Some Consumption-only connectors (e.g., SAP, IBM MQ) are not yet available as Standard built-in connectors",
+    "Stateless workflows do NOT persist run history — if you need debugging or audit trails, use stateful",
+    "Standard requires an App Service Plan (minimum WS1) — there is a monthly base cost even with zero executions",
+    "Migrating from Consumption to Standard is NOT automatic — workflow definitions are similar but connection wiring and deployment models differ"
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["azure-logic-apps-overview", "azure-logic-apps-arm-template-and-deployment", "logic-apps-arm-template-structure", "azure-logic-apps-limits-and-networking"],
+  "source_projects": ["shared-seed"]
+}

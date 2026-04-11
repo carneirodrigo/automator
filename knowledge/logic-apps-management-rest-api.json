@@ -1,0 +1,111 @@
+{
+  "id": "logic-apps-management-rest-api",
+  "title": "Logic Apps Management REST API — Runs, Triggers, Enable/Disable, Resubmit",
+  "source_family": "azure-logic-apps",
+  "coverage_type": "endpoint",
+  "applies_to": ["Logic Apps automation scripts", "Workflow run management", "Failed run resubmit", "Trigger history", "Programmatic workflow control"],
+  "verification_status": "current",
+  "fresh_until": "2026-10-11T00:00:00Z",
+  "confirmed_facts": [
+    {
+      "fact": "Logic Apps management base: https://management.azure.com/subscriptions/{subId}/resourceGroups/{rgName}/providers/Microsoft.Logic/workflows/{workflowName}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflows",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Auth: ARM scope (https://management.azure.com/.default). Requires Logic App Contributor or Contributor role on the resource group.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get workflow definition: GET .../workflows/{name}?api-version=2019-05-01 — returns full resource including properties.definition (the workflow JSON), properties.state, and properties.parameters",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflows/get",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List workflow runs: GET .../workflows/{name}/runs?api-version=2019-05-01&$top=25&$filter=status eq 'Failed' — supports OData filter on status, startTime",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-runs/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Run status values: Running, Waiting, Succeeded, Failed, Cancelled, Skipped, Suspended, TimedOut, Aborted",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-runs/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get run actions: GET .../runs/{runId}/actions?api-version=2019-05-01 — returns each action with status, startTime, endTime, inputs, outputs, error",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-run-actions/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get action input/output: GET .../runs/{runId}/actions/{actionName}/contentVersion/{version}/inputs or /outputs — returns the actual payload (useful for debugging)",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-run-actions",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List trigger history: GET .../triggers/{triggerName}/histories?api-version=2019-05-01 — shows fired, not fired (no new data), and failed evaluations",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-trigger-histories/list",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Run trigger manually: POST .../triggers/{triggerName}/run?api-version=2019-05-01 — executes the workflow immediately (useful for testing). For Request triggers, POST the callback URL instead.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-triggers/run",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Get callback URL for Request trigger: POST .../triggers/{triggerName}/listCallbackUrl?api-version=2019-05-01 — returns {value: 'https://...', basePath, queries: {sig, sv, sp}}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-triggers/list-callback-url",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Enable/disable workflow: PATCH .../workflows/{name}?api-version=2019-05-01 with body {properties: {state: 'Enabled'}} or {properties: {state: 'Disabled'}}",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflows/update",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Resubmit a failed run: POST .../runs/{runId}/resubmit?api-version=2019-05-01 — creates a new run with the same trigger inputs. Only works on completed (Failed/Succeeded) runs.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-runs",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Cancel a running workflow: POST .../runs/{runId}/cancel?api-version=2019-05-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-runs/cancel",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "List all Logic Apps in a resource group: GET /subscriptions/{subId}/resourceGroups/{rgName}/providers/Microsoft.Logic/workflows?api-version=2019-05-01",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflows/list-by-resource-group",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Deploy/update workflow definition: PUT .../workflows/{name}?api-version=2019-05-01 with full resource body (location, identity, properties.definition, properties.parameters). This is an idempotent create-or-update.",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflows/create-or-update",
+      "verified_date": "2026-04-11"
+    },
+    {
+      "fact": "Filter runs by time: $filter=startTime ge 2026-04-01T00:00:00Z and startTime lt 2026-04-11T00:00:00Z — ISO 8601 format, no quotes around the datetime",
+      "source_url": "https://learn.microsoft.com/en-us/rest/api/logic/workflow-runs/list",
+      "verified_date": "2026-04-11"
+    }
+  ],
+  "authoritative_sources": [
+    "https://learn.microsoft.com/en-us/rest/api/logic/"
+  ],
+  "implementation_notes": [
+    "Build base URL:\n```python\ndef logic_app_base(sub_id, rg_name, workflow_name):\n    return (\n        f'https://management.azure.com/subscriptions/{sub_id}'\n        f'/resourceGroups/{rg_name}'\n        f'/providers/Microsoft.Logic/workflows/{workflow_name}'\n    )\n```",
+    "List failed runs in the last 7 days:\n```python\nfrom datetime import datetime, timedelta, timezone\n\ndef list_failed_runs(session, base_url, days=7):\n    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%SZ')\n    url = f'{base_url}/runs'\n    params = {\n        'api-version': '2019-05-01',\n        '$filter': f\"status eq 'Failed' and startTime ge {since}\",\n        '$top': 50,\n    }\n    results = []\n    while url:\n        resp = session.get(url, params=params, timeout=(10, 30))\n        resp.raise_for_status()\n        data = resp.json()\n        results.extend(data.get('value', []))\n        url = data.get('nextLink')\n        params = None\n    return results\n```",
+    "Resubmit all failed runs:\n```python\ndef resubmit_failed(session, base_url, run_ids):\n    results = []\n    for run_id in run_ids:\n        url = f'{base_url}/runs/{run_id}/resubmit?api-version=2019-05-01'\n        resp = session.post(url, timeout=(10, 30))\n        results.append({'run_id': run_id, 'status': resp.status_code})\n    return results\n```",
+    "Get the failed action from a run (for error reporting):\n```python\ndef get_failed_actions(session, base_url, run_id):\n    url = f'{base_url}/runs/{run_id}/actions'\n    params = {'api-version': '2019-05-01', '$filter': \"status eq 'Failed'\"}\n    resp = session.get(url, params=params, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json().get('value', [])\n```",
+    "Enable/disable a workflow:\n```python\ndef set_workflow_state(session, base_url, enabled=True):\n    state = 'Enabled' if enabled else 'Disabled'\n    url = f'{base_url}?api-version=2019-05-01'\n    # GET current definition first (PUT requires full body)\n    current = session.get(url, timeout=(10, 30)).json()\n    current['properties']['state'] = state\n    resp = session.put(url, json=current, timeout=(10, 30))\n    resp.raise_for_status()\n    return resp.json()\n```"
+  ],
+  "caveats": [
+    "api-version 2019-05-01 is the stable version for Consumption Logic Apps. Standard (single-tenant) uses a different API surface.",
+    "Resubmit creates a NEW run — it does not retry the existing run. The original failed run stays in Failed state.",
+    "PATCH for state change is simpler but some environments require PUT with the full body — if PATCH returns 405, fall back to GET+PUT.",
+    "The /runs endpoint returns max 250 results per page. For large volumes, use $filter with time ranges.",
+    "Trigger callback URLs contain a SAS signature that expires — regenerate periodically for long-lived integrations."
+  ],
+  "last_verified": "2026-04-11T00:00:00Z",
+  "related_entries": ["azure-resource-manager-rest-api-patterns", "azure-logic-apps-management-and-recovery", "azure-logic-apps-monitoring-observability"],
+  "source_projects": ["shared-seed"]
+}

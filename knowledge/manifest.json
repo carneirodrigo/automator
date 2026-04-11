@@ -3054,6 +3054,125 @@
       "last_verified": "2026-04-11T00:00:00Z",
       "fresh_until": "2026-10-11T00:00:00Z",
       "summary": "App registration vs service principal, application vs delegated permissions, admin consent via Graph, Azure RBAC role assignments, permission audit patterns, common role IDs"
+    },
+    {
+      "id": "logic-apps-management-rest-api",
+      "title": "Logic Apps Management REST API \u2014 Runs, Triggers, Enable/Disable, Resubmit",
+      "file": "logic-apps-management-rest-api.json",
+      "tags": [
+        "logic-apps",
+        "management-api",
+        "runs",
+        "triggers",
+        "resubmit",
+        "enable-disable",
+        "rest-api",
+        "automation"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "endpoint",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:47:12Z",
+      "updated": "2026-04-11T03:47:12Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Programmatic Logic Apps management: list/filter runs, resubmit failed, trigger manually, get callback URL, enable/disable, deploy definition, get action inputs/outputs"
+    },
+    {
+      "id": "logic-apps-expression-function-reference",
+      "title": "Logic Apps Expression Functions \u2014 Complete Reference With Working Examples",
+      "file": "logic-apps-expression-function-reference.json",
+      "tags": [
+        "logic-apps",
+        "expressions",
+        "functions",
+        "string",
+        "collection",
+        "date",
+        "math",
+        "conversion",
+        "json-path"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:47:12Z",
+      "updated": "2026-04-11T03:47:12Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "All expression functions by category: string, collection, conversion, date/time, math/logic, JSON path. Includes common patterns like quarter calc, safe navigation, coalesce"
+    },
+    {
+      "id": "logic-apps-standard-vs-consumption",
+      "title": "Logic Apps Standard vs Consumption \u2014 Hosting, Deployment, Networking, Pricing",
+      "file": "logic-apps-standard-vs-consumption.json",
+      "tags": [
+        "logic-apps",
+        "standard",
+        "consumption",
+        "hosting-model",
+        "vnet",
+        "stateful",
+        "stateless",
+        "deployment-slots",
+        "pricing"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "reference",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:47:12Z",
+      "updated": "2026-04-11T03:47:12Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Side-by-side comparison: multi vs single-tenant, stateful/stateless, VNET, deployment slots, pricing, ISE deprecation, when to choose which, project structure"
+    },
+    {
+      "id": "logic-apps-workflow-validation-patterns",
+      "title": "Logic Apps Workflow Validation \u2014 Schema Checks, Common Errors, Pre-Deployment",
+      "file": "logic-apps-workflow-validation-patterns.json",
+      "tags": [
+        "logic-apps",
+        "validation",
+        "schema",
+        "arm-template",
+        "pre-deployment",
+        "common-errors",
+        "runAfter",
+        "connections"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "patterns",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:47:12Z",
+      "updated": "2026-04-11T03:47:12Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "Local structural validation (Python), ARM template dry-run, expression syntax check, common errors (InvalidTemplate, ConnectionNotFound, CircularDependency, runAfter mismatch)"
+    },
+    {
+      "id": "logic-apps-connector-discovery-schema",
+      "title": "Logic Apps Connector Discovery \u2014 Find API IDs, Actions, Input Schemas via REST",
+      "file": "logic-apps-connector-discovery-schema.json",
+      "tags": [
+        "logic-apps",
+        "connectors",
+        "managed-api",
+        "swagger",
+        "discovery",
+        "schema",
+        "api-connection",
+        "sentinel",
+        "sharepoint",
+        "office365"
+      ],
+      "source_family": "azure-logic-apps",
+      "coverage_type": "endpoint",
+      "source_project_id": "shared-seed",
+      "created": "2026-04-11T03:47:12Z",
+      "updated": "2026-04-11T03:47:12Z",
+      "last_verified": "2026-04-11T00:00:00Z",
+      "fresh_until": "2026-10-11T00:00:00Z",
+      "summary": "List managed APIs, get connector swagger/operations, build connection references and ApiConnection actions. Common connector API names and key operations for Sentinel, SharePoint, Teams, Office365"
     }
   ]
 }
