@@ -85,6 +85,8 @@ Every action is a flag. Use `--cli <llm>` or `--api` whenever a language model i
 ./automator --cli claude --project fork     --id github-issues-export --task store results in SharePoint
 ```
 
+The `--id` must match an existing project. If it doesn't, the engine fails fast with a clear message and a hint to run `--project list`.
+
 ### Accept or Reject Results
 
 When the orchestration completes, the engine prints the result and waits. The project stays open with a **pending** status until you respond explicitly — it will never auto-attach to a new request.
@@ -260,5 +262,13 @@ python3 -m unittest engine.tests.test_automator.ProjectResolutionTest -v
 ```
 
 The orchestration and guard suites are part of the engine contract, not optional extras. If pipeline behavior, capability allowlists, rework handling, or destructive guard semantics change, these tests must be updated in the same change.
+
+### Troubleshooting
+
+The engine shows one-line error messages for common problems (corrupt config, missing files, permission errors). To see full Python tracebacks for debugging, set the environment variable:
+
+```text
+PYTHONTRACEBACK=1 ./automator --cli claude --project new --task ...
+```
 
 See [engine/ORCHESTRATION.md](engine/ORCHESTRATION.md) for the full architecture, extension points, engine internals, and development workflows.

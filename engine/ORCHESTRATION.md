@@ -169,6 +169,8 @@ The engine runs a fixed lifecycle with no dynamic routing:
 - **Output validation:** Each stage's output is checked for minimum required fields (worker: `summary`; review: `status`). Empty or structureless output fails the stage instead of passing silently.
 - **Review default:** If the review agent returns no `status` field (unparseable output), the engine defaults to "fail" and triggers a rework cycle rather than silently accepting broken work.
 - **Stage resume:** On `--project continue` after a failed review, the engine detects the prior successful worker artifact and skips directly to review instead of re-running the full pipeline.
+- **Project ID validation:** `--project continue --id <id>` and `--project fork --id <id>` fail fast with a clear message if the project ID does not exist in the registry.
+- **Graceful error handling:** The top-level entrypoint catches common exceptions (corrupt JSON, permission denied, missing files) and prints one-line user-friendly messages instead of raw Python tracebacks. Set `PYTHONTRACEBACK=1` to see full tracebacks for development.
 
 **Project IDs** are sequential numbers: `001`, `002`, `003`, etc.
 

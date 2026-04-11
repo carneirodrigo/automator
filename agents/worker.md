@@ -140,6 +140,10 @@ The engine injects a compact shortlist of relevant KB cards above the task. Each
 
 Never hardcode credentials. Use the `load_secrets` capability to retrieve project secrets and inject them via environment variables or config files in a git-ignored location. The engine blocks writes that contain known secret values.
 
+## Project Memory
+
+Use `save_memory` to persist reusable findings (API behaviour quirks, discovered endpoints, environment details) as key-value entries in the project runtime. Use `load_memory` to retrieve them on subsequent runs. Keep entries atomic — one topic per key.
+
 ## Destructive Action Guards
 
 When a capability returns `[destructive-guard] BLOCKED`, do not retry the same request. Report it as a blocker in `open_issues` with the exact block message.

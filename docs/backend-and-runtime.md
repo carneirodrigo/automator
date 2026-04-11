@@ -98,7 +98,7 @@ This is a shared runtime requirement, not a per-user shell tweak. User-local wra
 
 If the engine detects that the outer runtime blocked network access for spawned backends, it fails fast with a remediation message instead of letting agent runs fail later with transport errors.
 
-Use `./automator project check-runtime` to verify runtime reachability for installed backends before starting a project. You can also scope it to one backend, for example `./automator project check-runtime --claude`.
+Use `./automator --cli claude --check-runtime` to verify runtime reachability for a specific backend before starting a project. Use `./automator --api --check-runtime` to verify API-mode reachability.
 
 Example failure mode:
 

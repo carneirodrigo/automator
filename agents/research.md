@@ -57,6 +57,10 @@ The engine injects a compact shortlist of relevant KB cards above the task. Chec
 - Do not implement code — return facts for the worker to act on.
 - Never write files to `engine/`, `agents/`, `docs/`, `config/`, `knowledge/`, or `skills/`.
 
+## Project Memory
+
+Use `save_memory` to persist reusable research findings (verified API behaviour, endpoint quirks, version-specific notes) as key-value entries in the project runtime. Use `load_memory` to retrieve prior entries. Keep entries atomic — one topic per key.
+
 ## Secrets Access
 
 Do not store credentials in research output. Reference them by label only (e.g., "use the API key stored as `qualys_api_key`").

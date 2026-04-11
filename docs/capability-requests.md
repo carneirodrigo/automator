@@ -36,6 +36,7 @@ Every request must include `capability`, `arguments`, and `reason`.
 | `run_command` | `{"command": ["python3", "script.py"], "cwd": "/path", "timeout": 30}` | Execute a shell command |
 | `load_artifact` | `{"artifact_path": "/absolute/path/artifact.json"}` | Load a previously persisted artifact |
 | `persist_artifact` | `{"runtime_dir": "/path/runtime", "agent": "role-name", "data": {...}}` | Save an artifact |
+| `load_memory` | `{"runtime_dir": "/path/runtime"}` | Load all key-value memory entries from the project runtime (worker and research only) |
 | `save_memory` | `{"runtime_dir": "/path/runtime", "key": "topic-slug", "data": {...}}` | Persist a key-value memory entry in the project runtime (worker and research only) |
 | `test_credentials` | `{"credential_type": "azure_ad", "service": "graph", "credentials": {...}}` | Validate credentials |
 | `load_secrets` | `{"project_id": "my-project", "keys": ["azure_tenant_id"]}` | Retrieve stored secrets for a project (`keys` filter is optional) |
@@ -66,6 +67,8 @@ Every request must include `capability`, `arguments`, and `reason`.
 - Use `test_credentials` to validate credentials before making API calls.
 - Use `load_secrets` to retrieve stored secrets (API keys, tokens, tenant IDs) for a project. Never hardcode secrets in source files.
 - Use `save_secret` to store secrets discovered during work (e.g., credentials from clarification responses). The engine automatically detects and stores secrets from user prompts.
+- Use `load_memory` to retrieve previously saved key-value entries from the project runtime. Useful on `--project continue` to recall what the prior run learned.
+- Use `save_memory` to persist reusable findings (API behaviour quirks, discovered endpoints, environment details) for future runs of the same project. Keep entries atomic — one topic per key.
 - Use `fetch_skill` to download and read a vendor skill from the Agent Skills catalog.
 - Use `get_kb_candidates` to widen local KB retrieval in compact batches before reading more entry bodies or moving to external search.
 - Use `query_git_status`, `query_git_diff`, `query_git_log` in place of `run_command(["git", ...])` whenever you need git information — these return typed structured data and are significantly more token-efficient than raw git output.

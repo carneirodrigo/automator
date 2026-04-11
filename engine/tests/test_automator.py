@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +11,17 @@ from unittest import mock
 
 from engine import automator
 from engine.work.repo_bootstrap import ensure_repo_structure
+
+
+@contextlib.contextmanager
+def _fake_registry(*project_ids: str):
+    """Create a temp registry file containing the given project IDs."""
+    registry = {"projects": [{"project_id": pid} for pid in project_ids]}
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(registry, f)
+        f.flush()
+        with mock.patch("engine.work.cli.REGISTRY_PATH", Path(f.name)):
+            yield
 
 
 class AutomatorProjectSubcommandTest(unittest.TestCase):
@@ -27,7 +40,8 @@ class AutomatorProjectSubcommandTest(unittest.TestCase):
         self.assertIn("Task: show me how to build the flow", request)
 
     def test_project_continue_uses_project_id_prefix(self) -> None:
-        with mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
+        with _fake_registry("my-project"), \
+             mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
             automator.main([
                 "--cli", "claude",
                 "--project", "continue",
@@ -39,7 +53,8 @@ class AutomatorProjectSubcommandTest(unittest.TestCase):
         self.assertIn("add sharepoint steps", request)
 
     def test_project_fork_builds_fork_request(self) -> None:
-        with mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
+        with _fake_registry("api-project"), \
+             mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
             automator.main([
                 "--cli", "claude",
                 "--project", "fork",
@@ -70,6 +85,18 @@ class AutomatorProjectSubcommandTest(unittest.TestCase):
     def test_project_continue_requires_id(self) -> None:
         with self.assertRaises(SystemExit):
             automator.main(["--cli", "claude", "--project", "continue", "--task", "do something"])
+
+    def test_project_continue_nonexistent_id_errors(self) -> None:
+        with _fake_registry("real-project"):
+            with self.assertRaises(SystemExit) as ctx:
+                automator.main(["--cli", "claude", "--project", "continue", "--id", "ghost", "--task", "fix"])
+        self.assertIn("not found", str(ctx.exception))
+
+    def test_project_fork_nonexistent_id_errors(self) -> None:
+        with _fake_registry("real-project"):
+            with self.assertRaises(SystemExit) as ctx:
+                automator.main(["--cli", "claude", "--project", "fork", "--id", "ghost", "--task", "fix"])
+        self.assertIn("not found", str(ctx.exception))
 
     def test_project_invalid_action_errors(self) -> None:
         with self.assertRaises(SystemExit):
@@ -111,7 +138,8 @@ class AutomatorDebugSubcommandTest(unittest.TestCase):
         ])
 
     def test_debug_continue_project_forces_debug_mode(self) -> None:
-        with mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
+        with _fake_registry("my-project"), \
+             mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
             automator.main([
                 "--cli", "claude",
                 "--project", "continue",

@@ -95,6 +95,19 @@ def _cmd_project(args: argparse.Namespace) -> int:
     if action in ("continue", "fork") and not project_id:
         raise SystemExit(f"--project {action} requires --id <project-id>")
 
+    if action in ("continue", "fork") and project_id:
+        # Validate that the project exists before proceeding
+        try:
+            registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8")) if REGISTRY_PATH.exists() else {}
+        except (json.JSONDecodeError, OSError):
+            registry = {}
+        known_ids = {p.get("project_id", "") for p in registry.get("projects", [])}
+        if project_id not in known_ids:
+            raise SystemExit(
+                f"Project '{project_id}' not found. "
+                f"Run: ./automator --project list   to see available projects."
+            )
+
     if action in ("new", "fork") and not task:
         raise SystemExit(f"--project {action} requires --task <description>")
 

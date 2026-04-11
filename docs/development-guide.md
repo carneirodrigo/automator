@@ -17,6 +17,16 @@ The system can be run under a **parent AI agent** (Claude, Gemini, or equivalent
     *   Re-run the `automator` command to verify end-to-end.
 5.  **Completion:** The supervisor only reports success when the `automator` finishes cleanly.
 
+## Error Handling
+
+The top-level entrypoint catches common exceptions (corrupt JSON, permission errors, missing files) and prints one-line user-friendly messages instead of raw Python tracebacks. To see full tracebacks for development, set:
+
+```bash
+PYTHONTRACEBACK=1 ./automator --cli claude --project new --task "..."
+```
+
+Or use Python's `-X dev` flag for the same effect.
+
 ## Debug Mode
 
 The engine supports a fail-fast debug mode for reproducing orchestration faults without letting the normal recovery loop hide them.
@@ -159,7 +169,7 @@ This repository is version-controlled using Git. Each user configures their own 
 ```bash
 pip install -r requirements.txt    # Install dependencies
 ./automator config setup           # Check environment and configure backend
-./automator project check-runtime  # Verify backend reachability
+./automator --cli claude --check-runtime  # Verify backend reachability
 ```
 
 The setup wizard checks all prerequisites (Python, Git, Node.js, CLI tools, Python packages) and reports what is missing before configuring the backend. See README.md for the full getting-started walkthrough.
