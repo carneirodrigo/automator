@@ -71,6 +71,42 @@ def _validate_agent_output(output: Any, role: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Blocker classification — hard vs researchable
+# ---------------------------------------------------------------------------
+
+# Patterns that indicate a blocker requires human intervention, not research.
+_HARD_BLOCKER_PATTERNS = re.compile(
+    r"\b("
+    r"credentials?|password|secrets?|api\s*key|tokens?|client\s*id|client\s*secret"
+    r"|tenant\s*id|subscription\s*id|access\s*denied|permissions?|forbidden"
+    r"|401|403|unauthori[sz]ed|authorize|authorization|consent|mfa|multi.factor"
+    r"|user\s+decision|user\s+input|user\s+confirmation|manual\s+step"
+    r"|vpn|firewall|network\s+access|whitelisted|allowlisted"
+    r")\b",
+    re.IGNORECASE,
+)
+
+MAX_RESEARCH_CYCLES = 2
+
+
+def _classify_blockers(open_issues: list[str]) -> tuple[list[str], list[str]]:
+    """Split blockers into hard (need human) and researchable (need research agent).
+
+    Returns (hard_blockers, researchable_blockers).
+    """
+    hard: list[str] = []
+    researchable: list[str] = []
+    for issue in open_issues:
+        if not isinstance(issue, str) or not issue.strip():
+            continue
+        if _HARD_BLOCKER_PATTERNS.search(issue):
+            hard.append(issue)
+        else:
+            researchable.append(issue)
+    return hard, researchable
+
+
+# ---------------------------------------------------------------------------
 # Lightweight task planning — heuristic gate + minimal LLM call
 # ---------------------------------------------------------------------------
 
@@ -140,6 +176,28 @@ def _needs_planning(request: str) -> bool:
     if _SIMPLICITY_SIGNALS.search(request) and len(matches) < 3:
         return False
     return len(matches) >= 2
+
+
+def _capability_rounds_for_task(request: str, has_plan: bool) -> int:
+    """Return the capability round budget based on task complexity.
+
+    Simple tasks: 5 rounds (current baseline).
+    Medium tasks: 8 rounds (multiple complexity signals but no planning).
+    Complex/planned tasks: 12 rounds (planning triggered or prior plan exists).
+    """
+    from engine.work.orchestration_state import (
+        MAX_CAPABILITY_ROUNDS,
+        MAX_CAPABILITY_ROUNDS_COMPLEX,
+        MAX_CAPABILITY_ROUNDS_MEDIUM,
+    )
+    if has_plan:
+        return MAX_CAPABILITY_ROUNDS_COMPLEX
+    if not request:
+        return MAX_CAPABILITY_ROUNDS
+    matches = set(m.group().lower() for m in _COMPLEXITY_SIGNALS.finditer(request))
+    if len(matches) >= 2:
+        return MAX_CAPABILITY_ROUNDS_MEDIUM
+    return MAX_CAPABILITY_ROUNDS
 
 
 def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[str]:
@@ -419,6 +477,9 @@ def run_orchestration(
             f"User clarifications: {worker_task}"
         )
 
+    # ── Adaptive capability round budget ─────────────────────────────────────
+    _round_budget = _capability_rounds_for_task(worker_task, _has_prior_plan or bool(task_state.get("plan")))
+
     # ── Stage resume: reuse successful worker output from a prior run ──────
     _resumed_worker = False
     worker_artifact: str = ""
@@ -448,6 +509,7 @@ def run_orchestration(
             lambda: run_agent_with_capabilities(
                 "worker", worker_task, "Implement the task",
                 project_inputs, active_project, agent_bin,
+                max_rounds=_round_budget,
             ),
             "worker", emit_progress,
         )
@@ -464,21 +526,87 @@ def run_orchestration(
         if validation_err:
             emit_progress(f"[engine] Worker output validation failed: {validation_err}")
             return 1
+    _research_cycles_used = 0  # track across blocker-challenge and explicit research
     if not _resumed_worker:
         if worker_output_1.get("status") == "blocked":
-            blockers    = worker_output_1.get("open_issues", [])
-            blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
-            emit_progress(f"[engine] Worker blocked: {blocker_msg}")
-            worker_artifact = persist_result(active_project, "worker", worker_output_1)
-            _record_step(task_state, "worker", "blocked", worker_artifact, blocker_msg, now_iso)
-            task_state["pending_resolution"] = {
-                "type":             "user_input_required",
-                "message":          blocker_msg,
-                "original_request": request,
-            }
-            task_state["last_updated"] = now_iso()
-            write_json(task_state_path, task_state)
-            return 1
+            blockers = worker_output_1.get("open_issues", [])
+            hard, researchable = _classify_blockers(blockers)
+
+            # If there are researchable blockers and we haven't exhausted research cycles,
+            # auto-dispatch research instead of stopping.
+            if researchable and _research_cycles_used < MAX_RESEARCH_CYCLES:
+                emit_progress(
+                    f"[engine] Worker reported blocked but {len(researchable)} issue(s) look "
+                    f"researchable. Challenging with research agent..."
+                )
+                numbered = "\n".join(f"Q{i+1}: {q}" for i, q in enumerate(researchable))
+                challenge_task = (
+                    f"The worker reported these as blockers. Research each one and provide "
+                    f"concrete answers so the worker can proceed:\n{numbered}"
+                    f"\n\nOriginal task: {worker_task}"
+                )
+                challenge_res = _run_with_retry(
+                    lambda: run_agent_with_capabilities(
+                        "research", challenge_task, "Challenge worker blockers with research",
+                        project_inputs, active_project, agent_bin,
+                    ),
+                    "research", emit_progress,
+                )
+                _research_cycles_used += 1
+                if challenge_res.get("status") != "failed":
+                    challenge_output = challenge_res.get("output") or {}
+                    challenge_artifact = persist_result(active_project, "research", challenge_output)
+                    challenge_summary = challenge_output.get("summary", "Research completed.")
+                    _record_step(task_state, "research", "success", challenge_artifact, challenge_summary, now_iso)
+                    task_state["last_updated"] = now_iso()
+                    write_json(task_state_path, task_state)
+                    emit_progress(f"[engine] Blocker research done: {challenge_summary}")
+
+                    # Re-run worker with research findings to unblock it.
+                    emit_progress("[engine] Re-running worker with research findings to resolve blockers...")
+                    research_context = (
+                        f"Research findings are in the injected artifact. "
+                        f"Questions answered: {numbered}. "
+                        f"Focus on `technical_data.answers[].implementation_notes` for direct guidance. "
+                        f"The issues you previously reported as blockers have been researched — "
+                        f"use the findings to proceed."
+                    )
+                    _challenge_inputs = [p for p in project_inputs + [challenge_artifact] if p]
+                    _challenge_task = f"{worker_task}\n\n{research_context}"
+                    worker_res = _run_with_retry(
+                        lambda: run_agent_with_capabilities(
+                            "worker", _challenge_task, "Implement the task using research findings",
+                            _challenge_inputs,
+                            active_project, agent_bin,
+                            max_rounds=_round_budget,
+                        ),
+                        "worker", emit_progress,
+                    )
+                    if worker_res.get("status") != "failed":
+                        worker_output_1 = worker_res.get("output") or {}
+                        # Fall through to re-evaluate the new output below
+                        # (the output may now be success, still blocked, or needs_research)
+                    else:
+                        emit_progress(f"[engine] Worker (post-challenge) failed: {worker_res.get('error', '')}")
+                        return 1
+                else:
+                    emit_progress("[engine] Blocker research failed — accepting original blockers.")
+
+            # After challenge attempt (or if no researchable blockers), check if still blocked.
+            if worker_output_1.get("status") == "blocked":
+                blockers = worker_output_1.get("open_issues", [])
+                blocker_msg = "; ".join(blockers) or "Worker reported a hard blocker."
+                emit_progress(f"[engine] Worker blocked: {blocker_msg}")
+                worker_artifact = persist_result(active_project, "worker", worker_output_1)
+                _record_step(task_state, "worker", "blocked", worker_artifact, blocker_msg, now_iso)
+                task_state["pending_resolution"] = {
+                    "type":             "user_input_required",
+                    "message":          blocker_msg,
+                    "original_request": request,
+                }
+                task_state["last_updated"] = now_iso()
+                write_json(task_state_path, task_state)
+                return 1
 
         if worker_output_1.get("needs_user_input"):
             needed      = worker_output_1.get("open_issues", [])
@@ -509,23 +637,29 @@ def run_orchestration(
         write_json(task_state_path, task_state)
         emit_progress(f"[engine] Worker done: {worker_summary}")
 
-    # ── Optional research if worker flagged external unknowns ────────────────
+    # ── Optional research loop (up to MAX_RESEARCH_CYCLES) ───────────────────
     # Skip research on resume — the resumed artifact already completed this path.
-    research_questions = (
-        [q for q in worker_output_1.get("open_issues", []) if isinstance(q, str) and q.strip()]
-        if worker_output_1.get("needs_research") and not _resumed_worker else []
-    )
-    if worker_output_1.get("needs_research") and not _resumed_worker and not research_questions:
-        emit_progress("[engine] Worker flagged needs_research but provided no questions — skipping research.")
-    if research_questions:
+    _current_worker_output = worker_output_1
+    while _research_cycles_used < MAX_RESEARCH_CYCLES and not _resumed_worker:
+        research_questions = (
+            [q for q in _current_worker_output.get("open_issues", []) if isinstance(q, str) and q.strip()]
+            if _current_worker_output.get("needs_research") else []
+        )
+        if _current_worker_output.get("needs_research") and not research_questions:
+            emit_progress("[engine] Worker flagged needs_research but provided no questions — skipping research.")
+            break
+        if not research_questions:
+            break
+
         questions = research_questions
         numbered = "\n".join(f"Q{i+1}: {q}" for i, q in enumerate(questions))
+        _cycle_label = f" (cycle {_research_cycles_used + 1})" if _research_cycles_used > 0 else ""
         research_task = (
             f"Answer these specific questions needed to complete the task:\n"
             + numbered
             + f"\n\nOriginal task: {worker_task}"
         )
-        emit_progress("[engine] Worker needs research. Running research agent...")
+        emit_progress(f"[engine] Worker needs research{_cycle_label}. Running research agent...")
         research_res = _run_with_retry(
             lambda: run_agent_with_capabilities(
                 "research", research_task, "Answer worker's open questions",
@@ -533,6 +667,7 @@ def run_orchestration(
             ),
             "research", emit_progress,
         )
+        _research_cycles_used += 1
         if research_res.get("status") == "failed":
             emit_progress(f"[engine] Research failed: {research_res.get('error', '')}")
             return 1
@@ -543,10 +678,10 @@ def run_orchestration(
         _record_step(task_state, "research", "success", research_artifact, research_summary, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)
-        emit_progress(f"[engine] Research done: {research_summary}")
+        emit_progress(f"[engine] Research done{_cycle_label}: {research_summary}")
 
         # Re-run worker with research findings
-        emit_progress("[engine] Re-running worker with research findings...")
+        emit_progress(f"[engine] Re-running worker with research findings{_cycle_label}...")
         research_context = (
             f"Research findings are in the injected artifact. "
             f"Questions answered: {numbered}. "
@@ -559,6 +694,7 @@ def run_orchestration(
                 "worker", _post_research_task, "Implement the task using research findings",
                 _post_research_inputs,
                 active_project, agent_bin,
+                max_rounds=_round_budget,
             ),
             "worker", emit_progress,
         )
@@ -601,8 +737,16 @@ def run_orchestration(
             write_json(task_state_path, task_state)
             return 1
 
-        worker_artifact = persist_result(active_project, "worker", worker_output)
-        worker_summary  = worker_output.get("summary", "Worker completed.")
+        # Update for next iteration check — if worker still needs_research, loop.
+        _current_worker_output = worker_output
+        # If worker is done (no more needs_research), break out.
+        if not worker_output.get("needs_research"):
+            break
+
+    # Persist final post-research worker output if research ran.
+    if _research_cycles_used > 0 and not _resumed_worker and not _current_worker_output.get("needs_research"):
+        worker_artifact = persist_result(active_project, "worker", _current_worker_output)
+        worker_summary  = _current_worker_output.get("summary", "Worker completed.")
         _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)
@@ -662,10 +806,25 @@ def run_orchestration(
         rework_requests  = review_output.get("rework_requests", [])
         blocking_lines   = "\n".join(f"- {r}" for r in blocking)
         fix_lines        = "\n".join(f"- {r}" for r in rework_requests)
+
+        # Build a structured rework checklist pairing issues with fixes.
+        checklist_lines: list[str] = []
+        for i, issue in enumerate(blocking):
+            fix = rework_requests[i] if i < len(rework_requests) else ""
+            entry = f"{i + 1}. ISSUE: {issue}"
+            if fix:
+                entry += f"\n   FIX: {fix}"
+            checklist_lines.append(entry)
+        # Append any extra fixes that don't have a paired issue.
+        for j in range(len(blocking), len(rework_requests)):
+            checklist_lines.append(f"{j + 1}. FIX: {rework_requests[j]}")
+
+        checklist = "\n".join(checklist_lines) if checklist_lines else blocking_lines
         rework_task = (
             f"Rework required. Original task:\n{worker_task}\n\n"
-            f"Blocking issues:\n{blocking_lines}"
-            + (f"\n\nRequired fixes:\n{fix_lines}" if fix_lines else "")
+            f"Review found {len(blocking)} blocking issue(s). "
+            f"Fix each item below and verify it before reporting success:\n\n"
+            f"{checklist}"
         )
 
         task_state["rework_loop_count"] = task_state.get("rework_loop_count", 0) + 1
@@ -678,6 +837,7 @@ def run_orchestration(
                 "worker", rework_task, "Rework based on review feedback",
                 _rework_inputs,
                 active_project, agent_bin,
+                max_rounds=_round_budget,
             ),
             "worker", emit_progress,
         )
@@ -727,10 +887,9 @@ def run_orchestration(
         final_review_task = (
             f"Review the worker output for this task:\n\n{worker_task}\n\n"
             f"Worker summary: {worker_summary2}\n\n"
-            f"This is a final review after a rework cycle. The previous review found these blocking issues:\n"
-            f"{blocking_lines}"
-            + (f"\n\nThe worker was asked to apply these fixes:\n{fix_lines}" if fix_lines else "")
-            + "\n\nVerify each issue above is resolved before passing."
+            f"This is a final review after a rework cycle. The previous review found these issues:\n\n"
+            f"{checklist}"
+            f"\n\nVerify each item above is resolved before passing."
         )
         _final_review_inputs = [p for p in project_inputs + [worker_artifact2, review_artifact] if p]
         review_res2 = _run_with_retry(

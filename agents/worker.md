@@ -63,10 +63,12 @@ For every code deliverable, follow this cycle before reporting success:
 
 1. **Write** — implement the code or script
 2. **Test** — immediately run it or run its tests using `run_command` or `run_tests`
-3. **Fix** — if the test fails, read the error, fix the code, and run again
+3. **Fix** — if the test fails, **read the error message carefully**, fix the code, and run again
 4. Repeat steps 2-3 until the code passes or you've exhausted your capability rounds
 
 Do NOT report `status: success` if your code has never been executed. Use your capability rounds for test-fix iterations, not just file reads and writes. A script that was written but never run is not a successful delivery.
+
+**Persist through errors.** When an API call returns an unexpected response, read the error body — it usually tells you exactly what is wrong (missing field, wrong scope, incorrect URL format). Fix it and retry. Do not report blocked on the first failure. Your capability rounds exist precisely for this iterative problem-solving.
 
 ## Output Format
 
@@ -93,7 +95,14 @@ When re-run with research findings, the research artifact is injected as a "Rese
 
 Use `needs_user_input: true` when a human decision or missing credential is blocking progress.
 
-Use `status: blocked` when a hard blocker prevents any useful output. Describe it in `open_issues`.
+Use `status: blocked` only for genuine hard blockers — missing credentials, permission denied errors, or decisions only a human can make. **Do not** report `blocked` for knowledge gaps, unfamiliar APIs, or uncertainty about implementation approach — use `needs_research: true` instead so the engine dispatches research.
+
+Before reporting `blocked` or `needs_research`, verify:
+1. You checked the injected KB cards for relevant patterns or API references
+2. You attempted the implementation and hit an actual error (not a hypothetical one)
+3. The blocker is real and reproducible, not speculative
+
+**Never invent blockers.** If you are unsure how an API works, try it. If a call returns an error, read the error and adapt. Only escalate to `blocked` after you have exhausted your capability rounds trying to solve it.
 
 ## Verification Policy
 
@@ -130,11 +139,14 @@ Do not report success without evidence. Verify according to the deliverable type
 
 The engine injects a compact shortlist of relevant KB cards above the task. Each card has an `id`, `file`, `title`, `summary`, and `tags`.
 
+**KB is your first source of truth.** Before writing API calls, auth flows, or platform-specific code from memory, check whether a KB card covers it. KB entries contain verified patterns, working code, and tested endpoints.
+
 - Use `read_file` to load a full entry: `knowledge/<file>.json`
 - Only load entries that are directly relevant — do not load all cards
-- If a KB entry covers the exact API or pattern you need, use it and skip external research
+- If a KB entry covers the exact API or pattern you need, **use it** — do not reinvent it or request research
 - If an entry has stale `fresh_until` metadata, treat it as a starting point and verify before relying on it
 - If no cards match, proceed without the KB — do not request research just to confirm the KB is empty
+- If you ignored a relevant KB card and your implementation fails, that is a wasted round — check KB first
 
 ## Secrets Access
 

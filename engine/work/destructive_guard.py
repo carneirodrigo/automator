@@ -878,7 +878,8 @@ def check_capability(
         None means no delivery mode was specified (safe default: non-deploy).
     """
     capability = request.get("capability", "")
-    arguments = request.get("arguments") or {}
+    raw_args = request.get("arguments")
+    arguments = raw_args if isinstance(raw_args, dict) else {}
 
     # 1. Role-based allowlist — unknown roles fall back to worker allowlist
     if role is not None and role not in _PERMISSIVE_ROLES:

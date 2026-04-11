@@ -554,7 +554,11 @@ def run_agent_with_capabilities(
         session=session,
     )
     capability_round = 0
-    all_round_results: list[str] = []
+    # Each entry: (round_number, full_text, compact_summary)
+    all_rounds: list[tuple[int, str, str]] = []
+    # Number of recent rounds to keep in full detail; older rounds get compacted.
+    _FULL_DETAIL_ROUNDS = 2
+    _MAX_CUMULATIVE_CHARS = 200_000
     while res["status"] == "capability_requested" and capability_round < max_capability_rounds:
         cap_requests = res.get("capability_requests", [])
         if not cap_requests:
@@ -579,26 +583,39 @@ def run_agent_with_capabilities(
             cap_result = execute_capability(cap_req)
             cap_results.append(cap_result)
         cap_results_str = serialize_for_prompt(cap_results)
-        all_round_results.append(f"Round {capability_round} results:\n{cap_results_str}")
-        cumulative_results = "\n\n".join(all_round_results)
-        # Cap cumulative results to prevent unbounded prompt growth across rounds.
-        _MAX_CUMULATIVE_CHARS = 200_000
+        full_text = f"Round {capability_round} results:\n{cap_results_str}"
+        # Build a compact one-line summary per capability in this round.
+        compact_lines = []
+        for cr in cap_results:
+            cap_name = cr.get("capability", "?")
+            cap_status = cr.get("status", "?")
+            issues = cr.get("issues", [])
+            issue_hint = f" — {issues[0][:80]}" if issues else ""
+            compact_lines.append(f"  {cap_name}: {cap_status}{issue_hint}")
+        compact_summary = f"Round {capability_round} (compact): " + "; ".join(
+            f"{cr.get('capability', '?')}={cr.get('status', '?')}" for cr in cap_results
+        )
+        all_rounds.append((capability_round, full_text, compact_summary))
+
+        # Build cumulative context: compact older rounds, full detail for recent ones.
+        parts: list[str] = []
+        cutoff = len(all_rounds) - _FULL_DETAIL_ROUNDS
+        if cutoff > 0:
+            parts.append("Prior rounds (compacted):")
+            for rnd_num, _full, summary in all_rounds[:cutoff]:
+                parts.append(f"  {summary}")
+            parts.append("")  # blank line separator
+        for _rnd_num, full, _summary in all_rounds[max(0, cutoff):]:
+            parts.append(full)
+        cumulative_results = "\n".join(parts)
+
+        # Hard ceiling: if still over budget, drop oldest compacted entries.
         if len(cumulative_results) > _MAX_CUMULATIVE_CHARS:
-            # Keep only the latest rounds that fit within the budget.
-            kept: list[str] = []
-            total = 0
-            for entry in reversed(all_round_results):
-                if total + len(entry) > _MAX_CUMULATIVE_CHARS and kept:
-                    break
-                kept.append(entry)
-                total += len(entry)
-            kept.reverse()
-            dropped = len(all_round_results) - len(kept)
-            truncation_note = (
-                f"[engine] Note: {dropped} earlier capability round(s) "
-                f"were dropped to fit the context budget. Only the most recent rounds are shown."
+            kept_full = [full for _, full, _ in all_rounds[-_FULL_DETAIL_ROUNDS:]]
+            cumulative_results = (
+                f"[engine] Note: earlier rounds dropped to fit context budget.\n\n"
+                + "\n\n".join(kept_full)
             )
-            cumulative_results = truncation_note + "\n\n" + "\n\n".join(kept)
         augmented_task = (
             f"{task}\n\n"
             f"Runtime Capability Results ({capability_round} round(s) so far):\n{cumulative_results}\n\n"

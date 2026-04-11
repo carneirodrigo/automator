@@ -146,16 +146,22 @@ For complex tasks (multiple systems, credentials, sequential steps), the engine 
 user → plan(questions?) → [user answers] → worker(with plan) → review → complete
 ```
 
-When the worker signals `needs_research: true`, the engine dispatches research and re-runs the worker:
+When the worker signals `needs_research: true`, the engine dispatches research and re-runs the worker (up to 2 research cycles):
 
 ```
-user → worker(needs_research) → research → worker(with findings) → review → complete
+user → worker(needs_research) → research → worker(with findings) → [still needs research?] → research → worker → review → complete
+```
+
+When the worker reports `blocked` with researchable issues (not credentials/permissions), the engine challenges the blockers with research:
+
+```
+user → worker(blocked: "unknown endpoint") → research(challenge) → worker(with findings) → review → complete
 ```
 
 The engine runs a fixed lifecycle with no dynamic routing:
 
 1. `worker` — implements the task; may signal `needs_research: true` if external facts are needed
-2. `research` (conditional) — runs only when the worker flags `needs_research`; answers the worker's specific questions, then the worker re-runs with the findings injected
+2. `research` (conditional, up to 2 cycles) — runs when the worker flags `needs_research` or reports researchable blockers; answers the worker's specific questions, then the worker re-runs with the findings injected
 3. `review` — verifies the output; one rework cycle is allowed if review fails
 4. `complete` — engine presents delivery files for user acceptance
 
@@ -171,6 +177,12 @@ The engine runs a fixed lifecycle with no dynamic routing:
 - **Stage resume:** On `--project continue` after a failed review, the engine detects the prior successful worker artifact and skips directly to review instead of re-running the full pipeline.
 - **Project ID validation:** `--project continue --id <id>` and `--project fork --id <id>` fail fast with a clear message if the project ID does not exist in the registry.
 - **Graceful error handling:** The top-level entrypoint catches common exceptions (corrupt JSON, permission denied, missing files) and prints one-line user-friendly messages instead of raw Python tracebacks. Set `PYTHONTRACEBACK=1` to see full tracebacks for development.
+- **Adaptive capability rounds:** The engine assigns 5 (simple), 8 (medium), or 12 (planned/complex) capability rounds based on task complexity signals. Planning, research, and review keep the default 5.
+- **Context compaction:** As capability rounds accumulate, older round results are compacted to one-line summaries (e.g., `Round 1 (compact): read_file=ok; run_command=ok`) while the 2 most recent rounds retain full detail. This prevents context window degradation on complex tasks.
+- **Delivery context pre-injection:** On continue runs, the worker receives a compact snapshot of the delivery directory (file tree + contents of small text files) at prompt time, saving 1-2 capability rounds of discovery.
+- **Blocker challenge:** When the worker reports `status: blocked`, the engine classifies each blocker as hard (credentials, permissions, user decisions) or researchable (API questions, implementation unknowns). Researchable blockers auto-dispatch research and re-run the worker instead of stopping.
+- **Research retry:** The research loop runs up to 2 cycles. If the post-research worker still flags `needs_research` with new questions, the engine dispatches a second research cycle before proceeding to review.
+- **Structured rework:** Review feedback is injected as a numbered checklist pairing each blocking issue with its required fix, so the worker can address items systematically.
 
 **Project IDs** are sequential numbers: `001`, `002`, `003`, etc.
 

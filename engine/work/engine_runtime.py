@@ -808,6 +808,82 @@ _AGENT_OUTPUT_TEMPLATES: dict[str, str] = {
 }
 
 
+_DELIVERY_INLINE_MAX_LINES = 100   # inline content for files under this many lines
+_DELIVERY_INLINE_MAX_BYTES = 8_000  # skip files larger than ~8KB even if short
+_DELIVERY_MAX_FILES = 30            # cap tree listing to prevent prompt bloat
+_DELIVERY_BINARY_EXTS = {
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg",
+    ".pdf", ".zip", ".gz", ".tar", ".7z", ".rar",
+    ".exe", ".dll", ".so", ".dylib", ".whl",
+    ".xlsx", ".docx", ".pptx",
+}
+
+
+def _build_delivery_context(project: dict[str, Any]) -> list[str]:
+    """Build a compact snapshot of the delivery directory for worker context.
+
+    Returns a file tree and inline contents of small text files so the worker
+    doesn't waste capability rounds on list_dir + read_file discovery.
+    Returns an empty list when no delivery directory or no files exist.
+    """
+    delivery_dir = Path(project.get("project_root", ""))
+    if not delivery_dir.is_dir():
+        return []
+
+    try:
+        all_files = sorted(delivery_dir.rglob("*"))
+    except OSError:
+        return []
+
+    files = [f for f in all_files if f.is_file()]
+    if not files:
+        return []
+
+    lines: list[str] = ["\nExisting delivery files:"]
+
+    # File tree (relative paths)
+    tree_files = files[:_DELIVERY_MAX_FILES]
+    for f in tree_files:
+        rel = f.relative_to(delivery_dir)
+        try:
+            size = f.stat().st_size
+        except OSError:
+            size = 0
+        if size < 1024:
+            size_str = f"{size}B"
+        elif size < 1024 * 1024:
+            size_str = f"{size // 1024}KB"
+        else:
+            size_str = f"{size // (1024 * 1024)}MB"
+        lines.append(f"  {rel} ({size_str})")
+    if len(files) > _DELIVERY_MAX_FILES:
+        lines.append(f"  ... and {len(files) - _DELIVERY_MAX_FILES} more files")
+
+    # Inline small text files
+    inlined = 0
+    for f in tree_files:
+        if f.suffix.lower() in _DELIVERY_BINARY_EXTS:
+            continue
+        try:
+            size = f.stat().st_size
+            if size > _DELIVERY_INLINE_MAX_BYTES or size == 0:
+                continue
+            content = f.read_text(encoding="utf-8", errors="replace")
+        except (OSError, UnicodeDecodeError):
+            continue
+        content_lines = content.splitlines()
+        if len(content_lines) > _DELIVERY_INLINE_MAX_LINES:
+            continue
+        rel = f.relative_to(delivery_dir)
+        lines.append(f"\n--- {rel} ---")
+        lines.append(content)
+        inlined += 1
+        if inlined >= 10:  # cap inlined files to keep prompt reasonable
+            break
+
+    return lines
+
+
 def _build_stage_summary(inputs: list[str]) -> list[str]:
     return prompt_work._build_stage_summary(inputs)
 
@@ -835,6 +911,7 @@ def run_agent_with_capabilities(
     delivery_mode: str | None = None,
     expected_result_shape: dict[str, Any] | None = None,
     session: AgentSession | None = None,
+    max_rounds: int | None = None,
 ) -> dict[str, Any]:
     from engine.work.destructive_guard import check_capability as _guard_check, is_absolute_block, _check_capability_specific
 
@@ -930,7 +1007,7 @@ def run_agent_with_capabilities(
         expected_result_shape=expected_result_shape,
         session=session,
         run_agent=run_agent,
-        max_capability_rounds=MAX_CAPABILITY_ROUNDS,
+        max_capability_rounds=max_rounds if max_rounds is not None else MAX_CAPABILITY_ROUNDS,
         validate_capability_request=validate_capability_request,
         emit_progress=emit_progress,
         execute_capability=_guarded_execute_capability,
@@ -1020,11 +1097,16 @@ def build_prompt(
     agent_spec = _strip_sections(agent_spec, ["Required Output", "Runtime Capabilities"])
 
     project_context = []
+    delivery_context: list[str] = []
     if project:
         project_context = [
             f"Active Project: {project['project_name']} ({project['project_id']})",
             f"Project Root: {project['project_root']}",
         ]
+        # Pre-inject delivery directory context for the worker on continue runs.
+        # Saves 1-2 capability rounds of list_dir + read_file discovery.
+        if role == "worker":
+            delivery_context = _build_delivery_context(project)
     else:
         project_context = ["Active Project: NONE (Requires resolution or bootstrap)"]
 
@@ -1062,6 +1144,7 @@ def build_prompt(
         f"\nYou are acting as the {role} agent in the {REPO_ROOT} workflow.",
         *project_context,
         *project_desc_context,
+        *delivery_context,
         *stage_summary_context,
         *knowledge_context,
         *skills_context,

@@ -26,7 +26,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, call, patch
 
+from engine.work.engine_runtime import _build_delivery_context
 from engine.work.orchestrator import (
+    MAX_RESEARCH_CYCLES,
+    _capability_rounds_for_task,
+    _classify_blockers,
     _needs_planning,
     _next_project_id,
     _project_name_from_request,
@@ -1134,6 +1138,286 @@ class TestNextProjectIdEdgeCases(unittest.TestCase):
     def test_normal_increment(self):
         registry = {"projects": [{"project_id": "003"}, {"project_id": "001"}]}
         self.assertEqual(_next_project_id(registry), "004")
+
+
+class TestCapabilityRoundsForTask(unittest.TestCase):
+    """Adaptive capability round budget based on task complexity."""
+
+    def test_simple_task_gets_5_rounds(self):
+        self.assertEqual(_capability_rounds_for_task("write a hello world script", False), 5)
+
+    def test_empty_task_gets_5_rounds(self):
+        self.assertEqual(_capability_rounds_for_task("", False), 5)
+
+    def test_none_task_gets_5_rounds(self):
+        self.assertEqual(_capability_rounds_for_task(None, False), 5)
+
+    def test_medium_task_gets_8_rounds(self):
+        task = "authenticate to the Graph API and then deploy the Logic App"
+        result = _capability_rounds_for_task(task, False)
+        self.assertEqual(result, 8)
+
+    def test_planned_task_gets_12_rounds(self):
+        result = _capability_rounds_for_task("simple task", True)
+        self.assertEqual(result, 12)
+
+    def test_complex_task_with_plan_gets_12(self):
+        task = "authenticate to Graph API and deploy to Azure and connect SharePoint"
+        result = _capability_rounds_for_task(task, True)
+        self.assertEqual(result, 12)
+
+    def test_plan_flag_overrides_simplicity(self):
+        result = _capability_rounds_for_task("write a script", True)
+        self.assertEqual(result, 12)
+
+
+class TestBuildDeliveryContext(unittest.TestCase):
+    """Delivery context pre-injection for worker prompts."""
+
+    def _make_project(self, tmp: Path) -> dict[str, Any]:
+        delivery = tmp / "delivery"
+        delivery.mkdir(parents=True, exist_ok=True)
+        return {"project_root": str(delivery)}
+
+    def test_empty_delivery_returns_empty(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._make_project(Path(tmp))
+            result = _build_delivery_context(project)
+            self.assertEqual(result, [])
+
+    def test_missing_dir_returns_empty(self):
+        result = _build_delivery_context({"project_root": "/nonexistent/path/xyz"})
+        self.assertEqual(result, [])
+
+    def test_small_text_file_inlined(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._make_project(Path(tmp))
+            delivery = Path(project["project_root"])
+            (delivery / "main.py").write_text("print('hello')\n", encoding="utf-8")
+            result = _build_delivery_context(project)
+            self.assertTrue(any("Existing delivery files" in line for line in result))
+            self.assertTrue(any("main.py" in line for line in result))
+            self.assertTrue(any("print('hello')" in line for line in result))
+
+    def test_large_file_listed_not_inlined(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._make_project(Path(tmp))
+            delivery = Path(project["project_root"])
+            # Write a file exceeding _DELIVERY_INLINE_MAX_BYTES
+            (delivery / "big.py").write_text("x = 1\n" * 2000, encoding="utf-8")
+            result = _build_delivery_context(project)
+            # Should appear in file tree
+            self.assertTrue(any("big.py" in line for line in result))
+            # Content should NOT be inlined (no --- big.py --- marker)
+            self.assertFalse(any("--- big.py ---" in line for line in result))
+
+    def test_binary_file_not_inlined(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._make_project(Path(tmp))
+            delivery = Path(project["project_root"])
+            (delivery / "image.png").write_bytes(b"\x89PNG\r\n")
+            result = _build_delivery_context(project)
+            self.assertTrue(any("image.png" in line for line in result))
+            self.assertFalse(any("--- image.png ---" in line for line in result))
+
+    def test_subdirectory_files_included(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._make_project(Path(tmp))
+            delivery = Path(project["project_root"])
+            sub = delivery / "lib"
+            sub.mkdir()
+            (sub / "util.py").write_text("def helper(): pass\n", encoding="utf-8")
+            result = _build_delivery_context(project)
+            self.assertTrue(any("lib/util.py" in line or "lib\\util.py" in line for line in result))
+
+
+class TestClassifyBlockers(unittest.TestCase):
+    """Blocker classification: hard vs researchable."""
+
+    def test_credential_blocker_is_hard(self):
+        hard, researchable = _classify_blockers(["Missing API key for Graph API"])
+        self.assertEqual(hard, ["Missing API key for Graph API"])
+        self.assertEqual(researchable, [])
+
+    def test_permission_denied_is_hard(self):
+        hard, researchable = _classify_blockers(["Access denied when calling /users endpoint"])
+        self.assertEqual(len(hard), 1)
+        self.assertEqual(len(researchable), 0)
+
+    def test_api_question_is_researchable(self):
+        hard, researchable = _classify_blockers(["Unknown endpoint for listing Logic App runs"])
+        self.assertEqual(hard, [])
+        self.assertEqual(researchable, ["Unknown endpoint for listing Logic App runs"])
+
+    def test_mixed_blockers_split(self):
+        blockers = [
+            "Need credentials to authenticate",
+            "Cannot find the correct endpoint for Qualys scan results",
+            "Waiting for user confirmation on output format",
+        ]
+        hard, researchable = _classify_blockers(blockers)
+        self.assertEqual(len(hard), 2)  # credentials + user confirmation
+        self.assertEqual(len(researchable), 1)  # endpoint question
+
+    def test_empty_list(self):
+        hard, researchable = _classify_blockers([])
+        self.assertEqual(hard, [])
+        self.assertEqual(researchable, [])
+
+    def test_non_string_items_skipped(self):
+        hard, researchable = _classify_blockers([None, 123, "", "Real issue here"])
+        self.assertEqual(len(researchable), 1)
+        self.assertEqual(hard, [])
+
+    def test_401_error_is_hard(self):
+        hard, _ = _classify_blockers(["API returned 401 Unauthorized"])
+        self.assertEqual(len(hard), 1)
+
+    def test_403_forbidden_is_hard(self):
+        hard, _ = _classify_blockers(["403 Forbidden when calling endpoint"])
+        self.assertEqual(len(hard), 1)
+
+    def test_max_research_cycles_constant(self):
+        self.assertEqual(MAX_RESEARCH_CYCLES, 2)
+
+
+def _worker_blocked(issues: list[str], summary: str = "Blocked.") -> dict[str, Any]:
+    return _make_agent_result({
+        "status": "blocked",
+        "summary": summary,
+        "changes_made": [],
+        "checks_run": [],
+        "artifacts": [],
+        "open_issues": issues,
+        "needs_research": False,
+        "needs_user_input": False,
+    })
+
+
+class TestBlockerChallenge(unittest.TestCase):
+    """Integration: worker reports researchable blocker → engine challenges with research."""
+
+    def test_researchable_blocker_triggers_challenge(self):
+        """Worker blocked with researchable issue → research runs → worker re-runs."""
+        run_agent = MagicMock(side_effect=[
+            _worker_blocked(["Unknown endpoint for listing Qualys vulnerability data"]),
+            _research_result(),
+            _worker_pass("Script completed"),
+            _review_pass(),
+        ])
+        task_state = [_make_task_state()]
+        project, ts_path = _configure(run_agent, task_state)
+
+        rc = run_orchestration(
+            request="build a script that queries the Qualys API",
+            agent_bin="claude", debug_mode=False, execute_agents=True,
+            active_project=project, task_state=task_state[0],
+            task_state_path=ts_path, fork_hint=None,
+            pending_secrets=[], pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        roles = [c.args[0] for c in run_agent.call_args_list]
+        self.assertEqual(roles, ["worker", "research", "worker", "review"])
+
+    def test_hard_blocker_stops_immediately(self):
+        """Worker blocked with credential issue → engine stops, no research."""
+        run_agent = MagicMock(side_effect=[
+            _worker_blocked(["Missing API key for Qualys"]),
+        ])
+        task_state = [_make_task_state()]
+        project, ts_path = _configure(run_agent, task_state)
+
+        rc = run_orchestration(
+            request="build a script",
+            agent_bin="claude", debug_mode=False, execute_agents=True,
+            active_project=project, task_state=task_state[0],
+            task_state_path=ts_path, fork_hint=None,
+            pending_secrets=[], pending_input_files=False,
+        )
+        self.assertEqual(rc, 1)
+        self.assertEqual(len(run_agent.call_args_list), 1)
+
+    def test_mixed_blockers_with_researchable_triggers_research(self):
+        """If at least one blocker is researchable, research is dispatched."""
+        run_agent = MagicMock(side_effect=[
+            _worker_blocked([
+                "Unknown API response format for scan results",  # researchable
+            ]),
+            _research_result(),
+            _worker_pass("Done"),
+            _review_pass(),
+        ])
+        task_state = [_make_task_state()]
+        project, ts_path = _configure(run_agent, task_state)
+
+        rc = run_orchestration(
+            request="build a script",
+            agent_bin="claude", debug_mode=False, execute_agents=True,
+            active_project=project, task_state=task_state[0],
+            task_state_path=ts_path, fork_hint=None,
+            pending_secrets=[], pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        roles = [c.args[0] for c in run_agent.call_args_list]
+        self.assertIn("research", roles)
+
+
+class TestResearchRetry(unittest.TestCase):
+    """Integration: worker still needs research after first cycle → second research dispatched."""
+
+    def test_second_research_cycle_runs(self):
+        """Worker needs research twice → both cycles run before review."""
+        run_agent = MagicMock(side_effect=[
+            _worker_needs_research(["What is the auth flow for API X?"]),
+            _research_result(),
+            _worker_needs_research(["How does pagination work for API X?"]),
+            _research_result(),
+            _worker_pass("Script completed"),
+            _review_pass(),
+        ])
+        task_state = [_make_task_state()]
+        project, ts_path = _configure(run_agent, task_state)
+
+        rc = run_orchestration(
+            request="build a complex integration",
+            agent_bin="claude", debug_mode=False, execute_agents=True,
+            active_project=project, task_state=task_state[0],
+            task_state_path=ts_path, fork_hint=None,
+            pending_secrets=[], pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        roles = [c.args[0] for c in run_agent.call_args_list]
+        self.assertEqual(roles, ["worker", "research", "worker", "research", "worker", "review"])
+
+    def test_research_capped_at_max_cycles(self):
+        """After MAX_RESEARCH_CYCLES, worker proceeds to review even if still flagging needs_research."""
+        run_agent = MagicMock(side_effect=[
+            _worker_needs_research(["Q1?"]),
+            _research_result(),
+            _worker_needs_research(["Q2?"]),
+            _research_result(),
+            # Worker 3 still flags needs_research but cycles exhausted
+            _worker_needs_research(["Q3?"]),
+            _review_pass(),
+        ])
+        task_state = [_make_task_state()]
+        project, ts_path = _configure(run_agent, task_state)
+
+        rc = run_orchestration(
+            request="build a complex integration",
+            agent_bin="claude", debug_mode=False, execute_agents=True,
+            active_project=project, task_state=task_state[0],
+            task_state_path=ts_path, fork_hint=None,
+            pending_secrets=[], pending_input_files=False,
+        )
+        self.assertEqual(rc, 0)
+        roles = [c.args[0] for c in run_agent.call_args_list]
+        self.assertEqual(roles, ["worker", "research", "worker", "research", "worker", "review"])
 
 
 if __name__ == "__main__":
