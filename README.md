@@ -195,6 +195,8 @@ POST (resource creation) is not blocked. If you want to prevent agents from crea
 
 In API mode you set a default provider and model, with optional per-role overrides (e.g., a stronger model for coding). Configuration lives in `config/` (git-ignored). If no config exists, the engine defaults to CLI mode.
 
+You can also set a custom `base_url` to point the `openai` provider at any OpenAI-compatible endpoint — OpenRouter (100+ models including DeepSeek, Qwen, Grok, Mistral, Llama), DeepSeek direct, or local servers like Ollama and LM Studio. See [docs/backend-and-runtime.md](docs/backend-and-runtime.md#openai-compatible-endpoints) for concrete examples.
+
 ## Command Reference
 
 Run `./automator --help` for the full reference with all flag combinations and examples.

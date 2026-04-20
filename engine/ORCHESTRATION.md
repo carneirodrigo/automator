@@ -319,7 +319,7 @@ Required maintenance rule:
 - `inputs/` — Drop zone for user-provided files (content git-ignored, structure preserved via `.gitkeep`). Files are moved to `projects/<project-id>/runtime/inputs/` on engine start.
 - `knowledge/` — Shared knowledge base. Contains `manifest.json` (entry index), `sources.json` (source-family routing hints), and tracked `<topic-slug>.json` files with reusable technical findings extracted from completed projects.
 - `skills/` — Agent Skills directory. Contains `catalog.json` (all available vendor skills), `manifest.json` (cached skills), `sources.json` (vendor repo config), and `<vendor>--<skill-name>/SKILL.md` cached skill files.
-- `config/` — Backend configuration (content git-ignored, structure preserved via `.gitkeep`). Contains `backends.json` (global mode, provider, default model, per-role overrides) and `secrets.json` (API keys). Created by `./automator --config setup` or manually from templates.
+- `config/` — Backend configuration (content git-ignored, structure preserved via `.gitkeep`). Contains `backends.json` (global mode, provider, default model, optional `base_url` for OpenAI-compatible endpoints like OpenRouter / DeepSeek / Ollama, per-role overrides) and `secrets.json` (API keys). Created by `./automator --config setup` or manually from templates.
 - `personal/` — User-specific configuration (git remote, SSH keys, tool preferences). Only `README.md` is tracked. AI agents read this directory to understand the user's environment.
 
 ## Build, Test, And Development Commands

@@ -215,6 +215,115 @@ class TestResolveBackendApiMode(unittest.TestCase):
             self.assertEqual(res.mode, "cli")
 
 
+class TestResolveBackendBaseUrl(unittest.TestCase):
+    """Tests for base_url resolution (custom OpenAI-compatible endpoints)."""
+
+    def _make_config(self, tmpdir, config, secrets=None):
+        config_dir = Path(tmpdir)
+        (config_dir / "backends.json").write_text(json.dumps(config))
+        if secrets:
+            (config_dir / "secrets.json").write_text(json.dumps(secrets))
+        return config_dir
+
+    def test_global_base_url_resolves(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "default_model": "deepseek/deepseek-chat",
+                 "base_url": "https://openrouter.ai/api/v1"},
+                {"openai_api_key": "sk-or-test"},
+            )
+            res = resolve_backend("codex", "worker", config_dir=config_dir)
+            self.assertEqual(res.base_url, "https://openrouter.ai/api/v1")
+
+    def test_missing_base_url_is_none(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai"},
+                {"openai_api_key": "sk-test"},
+            )
+            res = resolve_backend("codex", "worker", config_dir=config_dir)
+            self.assertIsNone(res.base_url)
+
+    def test_blank_base_url_normalised_to_none(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "base_url": "   "},
+                {"openai_api_key": "sk-test"},
+            )
+            res = resolve_backend("codex", "worker", config_dir=config_dir)
+            self.assertIsNone(res.base_url)
+
+    def test_non_string_base_url_ignored(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "base_url": 42},
+                {"openai_api_key": "sk-test"},
+            )
+            res = resolve_backend("codex", "worker", config_dir=config_dir)
+            self.assertIsNone(res.base_url)
+
+    def test_role_override_base_url(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "base_url": "https://openrouter.ai/api/v1",
+                 "role_overrides": {"worker": {"base_url": "http://localhost:11434/v1"}}},
+                {"openai_api_key": "sk-test"},
+            )
+            res_worker = resolve_backend("codex", "worker", config_dir=config_dir)
+            self.assertEqual(res_worker.base_url, "http://localhost:11434/v1")
+            res_review = resolve_backend("codex", "review", config_dir=config_dir)
+            self.assertEqual(res_review.base_url, "https://openrouter.ai/api/v1")
+
+    def test_role_override_provider_clears_inherited_base_url(self):
+        """Changing provider in an override invalidates the global base_url."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "base_url": "https://openrouter.ai/api/v1",
+                 "role_overrides": {"review": {"provider": "anthropic"}}},
+                {"openai_api_key": "sk-oai", "anthropic_api_key": "sk-ant"},
+            )
+            res = resolve_backend("codex", "review", config_dir=config_dir)
+            self.assertEqual(res.backend_name, "claude")
+            self.assertIsNone(res.base_url)
+
+    def test_role_override_provider_and_explicit_base_url(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "base_url": "https://openrouter.ai/api/v1",
+                 "role_overrides": {"review": {"provider": "anthropic",
+                                               "base_url": "https://proxy.example.com/v1"}}},
+                {"openai_api_key": "sk-oai", "anthropic_api_key": "sk-ant"},
+            )
+            res = resolve_backend("codex", "review", config_dir=config_dir)
+            self.assertEqual(res.backend_name, "claude")
+            self.assertEqual(res.base_url, "https://proxy.example.com/v1")
+
+    def test_role_override_explicit_null_base_url_clears(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = self._make_config(
+                tmpdir,
+                {"version": 2, "mode": "api", "provider": "openai",
+                 "base_url": "https://openrouter.ai/api/v1",
+                 "role_overrides": {"worker": {"base_url": None}}},
+                {"openai_api_key": "sk-test"},
+            )
+            res = resolve_backend("codex", "worker", config_dir=config_dir)
+            self.assertIsNone(res.base_url)
+
+
 class TestIsApiMode(unittest.TestCase):
     def test_no_config_is_not_api(self):
         self.assertFalse(is_api_mode(config_dir=Path("/nonexistent")))

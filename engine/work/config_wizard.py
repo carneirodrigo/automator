@@ -503,6 +503,30 @@ def cmd_setup(config_dir: Path | None = None) -> int:
     if api_key:
         secrets_config[key_field] = api_key
 
+    # --- Optional: custom API endpoint (base_url) ---
+    # OpenAI-compatible aggregators (OpenRouter), cheap/local providers (DeepSeek,
+    # Ollama, LM Studio, vLLM) all expose an OpenAI-compatible HTTP endpoint.
+    # Most useful with provider=openai, but vendor SDKs accept base_url too.
+    print()
+    existing_base_url = existing.get("base_url") or ""
+    if existing_base_url:
+        print(f"  Current API endpoint: {existing_base_url}")
+        print("  Press Enter to keep, type 'default' to clear, or paste a new URL.")
+    else:
+        print("  Optional: custom API endpoint (base_url).")
+        print("  Leave blank to use the vendor default. Examples:")
+        print("    https://openrouter.ai/api/v1        (OpenRouter — 100+ models)")
+        print("    https://api.deepseek.com/v1         (DeepSeek direct)")
+        print("    http://localhost:11434/v1           (Ollama local)")
+        print("    http://localhost:1234/v1            (LM Studio local)")
+    base_url_input = _prompt_string("  API endpoint (optional)", default=existing_base_url)
+    if base_url_input.strip().lower() == "default":
+        backends_config["base_url"] = None
+    elif base_url_input.strip():
+        backends_config["base_url"] = base_url_input.strip()
+    else:
+        backends_config["base_url"] = None
+
     # --- Step 5: Default model ---
     print()
     print("  " + "-" * 40)
@@ -664,6 +688,9 @@ def cmd_show(config_dir: Path | None = None) -> int:
     default_model = config.get("default_model") or "(not set)"
     print(f"  provider: {provider}")
     print(f"  default_model: {default_model}")
+    base_url = config.get("base_url")
+    if base_url:
+        print(f"  base_url: {base_url}")
 
     # Show API key status for the provider
     key_field = _API_KEY_FIELDS.get(provider, "")
@@ -685,6 +712,8 @@ def cmd_show(config_dir: Path | None = None) -> int:
                 parts.append(f"api_key={ovr_display}")
             if "model" in override:
                 parts.append(f"model={override['model']}")
+            if "base_url" in override:
+                parts.append(f"base_url={override['base_url']}")
             print(f"    {role}: {', '.join(parts)}")
 
     return 0

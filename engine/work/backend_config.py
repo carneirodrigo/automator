@@ -242,11 +242,18 @@ def resolve_backend(
 
     backend_name = _PROVIDER_TO_BACKEND[provider]
     default_model = config.get("default_model")
+    global_base_url = config.get("base_url")
+    if global_base_url is not None and not isinstance(global_base_url, str):
+        logger.warning("base_url in config is not a string; ignoring.")
+        global_base_url = None
+    if isinstance(global_base_url, str):
+        global_base_url = global_base_url.strip() or None
 
     resolution = BackendResolution(
         mode="api",
         backend_name=backend_name,
         model=default_model,
+        base_url=global_base_url,
     )
 
     # Apply role overrides if present
@@ -262,9 +269,22 @@ def resolve_backend(
         override_provider = role_override.get("provider")
         if override_provider and override_provider in VALID_PROVIDERS:
             resolution.backend_name = _PROVIDER_TO_BACKEND[override_provider]
+            # Switching provider invalidates a global base_url aimed at the previous provider.
+            # The override may restate base_url explicitly below; otherwise clear it.
+            resolution.base_url = None
         override_model = role_override.get("model")
         if override_model is not None:
             resolution.model = override_model
+        if "base_url" in role_override:
+            override_base_url = role_override.get("base_url")
+            if override_base_url is None:
+                resolution.base_url = None
+            elif isinstance(override_base_url, str):
+                resolution.base_url = override_base_url.strip() or None
+            else:
+                logger.warning(
+                    "base_url override for role '%s' is not a string; ignored.", role,
+                )
 
     # Resolve API key for the resolved backend
     key_field = _API_KEY_FIELDS.get(resolution.backend_name, "")

@@ -26,6 +26,7 @@ If `config/` does not exist or `config/backends.json` is missing, every backend 
   "mode": "cli",
   "provider": "anthropic",
   "default_model": "claude-sonnet-4-6",
+  "base_url": null,
   "role_overrides": {
     "worker": { "model": "claude-opus-4-6" },
     "research": { "provider": "google", "model": "gemini-2.5-pro" }
@@ -36,7 +37,8 @@ If `config/` does not exist or `config/backends.json` is missing, every backend 
 - `mode` — Global switch: `"cli"` or `"api"`. When `"cli"`, all other fields are ignored and `--cli claude|gemini|codex` drives execution. When `"api"`, the config drives everything.
 - `provider` — Which vendor API to use: `"anthropic"`, `"google"`, or `"openai"`.
 - `default_model` — The model used for all agent roles unless overridden.
-- `role_overrides` — Optional per-role overrides. Each role can specify a different `model` and optionally a different `provider`.
+- `base_url` — Optional custom HTTP endpoint. Leave `null` to use the vendor default. Setting it is how you reach OpenAI-compatible aggregators (OpenRouter), cheap providers (DeepSeek), and local servers (Ollama, LM Studio, vLLM). See "OpenAI-Compatible Endpoints" below.
+- `role_overrides` — Optional per-role overrides. Each role can specify a different `model`, `provider`, and `base_url`. When a role override changes `provider`, the global `base_url` is cleared for that role (it's aimed at the previous provider) unless the override restates `base_url` explicitly.
 
 `config/secrets.json`:
 ```json
@@ -52,11 +54,48 @@ If `config/` does not exist or `config/backends.json` is missing, every backend 
 
 When the engine executes an agent for a given role:
 1. If `mode` is `"cli"`: return CLI mode. The `--cli claude|gemini|codex` flag drives execution; config is irrelevant.
-2. If `mode` is `"api"`: use the global `provider` and `default_model`.
-3. Check `role_overrides[role]` — if present, override `provider` and/or `model`.
+2. If `mode` is `"api"`: use the global `provider`, `default_model`, and `base_url`.
+3. Check `role_overrides[role]` — if present, override `provider`, `model`, and/or `base_url`. Changing `provider` in an override clears the inherited `base_url` (unless the override also restates it).
 4. Look up the API key for the resolved provider in `secrets.json`.
 
 Provider-to-backend mapping: `anthropic` -> `claude`, `google` -> `gemini`, `openai` -> `codex`.
+
+### OpenAI-Compatible Endpoints
+
+The `provider: "openai"` path uses the standard `openai` Python SDK. The SDK accepts any server that implements the OpenAI Chat Completions API, so setting `base_url` lets one code path reach a wide range of providers without adding new backend adapters.
+
+| Endpoint | What you get | Notes |
+|---|---|---|
+| `https://openrouter.ai/api/v1` | 100+ models: DeepSeek, Qwen, Grok, Mistral, Llama, plus Claude/GPT/Gemini | One key, per-token billing |
+| `https://api.deepseek.com/v1` | DeepSeek V3 / R1 | Cheapest; model names: `deepseek-chat`, `deepseek-reasoner` |
+| `http://localhost:11434/v1` | Anything served by local Ollama | Fully local, free; weaker on complex agentic work |
+| `http://localhost:1234/v1` | Anything served by local LM Studio | GUI-based local server |
+| `http://localhost:8000/v1` | vLLM or similar self-hosted | Standard default port |
+
+Example config for OpenRouter routing to DeepSeek:
+
+```json
+{
+  "version": 2,
+  "mode": "api",
+  "provider": "openai",
+  "default_model": "deepseek/deepseek-chat",
+  "base_url": "https://openrouter.ai/api/v1"
+}
+```
+
+With the matching `secrets.json`:
+
+```json
+{
+  "version": 1,
+  "openai_api_key": "sk-or-v1-..."
+}
+```
+
+For local Ollama, put any non-empty placeholder in `openai_api_key` (e.g. `"ollama"`) — the local server ignores it but the SDK requires a non-empty value.
+
+The Anthropic and Google SDKs also accept `base_url`. Using it with those providers is supported (for proxies, Azure-style endpoints, etc.) but less common.
 
 ### CLI Management
 

@@ -3,5 +3,6 @@
   "mode": "cli",
   "provider": "anthropic",
   "default_model": null,
+  "base_url": null,
   "role_overrides": {}
 }
