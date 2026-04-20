@@ -887,6 +887,22 @@ class TestNeedsPlanning(unittest.TestCase):
             "and deploy the results to a SharePoint list"
         ))
 
+    def test_vague_setup_task_triggers_planning(self):
+        """'set up alerting so the team knows when things go wrong' — covered."""
+        self.assertTrue(_needs_planning(
+            "set up alerting so the team knows when things go wrong"
+        ))
+
+    def test_configure_notification_triggers_planning(self):
+        self.assertTrue(_needs_planning(
+            "configure a daily notification that tells users when the system is down"
+        ))
+
+    def test_operational_monitor_triggers_planning(self):
+        self.assertTrue(_needs_planning(
+            "monitor the pipeline and alert our ops channel on failures"
+        ))
+
 
 # ---------------------------------------------------------------------------
 # Delivery file verification

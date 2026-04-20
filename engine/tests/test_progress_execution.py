@@ -425,5 +425,40 @@ class TestExecutionProgress(unittest.TestCase):
         self.assertTrue(any(msg.startswith("worker: still running") for msg in messages))
 
 
+class TestEmitToolProgress(unittest.TestCase):
+    """Unit tests for _emit_tool_progress — ensures tool names map to readable messages."""
+
+    def _collect(self, tool_name: str, tool_input: dict) -> list[str]:
+        from engine.work.execution import _emit_tool_progress  # noqa: PLC0415
+        messages: list[str] = []
+        _emit_tool_progress("worker", tool_name, tool_input, messages.append)
+        return messages
+
+    def test_toolsearch_select_shows_tool_load(self):
+        msgs = self._collect("ToolSearch", {"query": "select:TodoWrite,Read", "max_results": 5})
+        self.assertEqual(len(msgs), 1)
+        self.assertIn("loading tool schemas", msgs[0])
+        self.assertIn("TodoWrite,Read", msgs[0])
+        self.assertNotIn("searching — select:", msgs[0])
+
+    def test_toolsearch_keyword_shows_tool_load(self):
+        msgs = self._collect("ToolSearch", {"query": "notebook", "max_results": 3})
+        self.assertEqual(len(msgs), 1)
+        self.assertIn("loading tool schemas", msgs[0])
+
+    def test_web_search_still_labelled_searching(self):
+        msgs = self._collect("WebSearch", {"query": "python asyncio patterns"})
+        self.assertEqual(len(msgs), 1)
+        self.assertTrue(msgs[0].startswith("worker: searching"))
+
+    def test_read_tool(self):
+        msgs = self._collect("Read", {"file_path": "/tmp/foo.py"})
+        self.assertEqual(msgs, ["worker: reading foo.py"])
+
+    def test_write_tool(self):
+        msgs = self._collect("Write", {"file_path": "/tmp/bar.py"})
+        self.assertEqual(msgs, ["worker: writing bar.py"])
+
+
 if __name__ == "__main__":
     unittest.main()

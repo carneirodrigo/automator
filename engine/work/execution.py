@@ -178,6 +178,17 @@ def persist_result(
 def _emit_tool_progress(role: str, tool_name: str, tool_input: dict, emit_progress: Callable) -> None:
     """Emit a human-readable progress line for a single tool call."""
     name_lower = tool_name.lower().replace("_", "").replace("-", "")
+    # ToolSearch is Claude's deferred-tool loader, not a user-visible search.
+    # Label it as a tool-loading event so operators don't see confusing
+    # "searching — select:Foo" lines leak through.
+    if name_lower == "toolsearch":
+        query = str(tool_input.get("query") or "")
+        if query.startswith("select:"):
+            targets = query[len("select:"):].strip() or "tool schemas"
+            emit_progress(f"{role}: loading tool schemas ({targets})")
+        else:
+            emit_progress(f"{role}: loading tool schemas")
+        return
     if any(k in name_lower for k in ("read", "view", "cat", "open")):
         path = tool_input.get("file_path") or tool_input.get("path") or tool_input.get("filename", "")
         emit_progress(f"{role}: reading {Path(path).name if path else 'file'}")

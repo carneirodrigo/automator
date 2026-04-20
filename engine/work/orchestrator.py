@@ -124,6 +124,13 @@ _COMPLEXITY_SIGNALS = re.compile(
     r"|sharepoint|graph\s+api|power\s+bi|azure|qualys|defender"
     r"|multiple|several|each|every|all\s+the"
     r"|deploy|migrate|integrate|connect\s+to"
+    # Operational / setup verbs — these rarely come with enough spec to start.
+    r"|set\s+up|setup|install|configure|provision|onboard"
+    r"|monitor|alerting|alert|notify|notification"
+    # Routing / recipient ambiguity.
+    r"|the\s+team|the\s+user|the\s+system|our\s+\w+|your\s+\w+|users"
+    # Scheduling signals.
+    r"|schedule|cron|recurring|daily|weekly|nightly"
     r")\w*\b",
     re.IGNORECASE,
 )
