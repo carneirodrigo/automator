@@ -614,6 +614,38 @@ def cmd_setup(config_dir: Path | None = None) -> int:
             if override_model and override_model != (default_model or ""):
                 override["model"] = override_model
 
+            # base_url override
+            global_base = backends_config.get("base_url") or ""
+            provider_changed = "provider" in override
+            print()
+            if provider_changed:
+                print(f"    API endpoint for {role} (optional).")
+                print("    Leave blank to use the vendor default for this provider,")
+                print("    or paste a URL (e.g. https://openrouter.ai/api/v1).")
+                endpoint_default = ""
+            elif global_base:
+                print(f"    API endpoint for {role}.")
+                print(f"    Enter to inherit the global endpoint ({global_base}),")
+                print("    type 'default' to force the vendor default, or paste a URL.")
+                endpoint_default = global_base
+            else:
+                print(f"    API endpoint for {role} (optional).")
+                print("    Leave blank to use the vendor default, or paste a URL.")
+                endpoint_default = ""
+
+            override_base_url_input = _prompt_string(
+                f"    Endpoint for {role}",
+                default=endpoint_default,
+            )
+            bu = override_base_url_input.strip()
+            if bu.lower() == "default":
+                override["base_url"] = None
+            elif provider_changed:
+                if bu:
+                    override["base_url"] = bu
+            elif bu and bu != global_base:
+                override["base_url"] = bu
+
             if override:
                 role_overrides[role] = override
                 print(f"    -> {role}: {override}")
@@ -635,9 +667,9 @@ def cmd_setup(config_dir: Path | None = None) -> int:
     print(f"  Config written to:  {backends_path}")
     print(f"  Secrets written to: {secrets_path}")
     print()
-    print("  Verify with:   ./automator config show")
-    print("  Validate with: ./automator config validate")
-    print("  Test runtime:  ./automator project check-runtime")
+    print("  Verify with:   ./automator --config show")
+    print("  Validate with: ./automator --config validate")
+    print("  Test runtime:  ./automator --api --check-runtime   (or --cli <llm>)")
     print()
 
     return 0
@@ -652,9 +684,9 @@ def _print_done(backends_path: Path, secrets_path: Path) -> None:
     print(f"  Config written to:  {backends_path}")
     print(f"  Secrets written to: {secrets_path}")
     print()
-    print("  Verify with:   ./automator config show")
-    print("  Validate with: ./automator config validate")
-    print("  Test runtime:  ./automator project check-runtime")
+    print("  Verify with:   ./automator --config show")
+    print("  Validate with: ./automator --config validate")
+    print("  Test runtime:  ./automator --api --check-runtime   (or --cli <llm>)")
     print()
 
 

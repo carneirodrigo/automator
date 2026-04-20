@@ -27,6 +27,7 @@ from engine.work.config_wizard import (
     check_python_packages,
     check_python_version,
     check_venv,
+    cmd_setup,
     cmd_show,
     cmd_validate,
     run_all_checks,
@@ -318,6 +319,155 @@ class TestCmdShow(unittest.TestCase):
         self.assertIn("worker", output)
         # Key should be redacted
         self.assertNotIn("sk-ant-test1234567890", output)
+
+
+# ---------------------------------------------------------------------------
+# cmd_setup end-to-end tests
+# ---------------------------------------------------------------------------
+
+
+class TestCmdSetupEndToEnd(unittest.TestCase):
+    """Drive the interactive wizard with scripted stdin and assert JSON output."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.config_dir = Path(self.tmpdir)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _run_setup(self, answers: list[str], secret_answers: list[str]) -> int:
+        """Run cmd_setup with queued answers for input() and getpass()."""
+        input_queue = list(answers)
+        secret_queue = list(secret_answers)
+
+        def fake_input(prompt: str = "") -> str:
+            if not input_queue:
+                raise AssertionError(f"input() queue empty at prompt: {prompt!r}")
+            return input_queue.pop(0)
+
+        def fake_getpass(prompt: str = "") -> str:
+            if not secret_queue:
+                raise AssertionError(f"getpass() queue empty at prompt: {prompt!r}")
+            return secret_queue.pop(0)
+
+        with patch("builtins.input", fake_input), \
+             patch("getpass.getpass", fake_getpass), \
+             patch("engine.work.repo_bootstrap.ensure_repo_structure", lambda: None):
+            old_stdout = sys.stdout
+            sys.stdout = StringIO()
+            try:
+                return cmd_setup(self.config_dir)
+            finally:
+                sys.stdout = old_stdout
+                if input_queue:
+                    raise AssertionError(f"input() queue not drained: {input_queue}")
+                if secret_queue:
+                    raise AssertionError(f"getpass() queue not drained: {secret_queue}")
+
+    def test_openrouter_deepseek_setup(self):
+        """A new user configures OpenAI provider pointed at OpenRouter for DeepSeek."""
+        rc = self._run_setup(
+            answers=[
+                "api",                              # execution mode
+                "openai",                           # default provider
+                "https://openrouter.ai/api/v1",     # API endpoint
+                "deepseek/deepseek-chat",           # default model
+                "no",                               # add role overrides?
+            ],
+            secret_answers=["sk-or-v1-test"],        # API key
+        )
+        self.assertEqual(rc, 0)
+
+        backends = json.loads((self.config_dir / "backends.json").read_text())
+        secrets = json.loads((self.config_dir / "secrets.json").read_text())
+        self.assertEqual(backends["mode"], "api")
+        self.assertEqual(backends["provider"], "openai")
+        self.assertEqual(backends["default_model"], "deepseek/deepseek-chat")
+        self.assertEqual(backends["base_url"], "https://openrouter.ai/api/v1")
+        self.assertEqual(secrets["openai_api_key"], "sk-or-v1-test")
+
+    def test_ollama_local_setup(self):
+        """Local Ollama via OpenAI-compatible endpoint."""
+        rc = self._run_setup(
+            answers=[
+                "api",
+                "openai",
+                "http://localhost:11434/v1",
+                "qwen3-coder",
+                "no",
+            ],
+            secret_answers=["ollama"],
+        )
+        self.assertEqual(rc, 0)
+        backends = json.loads((self.config_dir / "backends.json").read_text())
+        self.assertEqual(backends["base_url"], "http://localhost:11434/v1")
+        self.assertEqual(backends["default_model"], "qwen3-coder")
+
+    def test_default_vendor_endpoint_is_none(self):
+        """Leaving the endpoint blank keeps base_url null."""
+        rc = self._run_setup(
+            answers=[
+                "api",
+                "anthropic",
+                "",                                 # no custom endpoint
+                "claude-sonnet-4-6",
+                "no",
+            ],
+            secret_answers=["sk-ant-test"],
+        )
+        self.assertEqual(rc, 0)
+        backends = json.loads((self.config_dir / "backends.json").read_text())
+        self.assertIsNone(backends["base_url"])
+
+    def test_per_role_base_url_override(self):
+        """User sets a global endpoint and overrides one role to a local server."""
+        rc = self._run_setup(
+            answers=[
+                "api",
+                "openai",
+                "https://openrouter.ai/api/v1",     # global endpoint
+                "gpt-4.1",
+                "yes",                              # add overrides
+                "worker",                           # role name
+                "same",                             # keep provider
+                "gpt-4.1",                          # keep model
+                "http://localhost:11434/v1",        # base_url override for worker
+                "done",                             # no more roles
+            ],
+            secret_answers=["sk-or-v1-test"],
+        )
+        self.assertEqual(rc, 0)
+        backends = json.loads((self.config_dir / "backends.json").read_text())
+        self.assertEqual(backends["base_url"], "https://openrouter.ai/api/v1")
+        overrides = backends["role_overrides"]
+        self.assertIn("worker", overrides)
+        self.assertEqual(overrides["worker"]["base_url"], "http://localhost:11434/v1")
+
+    def test_per_role_inherits_global_endpoint(self):
+        """Pressing Enter at the per-role endpoint prompt inherits the global value
+        (no base_url override recorded)."""
+        rc = self._run_setup(
+            answers=[
+                "api",
+                "openai",
+                "https://openrouter.ai/api/v1",
+                "gpt-4.1",
+                "yes",
+                "worker",
+                "same",
+                "claude-opus-4-6",                  # model override (differs from default)
+                "https://openrouter.ai/api/v1",     # Enter → returns default → equals global → don't record
+                "done",
+            ],
+            secret_answers=["sk-or-v1-test"],
+        )
+        self.assertEqual(rc, 0)
+        backends = json.loads((self.config_dir / "backends.json").read_text())
+        overrides = backends["role_overrides"]["worker"]
+        self.assertEqual(overrides["model"], "claude-opus-4-6")
+        self.assertNotIn("base_url", overrides)
 
 
 # ---------------------------------------------------------------------------
