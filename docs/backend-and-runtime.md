@@ -60,9 +60,9 @@ Provider-to-backend mapping: `anthropic` -> `claude`, `google` -> `gemini`, `ope
 
 ### CLI Management
 
-- `./automator config setup` — Interactive wizard to configure mode, provider, API keys, models, and per-role overrides. Also runnable standalone: `python3 engine/work/config_wizard.py`.
-- `./automator config show` — Display current configuration with redacted API keys.
-- `./automator config validate` — Check that all API providers have keys configured.
+- `./automator --config setup` — Interactive wizard to configure mode, provider, API keys, models, and per-role overrides. Also runnable standalone: `python3 engine/work/config_wizard.py`.
+- `./automator --config show` — Display current configuration with redacted API keys.
+- `./automator --config validate` — Check that all API providers have keys configured.
 
 ### API Execution Path
 

@@ -168,7 +168,7 @@ This repository is version-controlled using Git. Each user configures their own 
 
 ```bash
 pip install -r requirements.txt    # Install dependencies
-./automator config setup           # Check environment and configure backend
+./automator --config setup         # Check environment and configure backend
 ./automator --cli claude --check-runtime  # Verify backend reachability
 ```
 

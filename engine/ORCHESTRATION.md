@@ -45,18 +45,18 @@ To ensure a seamless experience across different AI platforms and maintain a sin
 
 - **Universal AI Guidance:** `ORCHESTRATION.md`, `GEMINI.md`, `CLAUDE.md`, and `AGENTS.md` at the repo root are symlinks to `engine/ORCHESTRATION.md`. This architecture ensures that any AI assistant (Gemini, Claude, or Codex) automatically loads the same authoritative orchestration rules and project context, regardless of which specific filename its internal logic prioritizes for repository discovery.
 - **Simplified Command Entry:** `engine/automator.py` is the canonical Python entrypoint for project runs, debug supervision, skills commands, and agent scaffolding. The tracked root-level `automator` launcher prefers `./.venv/bin/python3` when available.
-- **Auto-Created, Not Tracked:** The repo-root symlinks (`ORCHESTRATION.md`, `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`) and `.gitignore` are auto-created by `ensure_repo_structure()` (in `engine/work/repo_bootstrap.py`). Bootstrap runs automatically at engine startup and from `./automator config setup`. The `automator` launcher itself is tracked in git.
+- **Auto-Created, Not Tracked:** The repo-root symlinks (`ORCHESTRATION.md`, `CLAUDE.md`, `GEMINI.md`, `AGENTS.md`) and `.gitignore` are auto-created by `ensure_repo_structure()` (in `engine/work/repo_bootstrap.py`). Bootstrap runs automatically at engine startup and from `./automator --config setup`. The `automator` launcher itself is tracked in git.
 
 First-time setup for new users:
 
 1. `pip install -r requirements.txt` — installs dependencies
-2. `./automator config setup` — checks environment, configures CLI or API backend
+2. `./automator --config setup` — checks environment, configures CLI or API backend
 3. `./automator --cli claude --check-runtime` — verifies backend reachability
 
 Python dependency model:
 
 - Automator is designed to work with Python 3.10 or higher.
-- The recommended installation flow is `pip install -r requirements.txt` followed by `./automator config setup`.
+- The recommended installation flow is `pip install -r requirements.txt` followed by `./automator --config setup`.
 - Prefer running the engine as `./automator ...`. The launcher uses `./.venv/bin/python3` if available and falls back to `python3`.
 - Optional lightweight document/PDF helpers:
   - `sudo apt-get install -y poppler-utils qpdf`
@@ -168,6 +168,7 @@ The engine runs a fixed lifecycle with no dynamic routing:
 **Delivery assurance features:**
 
 - **Task planning:** Complex tasks (multiple systems, credentials, sequential steps) trigger a lightweight planning step that decomposes the request into ordered steps. If critical information is missing, the engine returns questions to the user before starting implementation. Simple tasks skip planning entirely (zero extra tokens).
+- **LLM planning classifier fallback:** When the regex heuristic is inconclusive (exactly one complexity signal in a substantive request), the engine asks the backend to classify the request as `needs_planning: true/false` via a minimal prompt. Clear cases stay on the fast path; only ambiguous requests pay the extra classification call. Classifier failure defaults to skip-planning (safe default).
 - **Write-test-fix cycle:** The worker is required to run code after writing it, fix failures, and iterate — not just write and report success. Capability rounds are used for test-fix cycles.
 - **Delivery verification:** After the worker reports success, the engine verifies that claimed files (artifacts, changes_made) actually exist on disk.
 - **Review enforcement:** Reviews that pass without running any commands or tests are auto-demoted to fail, triggering a rework cycle with actual verification.
@@ -244,7 +245,7 @@ When stdin is not a TTY (CI/CD pipelines, piped input), all soft blocks default 
 
 ### What agents see
 
-When a capability is blocked, the failure result is injected back into the agent's capability round with a `[destructive-guard] BLOCKED: ...` issue. Agents must report persistent blocks as blockers rather than retrying the same capability. After 5 capability rounds the stage fails with a `capability_loop` error enriched with the specific guard block reasons.
+When a capability is blocked, the failure result is injected back into the agent's capability round with a `[destructive-guard] BLOCKED: ...` issue. Agents must report persistent blocks as blockers rather than retrying the same capability. Once the per-stage capability round budget (5/8/12 depending on task complexity) is exhausted, the stage fails with a `capability_loop` error enriched with the specific guard block reasons.
 
 The full policy reference is in `docs/capability-requests.md`.
 
@@ -318,7 +319,7 @@ Required maintenance rule:
 - `inputs/` — Drop zone for user-provided files (content git-ignored, structure preserved via `.gitkeep`). Files are moved to `projects/<project-id>/runtime/inputs/` on engine start.
 - `knowledge/` — Shared knowledge base. Contains `manifest.json` (entry index), `sources.json` (source-family routing hints), and tracked `<topic-slug>.json` files with reusable technical findings extracted from completed projects.
 - `skills/` — Agent Skills directory. Contains `catalog.json` (all available vendor skills), `manifest.json` (cached skills), `sources.json` (vendor repo config), and `<vendor>--<skill-name>/SKILL.md` cached skill files.
-- `config/` — Backend configuration (content git-ignored, structure preserved via `.gitkeep`). Contains `backends.json` (global mode, provider, default model, per-role overrides) and `secrets.json` (API keys). Created by `./automator config setup` or manually from templates.
+- `config/` — Backend configuration (content git-ignored, structure preserved via `.gitkeep`). Contains `backends.json` (global mode, provider, default model, per-role overrides) and `secrets.json` (API keys). Created by `./automator --config setup` or manually from templates.
 - `personal/` — User-specific configuration (git remote, SSH keys, tool preferences). Only `README.md` is tracked. AI agents read this directory to understand the user's environment.
 
 ## Build, Test, And Development Commands
@@ -338,6 +339,8 @@ Required maintenance rule:
 - `python3 -m unittest engine.tests.test_progress_execution -v`: Run the execution-layer suite.
 - `python3 -m unittest engine.tests.test_destructive_guard -v`: Run the destructive guard suite.
 - `python3 -m unittest engine.tests.test_automator.SomeTestClass -v`: Run a single test class.
+
+GitHub Actions runs the full `unittest discover` suite on every push/PR to `master` under Python 3.10 / 3.11 / 3.12 (see `.github/workflows/tests.yml`).
 
 ## Runtime Requirements
 

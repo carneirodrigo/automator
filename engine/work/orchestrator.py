@@ -141,6 +141,21 @@ _SIMPLICITY_SIGNALS = re.compile(
     re.IGNORECASE,
 )
 
+_CLASSIFY_PROMPT_TEMPLATE = """\
+Classify a software task as needing planning or not. Output JSON only, no prose.
+
+Definitions:
+- needs_planning=true when the task involves multiple systems, external APIs, credentials, deployment, scheduling, monitoring, or ambiguous scope.
+- needs_planning=false when the task is a single self-contained script, a code change, a local refactor, or a clearly scoped file operation.
+
+Request: {request}
+
+Return exactly:
+{{"needs_planning": true, "reason": "one short sentence"}}
+or
+{{"needs_planning": false, "reason": "one short sentence"}}
+"""
+
 _PLANNING_PROMPT_TEMPLATE = """\
 You are a task planner for an autonomous coding engine. Analyse the request and return a JSON object.
 
@@ -168,27 +183,80 @@ Return exactly this JSON (no markdown fences, no prose):
 """
 
 
+def _planning_decision(request: str) -> str:
+    """Three-way heuristic: 'plan', 'skip', or 'uncertain'.
+
+    'uncertain' is returned when the regex sees exactly one complexity signal
+    in a non-trivial request — the caller may invoke an LLM classifier to
+    break the tie, or default to 'skip'.
+    """
+    if not request:
+        return "skip"
+    if any(kw in request.lower() for kw in ("rework required", "rework based on", "continue:")):
+        return "skip"
+    words = request.split()
+    if len(words) < 10:
+        return "skip"
+    matches = set(m.group().lower() for m in _COMPLEXITY_SIGNALS.finditer(request))
+    if _SIMPLICITY_SIGNALS.search(request) and len(matches) < 3:
+        return "skip"
+    if len(matches) >= 2:
+        return "plan"
+    if len(matches) == 1:
+        return "uncertain"
+    return "skip"
+
+
 def _needs_planning(request: str) -> bool:
     """Heuristic: does this request warrant a planning step?
 
-    Returns False for short, simple, or rework requests — these go straight
-    to the worker.  Returns True when multiple complexity signals are present.
+    Legacy boolean wrapper around :func:`_planning_decision`. Returns True
+    only on 'plan'; 'uncertain' collapses to False here so callers that do
+    not invoke the LLM classifier keep the old safe-default behaviour.
     """
-    if not request:
-        return False
-    # Never plan on rework, continue, or acceptance flows.
-    if any(kw in request.lower() for kw in ("rework required", "rework based on", "continue:")):
-        return False
-    # Very short requests are almost always simple.
-    words = request.split()
-    if len(words) < 10:
-        return False
-    # Count complexity signals — need at least 2 distinct matches.
-    matches = set(m.group().lower() for m in _COMPLEXITY_SIGNALS.finditer(request))
-    # For moderately short requests, simplicity signals override low complexity.
-    if _SIMPLICITY_SIGNALS.search(request) and len(matches) < 3:
-        return False
-    return len(matches) >= 2
+    return _planning_decision(request) == "plan"
+
+
+def _classify_via_llm(
+    request: str,
+    *,
+    active_project: dict[str, Any] | None,
+    agent_bin: str,
+    run_agent_with_capabilities: Any,
+    emit_progress: Any,
+) -> bool | None:
+    """Ask the backend whether the request needs planning. Returns None on failure.
+
+    Sent as a worker-role call with a minimal classify-only prompt and zero
+    expected capability rounds. A parsing failure, transport error, or
+    ambiguous response returns None so the caller can fall back to 'skip'.
+    """
+    prompt = _CLASSIFY_PROMPT_TEMPLATE.format(request=request)
+    try:
+        res = _run_with_retry(
+            lambda: run_agent_with_capabilities(
+                "worker", prompt, "Classify whether the task needs planning",
+                [], active_project, agent_bin,
+            ),
+            "worker", emit_progress,
+        )
+    except Exception:  # noqa: BLE001 — classifier is best-effort, never fatal
+        return None
+    if res.get("status") == "failed":
+        return None
+    output = res.get("output") or {}
+    if not isinstance(output, dict):
+        return None
+    verdict = output.get("needs_planning")
+    if isinstance(verdict, bool):
+        return verdict
+    if isinstance(verdict, str):
+        low = verdict.strip().lower()
+        if low in ("true", "yes", "plan"):
+            return True
+        if low in ("false", "no", "skip", "simple"):
+            return False
+    return None
 
 
 def _capability_rounds_for_task(request: str, has_plan: bool) -> int:
@@ -455,7 +523,26 @@ def run_orchestration(
     # the heuristic detects complexity.  Uses a minimal prompt — no KB, no
     # skills, no capability reference — to keep token cost low.
     _has_prior_plan = bool(task_state.get("plan"))
-    if not _has_prior_plan and _needs_planning(worker_task):
+    _planning_verdict = "skip" if _has_prior_plan else _planning_decision(worker_task)
+    if _planning_verdict == "uncertain":
+        emit_progress("[engine] Heuristic inconclusive — asking backend to classify...")
+        llm_verdict = _classify_via_llm(
+            worker_task,
+            active_project=active_project,
+            agent_bin=agent_bin,
+            run_agent_with_capabilities=run_agent_with_capabilities,
+            emit_progress=emit_progress,
+        )
+        if llm_verdict is True:
+            emit_progress("[engine] Classifier: task needs planning.")
+            _planning_verdict = "plan"
+        else:
+            if llm_verdict is False:
+                emit_progress("[engine] Classifier: task is simple — skipping planning.")
+            else:
+                emit_progress("[engine] Classifier unavailable — defaulting to skip.")
+            _planning_verdict = "skip"
+    if not _has_prior_plan and _planning_verdict == "plan":
         emit_progress("[engine] Complex task detected — running lightweight planning step...")
         planning_prompt = _PLANNING_PROMPT_TEMPLATE.format(request=worker_task)
         plan_res = _run_with_retry(

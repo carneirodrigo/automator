@@ -210,7 +210,7 @@ Quick overview:
 ./automator --check-runtime                        probe backend (needs backend)
 ./automator --debug open|list|analyse|verify       debug management (local)
 ./automator --config setup|show|validate           configuration (local)
-./automator --skill  list|check|catalog|fetch      skills (local)
+./automator --skill  list|check|catalog|fetch|rebuild-manifest   skills (local)
 ./automator --agent  list|add                      agents (local)
 ```
 

@@ -2,7 +2,7 @@
 """Backend configuration wizard for the Automator engine.
 
 Run directly:   python3 engine/work/config_wizard.py
-Via automator:   ./automator config setup
+Via automator:   ./automator --config setup
 """
 
 from __future__ import annotations
@@ -646,7 +646,7 @@ def cmd_show(config_dir: Path | None = None) -> int:
     secrets_path = config_dir / "secrets.json"
 
     if not backends_path.exists():
-        print("No backend configuration found. Run: ./automator config setup")
+        print("No backend configuration found. Run: ./automator --config setup")
         return 1
 
     config = _load_json(backends_path)
@@ -702,7 +702,7 @@ def cmd_validate(config_dir: Path | None = None) -> int:
     secrets_path = config_dir / "secrets.json"
 
     if not backends_path.exists():
-        print("No backend configuration found. Run: ./automator config setup")
+        print("No backend configuration found. Run: ./automator --config setup")
         return 1
 
     config = _load_json(backends_path)

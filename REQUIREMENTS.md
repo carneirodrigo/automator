@@ -9,6 +9,7 @@ These packages are recommended to be installed inside a repo-local `.venv`.
 ### Core Runtime Dependencies
 
 - **tiktoken>=0.5.0**: Improved token estimation (falls back to `len/3` heuristic if absent).
+- **typing_extensions>=4.0.0**: Backports of newer typing features for Python 3.10 compatibility.
 - **requests>=2.28.0**: Common dependency for generated delivery scripts (Microsoft Graph API, etc.).
 - **pyyaml>=6.0**: YAML frontmatter parsing for Agent Skills (falls back to regex parser if absent).
 

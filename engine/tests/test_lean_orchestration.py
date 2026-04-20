@@ -31,8 +31,10 @@ from engine.work.orchestrator import (
     MAX_RESEARCH_CYCLES,
     _capability_rounds_for_task,
     _classify_blockers,
+    _classify_via_llm,
     _needs_planning,
     _next_project_id,
+    _planning_decision,
     _project_name_from_request,
     _run_with_retry,
     _validate_agent_output,
@@ -902,6 +904,123 @@ class TestNeedsPlanning(unittest.TestCase):
         self.assertTrue(_needs_planning(
             "monitor the pipeline and alert our ops channel on failures"
         ))
+
+
+class TestPlanningDecision(unittest.TestCase):
+    """Three-way decision that powers _needs_planning plus the LLM fallback."""
+
+    def test_obvious_simple_skips(self):
+        self.assertEqual(_planning_decision("write a hello world script"), "skip")
+
+    def test_obvious_complex_plans(self):
+        self.assertEqual(
+            _planning_decision(
+                "connect to Azure Defender and Qualys, pull data, deploy to SharePoint"
+            ),
+            "plan",
+        )
+
+    def test_single_signal_long_sentence_is_uncertain(self):
+        """Exactly one complexity signal in a substantive request falls to the classifier."""
+        verdict = _planning_decision(
+            "please write a python program that reads a csv file and "
+            "produces a deploy-ready static html report on disk"
+        )
+        self.assertEqual(verdict, "uncertain")
+
+    def test_rework_skips_regardless_of_signals(self):
+        self.assertEqual(
+            _planning_decision("Rework required. Configure deploy and monitor alert notification."),
+            "skip",
+        )
+
+
+class TestClassifyViaLLM(unittest.TestCase):
+    """The LLM classifier wraps a single backend call and parses {needs_planning: bool}."""
+
+    def _emit(self, _: str) -> None:
+        pass
+
+    def test_returns_true_for_plan_verdict(self):
+        def fake_run(*_a, **_k):
+            return {"status": "success", "output": {"needs_planning": True, "reason": "multi-system"}}
+        self.assertIs(
+            _classify_via_llm(
+                "anything",
+                active_project=None,
+                agent_bin="claude",
+                run_agent_with_capabilities=fake_run,
+                emit_progress=self._emit,
+            ),
+            True,
+        )
+
+    def test_returns_false_for_skip_verdict(self):
+        def fake_run(*_a, **_k):
+            return {"status": "success", "output": {"needs_planning": False, "reason": "trivial"}}
+        self.assertIs(
+            _classify_via_llm(
+                "x",
+                active_project=None,
+                agent_bin="claude",
+                run_agent_with_capabilities=fake_run,
+                emit_progress=self._emit,
+            ),
+            False,
+        )
+
+    def test_accepts_string_verdict(self):
+        def fake_run(*_a, **_k):
+            return {"status": "success", "output": {"needs_planning": "plan"}}
+        self.assertIs(
+            _classify_via_llm(
+                "x",
+                active_project=None,
+                agent_bin="claude",
+                run_agent_with_capabilities=fake_run,
+                emit_progress=self._emit,
+            ),
+            True,
+        )
+
+    def test_returns_none_on_failure(self):
+        def fake_run(*_a, **_k):
+            return {"status": "failed", "error_category": "provider_error"}
+        self.assertIsNone(
+            _classify_via_llm(
+                "x",
+                active_project=None,
+                agent_bin="claude",
+                run_agent_with_capabilities=fake_run,
+                emit_progress=self._emit,
+            )
+        )
+
+    def test_returns_none_on_malformed_output(self):
+        def fake_run(*_a, **_k):
+            return {"status": "success", "output": {"something_else": "nope"}}
+        self.assertIsNone(
+            _classify_via_llm(
+                "x",
+                active_project=None,
+                agent_bin="claude",
+                run_agent_with_capabilities=fake_run,
+                emit_progress=self._emit,
+            )
+        )
+
+    def test_returns_none_on_exception(self):
+        def fake_run(*_a, **_k):
+            raise RuntimeError("boom")
+        self.assertIsNone(
+            _classify_via_llm(
+                "x",
+                active_project=None,
+                agent_bin="claude",
+                run_agent_with_capabilities=fake_run,
+                emit_progress=self._emit,
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
