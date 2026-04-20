@@ -111,6 +111,30 @@ def bootstrap_project(
     return new_entry
 
 
+_DELIVERY_SKIP_DIRS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".git", "node_modules", ".venv", "venv"}
+
+
+def _copy_delivery_tree(src: Path, dst: Path) -> list[Path]:
+    """Copy regular files from src into dst, skipping caches. Returns copied paths."""
+    copied: list[Path] = []
+    for entry in src.rglob("*"):
+        rel = entry.relative_to(src)
+        if any(part in _DELIVERY_SKIP_DIRS for part in rel.parts):
+            continue
+        target = dst / rel
+        if entry.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        if entry.is_file():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(entry, target)
+                copied.append(target)
+            except OSError:
+                continue
+    return copied
+
+
 def fork_project(
     decision: dict[str, Any],
     *,
@@ -141,6 +165,20 @@ def fork_project(
     source_artifacts_dir = Path(source["runtime_dir"]) / "artifacts"
     new_artifacts_dir = runtime_dir / "artifacts"
     inherited_steps = []
+
+    # Copy delivery files so the worker can extend the fork in place instead of
+    # rebuilding from the source. Skips caches and vcs noise. Register each
+    # copied file as engine-created so the worker can overwrite them without
+    # tripping the destructive-guard's overwrite protection.
+    source_delivery = Path(source.get("project_root", ""))
+    new_delivery = Path(new_entry.get("project_root", ""))
+    if source_delivery.is_dir() and new_delivery.is_dir():
+        copied = _copy_delivery_tree(source_delivery, new_delivery)
+        if copied:
+            from engine.work.destructive_guard import register_created_path  # noqa: PLC0415
+            for target in copied:
+                register_created_path(target)
+            emit_progress(f"[engine] Fork: copied {len(copied)} delivery file(s) from {source_project_id}.")
 
     for role in inherit_roles:
         latest_path = source_artifacts_dir / f"latest_{role}.json"

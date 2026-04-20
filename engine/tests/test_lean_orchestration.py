@@ -930,6 +930,33 @@ class TestVerifyDeliveryFiles(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertIn("not found", result[0])
 
+    def test_empty_init_py_not_flagged(self):
+        """Empty __init__.py is a conventional Python marker — do not flag."""
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            init = os.path.join(tmpdir, "__init__.py")
+            open(init, "w").close()  # 0 bytes
+            result = _verify_delivery_files({"artifacts": [init]}, tmpdir)
+            self.assertEqual(result, [])
+
+    def test_empty_gitkeep_not_flagged(self):
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            keep = os.path.join(tmpdir, ".gitkeep")
+            open(keep, "w").close()
+            result = _verify_delivery_files({"artifacts": [keep]}, tmpdir)
+            self.assertEqual(result, [])
+
+    def test_empty_non_marker_still_flagged(self):
+        """Empty .py files (not __init__.py) should still be flagged."""
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as tmpdir:
+            empty = os.path.join(tmpdir, "main.py")
+            open(empty, "w").close()
+            result = _verify_delivery_files({"artifacts": [empty]}, tmpdir)
+            self.assertEqual(len(result), 1)
+            self.assertIn("empty", result[0])
+
 
 # ---------------------------------------------------------------------------
 # Review enforcement: pass without checks → demoted to fail

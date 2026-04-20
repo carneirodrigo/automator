@@ -228,6 +228,10 @@ def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[st
             return root / raw_path
         return None
 
+    # Empty-by-convention markers. Flagging these as "empty (0 bytes)" produces
+    # false-positive warnings on normal Python packages and git-tracked folders.
+    _ALLOW_EMPTY = {"__init__.py", ".gitkeep", ".keep", "py.typed"}
+
     def _check(raw_path: str, label: str) -> None:
         resolved = _resolve(raw_path)
         if resolved is None:
@@ -235,6 +239,8 @@ def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[st
             return
         if not resolved.is_file():
             missing.append(f"{label} is not a regular file: {raw_path}")
+            return
+        if resolved.name in _ALLOW_EMPTY:
             return
         try:
             if resolved.stat().st_size == 0:
@@ -509,7 +515,13 @@ def run_orchestration(
             last_worker_step = step
             break
 
+    # Inherited steps (from a fork) describe another project's artifacts — they
+    # are context for the new task, not completed work. Skip-to-review on them
+    # would run review against an empty delivery directory.
+    _is_inherited = bool(last_worker_step and last_worker_step.get("inherited"))
+
     if (last_worker_step
+            and not _is_inherited
             and last_worker_step.get("status") == "success"
             and last_worker_step.get("artifact")
             and Path(last_worker_step["artifact"]).exists()):
@@ -646,7 +658,7 @@ def run_orchestration(
         if missing:
             for m in missing:
                 emit_progress(f"[engine] Delivery verification: {m}")
-            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) not found. Review will catch this.")
+            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) missing or problematic. Review will catch this.")
 
         worker_artifact = persist_result(active_project, "worker", worker_output_1)
         worker_summary  = worker_output_1.get("summary", "Worker completed.")
@@ -658,6 +670,7 @@ def run_orchestration(
     # ── Optional research loop (up to MAX_RESEARCH_CYCLES) ───────────────────
     # Skip research on resume — the resumed artifact already completed this path.
     _current_worker_output = worker_output_1
+    _research_loop_ran_worker = False  # true when the loop re-invokes the worker
     while _research_cycles_used < MAX_RESEARCH_CYCLES and not _resumed_worker:
         research_questions = (
             [q for q in _current_worker_output.get("open_issues", []) if isinstance(q, str) and q.strip()]
@@ -716,6 +729,7 @@ def run_orchestration(
             ),
             "worker", emit_progress,
         )
+        _research_loop_ran_worker = True
         if worker_res.get("status") == "failed":
             emit_progress(f"[engine] Worker (post-research) failed: {worker_res.get('error', '')}")
             return 1
@@ -761,13 +775,15 @@ def run_orchestration(
         if not worker_output.get("needs_research"):
             break
 
-    # Persist final post-research worker output if research ran.
-    if _research_cycles_used > 0 and not _resumed_worker and not _current_worker_output.get("needs_research"):
+    # Persist final post-research worker output if the research loop re-invoked
+    # the worker. Blocker-challenge re-runs are already persisted at line 668
+    # above, so skip unless the loop itself produced new output.
+    if _research_loop_ran_worker and not _resumed_worker and not _current_worker_output.get("needs_research"):
         missing = _verify_delivery_files(_current_worker_output, active_project.get("project_root", ""))
         if missing:
             for m in missing:
                 emit_progress(f"[engine] Delivery verification: {m}")
-            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) not found. Review will catch this.")
+            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) missing or problematic. Review will catch this.")
         worker_artifact = persist_result(active_project, "worker", _current_worker_output)
         worker_summary  = _current_worker_output.get("summary", "Worker completed.")
         _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
@@ -923,7 +939,7 @@ def run_orchestration(
         if missing:
             for m in missing:
                 emit_progress(f"[engine] Delivery verification: {m}")
-            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) not found. Review will catch this.")
+            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) missing or problematic. Review will catch this.")
         worker_artifact2 = persist_result(active_project, "worker", rework_output)
         worker_summary2  = rework_output.get("summary", "Rework completed.")
         _record_step(task_state, "worker", "success", worker_artifact2, worker_summary2, now_iso)
