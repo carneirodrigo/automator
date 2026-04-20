@@ -17,9 +17,7 @@ __pycache__/
 .claude/
 .codex/
 .gemini/
-.github/*
-!.github/workflows/
-!.github/workflows/**
+.github/
 
 # Projects — all per-project content including registry (local only)
 projects/*

@@ -340,8 +340,6 @@ Required maintenance rule:
 - `python3 -m unittest engine.tests.test_destructive_guard -v`: Run the destructive guard suite.
 - `python3 -m unittest engine.tests.test_automator.SomeTestClass -v`: Run a single test class.
 
-GitHub Actions runs the full `unittest discover` suite on every push/PR to `master` under Python 3.10 / 3.11 / 3.12 (see `.github/workflows/tests.yml`).
-
 ## Runtime Requirements
 
 The orchestration engine requires outbound HTTPS/WebSocket access for all supported AI CLIs: `claude`, `gemini`, and `codex`.
