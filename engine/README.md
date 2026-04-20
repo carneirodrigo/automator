@@ -51,13 +51,14 @@ All runtime logic lives here. Files are split by concern:
 |---|---|
 | `sessions.py` | `AgentSession` dataclass, `PERSISTENT_SESSION_ROLES`, and provider resume modes. |
 | `task_state.py` | `TaskState` TypedDict — schema for `projects/<id>/runtime/state/active_task.json`. |
-| `project_state.py` | Project bootstrap/fork, registry persistence, secrets vault, input inbox ingestion. |
+| `project_state.py` | Project bootstrap/fork, registry persistence, secrets vault, input inbox ingestion, and project deletion. |
+| `knowledge_store.py` | Project-output KB entry extraction and per-project knowledge purge. |
 | `orchestration_state.py` | Stage/capability/inspect limits and `CMD_OUTPUT_INLINE_LIMIT`. |
 
 ### Infrastructure
 | File | Responsibility |
 |---|---|
-| `runtime_helpers.py` | Session-ID extraction, project resolution helpers, feedback classification, network-block detection; re-exports `json_io`, `tokenization`, `error_classifier`. |
+| `runtime_helpers.py` | Session-ID extraction, project resolution helpers, feedback classification, network-block detection. |
 | `json_io.py` | `load_json`, `write_json`, `load_json_safe`, `extract_json_payload`. |
 | `tokenization.py` | `estimate_tokens` with tiktoken and character-count fallback. |
 | `error_classifier.py` | `classify_error` — maps error strings to orchestration error categories. |

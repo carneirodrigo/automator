@@ -18,8 +18,7 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from engine.work.runtime_helpers import load_json_safe as _load_json
-from engine.work.runtime_helpers import write_json as _write_json
+from engine.work.json_io import load_json_safe as _load_json, write_json as _write_json
 
 
 # ---------------------------------------------------------------------------

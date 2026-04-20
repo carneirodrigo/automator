@@ -15,11 +15,12 @@ Read this when modifying engine code, adding capabilities, adding agent roles, o
   - `orchestrator.py` — The main orchestration runner: pending-resolution handling, stage loop execution, research/worker/review transitions, and completion/blocking control flow.
   - `sessions.py` — `AgentSession` dataclass (`mode`, `conversation_id`, `persistent`) and `PERSISTENT_SESSION_ROLES`.
   - `task_state.py` — `TaskState` TypedDict defining the schema for `projects/<id>/runtime/state/active_task.json`.
-  - `runtime_helpers.py` — Request/project-resolution heuristics, feedback classification, session-ID extraction, runtime network-block detection, and `runtime_check_output_has_success`. Re-exports `load_json`, `write_json`, `load_json_safe`, `extract_json_payload`, `estimate_tokens`, `classify_error` from the focused modules below.
+  - `runtime_helpers.py` — Request/project-resolution heuristics, feedback classification, session-ID extraction, runtime network-block detection, and `runtime_check_output_has_success`. Importers should pull JSON I/O, tokenization, and error classification directly from the focused modules below.
   - `json_io.py` — `load_json`, `write_json`, `load_json_safe`, `extract_json_payload`. Imported directly by modules that only need file I/O.
   - `tokenization.py` — `estimate_tokens` with tiktoken and character-count fallback. Falls back to `len(text) // 3` when tiktoken is not installed.
   - `error_classifier.py` — `classify_error` maps error strings to stable orchestration error categories (`binary_not_found`, `timeout`, `rate_limited`, etc.).
-  - `project_state.py` — Project bootstrap/fork logic, registry persistence, secret-vault helpers, input inbox ingestion, and project-path inference.
+  - `project_state.py` — Project bootstrap/fork logic, registry persistence, secret-vault helpers, input inbox ingestion, project-path inference, and project deletion (`delete_projects`).
+  - `knowledge_store.py` — Project-output KB entry extraction (`extract_project_knowledge`) and per-project knowledge purge (`purge_project_knowledge`). Owns the `KNOWLEDGE_DIR`, `KNOWLEDGE_MANIFEST_PATH`, and `KNOWLEDGE_SOURCES_PATH` path constants.
   - `orchestrator.py` — Also handles rework-packet construction and review-artifact injection for the one rework cycle.
   - `execution.py` — Backend execution for agent runs: command building, runtime probes, prompt invocation, subprocess execution or API dispatch, output/session parsing, failure classification, execution summaries, result persistence, and the capability re-invocation loop.
   - `backend_config.py` — Backend configuration loader and resolver. Reads `config/backends.json` and `config/secrets.json`, resolves global CLI vs API mode, provider selection, and per-role overrides. Provides the `BackendResolution` dataclass.
@@ -76,12 +77,12 @@ The project-structure section above is the canonical file inventory. For runtime
 - `run_agent_api()` (`engine/work/api_execution.py`) — API equivalent of the CLI `run_agent()`. Calls vendor HTTP APIs and returns the same result envelope.
 - `_get_api_caller()` (`engine/work/api_execution.py`) — Late-binding lookup for vendor-specific API callers (Anthropic, Google, OpenAI).
 - `now_iso()` (`engine/work/runtime_helpers.py`) — UTC ISO-8601 timestamp.
-- `load_json()` / `write_json()` / `load_json_safe()` (`engine/work/json_io.py`) — JSON file helpers (re-exported from `runtime_helpers`).
+- `load_json()` / `write_json()` / `load_json_safe()` (`engine/work/json_io.py`) — JSON file helpers.
 - `extract_json_payload()` (`engine/work/json_io.py`) — Extracts and parses the first complete JSON object from agent output text, including markdown fence stripping and nested response/result unwrapping.
 - `extract_session_id_from_text()` (`engine/work/runtime_helpers.py`) — Recovers backend session/conversation IDs from CLI output.
 - `detect_runtime_network_block()` (`engine/work/runtime_helpers.py`) — Fail-fast preflight: detects when an outer sandbox has disabled network for spawned backends.
-- `estimate_tokens()` (`engine/work/tokenization.py`) — Estimates token count for a prompt string. Uses `tiktoken` if available, otherwise `len(text) // 3`. Re-exported from `runtime_helpers`.
-- `classify_error()` (`engine/work/error_classifier.py`) — Maps error strings to stable orchestration error categories (`binary_not_found`, `timeout`, `rate_limited`, etc.). Re-exported from `runtime_helpers`.
+- `estimate_tokens()` (`engine/work/tokenization.py`) — Estimates token count for a prompt string. Uses `tiktoken` if available, otherwise `len(text) // 3`.
+- `classify_error()` (`engine/work/error_classifier.py`) — Maps error strings to stable orchestration error categories (`binary_not_found`, `timeout`, `rate_limited`, etc.).
 - `bootstrap_project()` / `fork_project()` / `save_last_active_project()` (`engine/work/project_state.py`) — Project creation/forking and registry state persistence.
 - `store_secrets()` / `load_secrets()` / `ingest_input_files()` (`engine/work/project_state.py`) — Secret-vault and input-inbox lifecycle helpers.
 - `run_agent()` / `run_agent_with_capabilities()` (`engine/work/execution.py`) — Single-agent execution plus the capability re-invocation loop. This layer builds prompts, dispatches to CLI subprocess or API execution based on `resolve_backend()`, parses output, recovers session IDs, executes requested capabilities, and returns the normalized execution envelope. The API dispatch is opt-in via the `resolve_backend` and `run_agent_api` keyword parameters (both default to `None`, preserving CLI-only behavior when not wired).

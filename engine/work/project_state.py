@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from engine.work.file_lock import locked
+
 
 def sync_registry_csv(
     *,
@@ -81,29 +83,30 @@ def bootstrap_project(
         config["deliverables_dir"] = str(project_root)
         write_json(runtime_dir / "config.json", config)
 
-    registry = load_json(registry_path)
-    if not isinstance(registry.get("projects"), list):
-        registry["projects"] = []
+    with locked(registry_path):
+        registry = load_json(registry_path)
+        if not isinstance(registry.get("projects"), list):
+            registry["projects"] = []
 
-    new_entry = {
-        "project_id": project_id,
-        "project_name": project_name,
-        "project_home": str(project_home),
-        "project_root": str(project_root),
-        "runtime_dir": str(runtime_dir),
-        "description": decision.get("description", ""),
-    }
+        new_entry = {
+            "project_id": project_id,
+            "project_name": project_name,
+            "project_home": str(project_home),
+            "project_root": str(project_root),
+            "runtime_dir": str(runtime_dir),
+            "description": decision.get("description", ""),
+        }
 
-    exists = False
-    for idx, project in enumerate(registry["projects"]):
-        if project["project_id"] == project_id:
-            registry["projects"][idx] = new_entry
-            exists = True
-            break
-    if not exists:
-        registry["projects"].append(new_entry)
+        exists = False
+        for idx, project in enumerate(registry["projects"]):
+            if project["project_id"] == project_id:
+                registry["projects"][idx] = new_entry
+                exists = True
+                break
+        if not exists:
+            registry["projects"].append(new_entry)
 
-    write_json(registry_path, registry)
+        write_json(registry_path, registry)
     sync_registry_csv()
     return new_entry
 
@@ -198,6 +201,82 @@ def detect_fork_intent(
     }
 
 
+def reconcile_registry(
+    *,
+    projects_dir: Path,
+    registry_path: Path,
+    load_json: Callable[[Path], Any],
+    write_json: Callable[[Path, Any], None],
+    sync_registry_csv: Callable[[], None] | None = None,
+    emit_progress: Callable[[str], None] | None = None,
+) -> int:
+    """Rebuild missing registry entries from on-disk project configs.
+
+    A folder under projects/ is considered a real project iff it has
+    runtime/config.json. This function is idempotent — it only adds
+    entries that are missing; it never deletes entries whose folders
+    went missing (that could be a transient mount issue).
+
+    Returns the number of entries added.
+    """
+    if not projects_dir.exists():
+        return 0
+
+    with locked(registry_path):
+        # Load or initialize registry
+        if registry_path.exists():
+            try:
+                registry = load_json(registry_path)
+            except (json.JSONDecodeError, OSError):
+                registry = {"projects": []}
+        else:
+            registry = {"projects": []}
+        if not isinstance(registry.get("projects"), list):
+            registry["projects"] = []
+
+        known_ids = {p.get("project_id", "") for p in registry["projects"]}
+        added = 0
+
+        for child in sorted(projects_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            if child.name in ("runtime", ".gitkeep"):
+                continue
+            config_path = child / "runtime" / "config.json"
+            if not config_path.exists():
+                continue
+            if child.name in known_ids:
+                continue
+            try:
+                config = load_json(config_path)
+            except (json.JSONDecodeError, OSError):
+                continue
+            entry = {
+                "project_id": config.get("project_id", child.name),
+                "project_name": config.get("project_name", child.name),
+                "project_home": str(child),
+                "project_root": config.get("project_root", str(child / "delivery")),
+                "runtime_dir": config.get("runtime_dir", str(child / "runtime")),
+                "description": config.get("description", ""),
+            }
+            registry["projects"].append(entry)
+            known_ids.add(entry["project_id"])
+            added += 1
+            if emit_progress:
+                emit_progress(f"[registry] Reconciled missing entry: {entry['project_id']}")
+
+        if added:
+            write_json(registry_path, registry)
+
+    if added and sync_registry_csv:
+        try:
+            sync_registry_csv()
+        except Exception as exc:  # noqa: BLE001 — CSV is best-effort
+            if emit_progress:
+                emit_progress(f"[registry] CSV sync after reconcile failed: {exc}")
+    return added
+
+
 def save_last_active_project(
     project: dict[str, Any] | None,
     *,
@@ -205,9 +284,10 @@ def save_last_active_project(
     write_json: Callable[[Path, Any], None],
     registry_path: Path,
 ) -> None:
-    registry = load_json(registry_path)
-    registry["last_active_project"] = project
-    write_json(registry_path, registry)
+    with locked(registry_path):
+        registry = load_json(registry_path)
+        registry["last_active_project"] = project
+        write_json(registry_path, registry)
 
 
 def secrets_path(project_id: str, *, secrets_projects_dir: Path) -> Path:
@@ -441,3 +521,63 @@ def infer_project_id_from_path(
     except (OSError, ValueError):
         pass
     return None
+
+
+def delete_projects(
+    project_ids: list[str],
+    *,
+    delete_all: bool = False,
+    registry_path: Path,
+    load_json_safe: Callable[[Path], Any],
+    write_json: Callable[[Path, Any], None],
+    sync_registry_csv: Callable[[], None],
+    emit_progress: Callable[[str], None],
+) -> int:
+    """Delete one or more projects: remove folder and registry entry."""
+    registry = load_json_safe(registry_path)
+    projects = registry.get("projects", [])
+
+    if delete_all:
+        targets = list(projects)
+    else:
+        by_id = {p["project_id"]: p for p in projects}
+        missing = [pid for pid in project_ids if pid not in by_id]
+        if missing:
+            for pid in missing:
+                emit_progress(f"Error: Project '{pid}' not found in registry.")
+            return 1
+        targets = [by_id[pid] for pid in project_ids]
+
+    if not targets:
+        emit_progress("[engine] No projects to delete.")
+        return 0
+
+    last_active = registry.get("last_active_project") or {}
+    last_active_id = last_active.get("project_id")
+    cleared_last_active = False
+
+    for project in targets:
+        pid = project["project_id"]
+        try:
+            home = project.get("project_home") or str(Path(project["project_root"]).parent)
+        except KeyError:
+            emit_progress(f"[engine] Warning: project '{pid}' has no path in registry — removing entry only.")
+            if pid == last_active_id:
+                cleared_last_active = True
+            continue
+        home_path = Path(home)
+        if home_path.exists():
+            shutil.rmtree(home_path)
+        emit_progress(f"[engine] Deleted project '{pid}'.")
+        if pid == last_active_id:
+            cleared_last_active = True
+
+    deleted_ids = {p["project_id"] for p in targets}
+    registry["projects"] = [p for p in projects if p["project_id"] not in deleted_ids]
+    if cleared_last_active:
+        registry.pop("last_active_project", None)
+    write_json(registry_path, registry)
+    sync_registry_csv()
+
+    emit_progress(f"[engine] {len(targets)} project(s) deleted.")
+    return 0

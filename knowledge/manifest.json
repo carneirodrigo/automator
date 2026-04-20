@@ -2919,22 +2919,6 @@
       "summary": "Complete MSI HTTP auth reference: exact JSON block for system-assigned and user-assigned MSI, audience values per API (ARM with trailing slash, Graph without), PowerShell patterns to grant Graph/WDATP app permissions, RBAC role assignment, and common 401/403 failure modes."
     },
     {
-      "id": "project-002-create-a-script-that-prints-hello",
-      "title": "Create A Script That Prints Hello",
-      "file": "project-002-create-a-script-that-prints-hello.json",
-      "tags": [
-        "project-output"
-      ],
-      "source_family": "project",
-      "coverage_type": "output",
-      "source_project_id": "002",
-      "created": "2026-04-11T00:06:17.064829+00:00",
-      "updated": "2026-04-11T00:06:17.064829+00:00",
-      "last_verified": "2026-04-11T00:06:17.064829+00:00",
-      "fresh_until": "2026-04-11T00:06:17.064829+00:00",
-      "summary": "Added datetime import and current date/time output to the hello_world.py script as requested by review feedback."
-    },
-    {
       "id": "python-requests-http-client-patterns",
       "title": "Python requests Library \u2014 Auth, Retry, Pagination, Error Handling",
       "file": "python-requests-http-client-patterns.json",

@@ -208,31 +208,6 @@ class AutomatorHelpCommandTest(unittest.TestCase):
         self.assertEqual(result, 1)
 
 
-class AutomatorLegacyCompatibilityTest(unittest.TestCase):
-    def test_legacy_project_request_routes_to_engine_runtime(self) -> None:
-        with mock.patch("engine.automator.engine_runtime.main", return_value=0) as mocked:
-            result = automator.main(["--claude", "build", "a", "script"])
-        self.assertEqual(result, 0)
-        mocked.assert_called_once_with(["--claude", "build a script"])
-
-    def test_legacy_debug_open_routes_to_debug_supervisor(self) -> None:
-        with mock.patch("engine.automator.debug_supervisor.main", return_value=0) as mocked:
-            result = automator.main(["--debug-open"])
-        self.assertEqual(result, 0)
-        mocked.assert_called_once_with(["open"])
-
-    def test_legacy_skills_list_routes_to_skill_sync(self) -> None:
-        with mock.patch("engine.automator.skill_sync.main", return_value=0) as mocked:
-            result = automator.main(["--skills-list"])
-        self.assertEqual(result, 0)
-        mocked.assert_called_once_with(["--list"])
-
-    def test_mixed_legacy_debug_and_skills_modes_error(self) -> None:
-        with self.assertRaises(SystemExit) as exc:
-            automator.main(["--debug-open", "--skills-list"])
-        self.assertEqual(exc.exception.code, 2)
-
-
 class RepoBootstrapLauncherPreservationTest(unittest.TestCase):
     def test_preserves_tracked_automator_launcher(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -58,21 +58,22 @@ from engine.work.prompts import (
 )
 from engine.work.sessions import AgentSession
 from engine.work.runtime_helpers import (
-    classify_error as _runtime_classify_error,
-    count_words as _runtime_count_words,
-    detect_runtime_network_block as _runtime_detect_runtime_network_block,
-    estimate_tokens as _runtime_estimate_tokens,
-    extract_json_payload as _runtime_extract_json_payload,
-    extract_session_id_from_text as _runtime_extract_session_id_from_text,
-    is_known_feedback as _runtime_is_acceptance_feedback,
-    load_json as _runtime_load_json,
-    load_json_safe as _runtime_load_json_safe,
-    now_iso as _runtime_now_iso,
-    resolve_active_project as _runtime_resolve_active_project,
-    runtime_check_output_has_success as _runtime_runtime_check_output_has_success,
-    should_ignore_cached_project_for_new_request as _runtime_should_ignore_cached_project_for_new_request,
-    write_json as _runtime_write_json,
+    detect_runtime_network_block,
+    extract_session_id_from_text as _helper_extract_session_id_from_text,
+    is_known_feedback,
+    now_iso,
+    resolve_active_project as _helper_resolve_active_project,
+    runtime_check_output_has_success as _helper_runtime_check_output_has_success,
+    should_ignore_cached_project_for_new_request,
 )
+from engine.work.json_io import (
+    extract_json_payload,
+    load_json,
+    load_json_safe,
+    write_json,
+)
+from engine.work.tokenization import estimate_tokens
+from engine.work.error_classifier import classify_error
 from engine.work import project_state as project_state_work
 from engine.work import execution as execution_work
 from engine.work import runtime_entry as runtime_entry_work
@@ -93,9 +94,17 @@ from engine.work.orchestration_state import (
 REGISTRY_CSV_PATH = PROJECTS_DIR / "registry.csv"
 STATE_TEMPLATE_PATH = Path(__file__).resolve().parent / "task_state.template.json"
 CONFIG_TEMPLATE_PATH = Path(__file__).resolve().parent / "project_config.template.json"
-KNOWLEDGE_DIR = REPO_ROOT / "knowledge"
-KNOWLEDGE_MANIFEST_PATH = KNOWLEDGE_DIR / "manifest.json"
-KNOWLEDGE_SOURCES_PATH = KNOWLEDGE_DIR / "sources.json"
+
+# Knowledge-base paths live in knowledge_store.py; re-exported here for the
+# prompt-layer attribute-injection at line ~820 and for backward compatibility
+# with callers that import KNOWLEDGE_* from engine_runtime.
+from engine.work.knowledge_store import (  # noqa: E402  — after constants block above
+    KNOWLEDGE_DIR,
+    KNOWLEDGE_MANIFEST_PATH,
+    KNOWLEDGE_SOURCES_PATH,
+    extract_project_knowledge as _extract_project_knowledge_impl,
+    purge_project_knowledge as _purge_project_knowledge_impl,
+)
 
 # Environmental block phrases - used to prune stale transient failures from prior sessions.
 # Uses multi-word phrases to avoid false positives on domain terms (e.g. "dns" in
@@ -287,19 +296,6 @@ def _prompt_guard_block(
     return "block"
 
 
-# --- Utility Functions ---
-def now_iso() -> str:
-    return _runtime_now_iso()
-
-def load_json(path: Path) -> Any:
-    return _runtime_load_json(path)
-
-def load_json_safe(path: Path) -> Any:
-    return _runtime_load_json_safe(path)
-
-def write_json(path: Path, data: Any) -> None:
-    _runtime_write_json(path, data)
-
 def emit_progress(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
 
@@ -337,9 +333,6 @@ def record_debug_issue(
         ctx_to_dict=asdict,
     )
 
-def detect_runtime_network_block(agent_bin: str | None = None) -> str | None:
-    return _runtime_detect_runtime_network_block(agent_bin)
-
 def _is_backend_available(agent_bin: str) -> bool:
     # If global config is API mode, the configured provider is always "available"
     if _is_api_mode():
@@ -352,7 +345,7 @@ def run_runtime_check(agent_bin: str, timeout_seconds: int = 25) -> dict[str, An
     return execution_work.runtime_check(
         agent_bin,
         runtime_check_prompt=RUNTIME_CHECK_PROMPT,
-        build_agent_command=build_agent_command,
+        build_agent_command=execution_work.build_agent_command,
         extract_json_payload=extract_json_payload,
         runtime_check_output_has_success=_runtime_check_output_has_success,
         timeout_seconds=timeout_seconds,
@@ -369,14 +362,11 @@ def run_runtime_checks(backends: list[str]) -> list[dict[str, Any]]:
 
 
 def _runtime_check_output_has_success(payload: dict[str, Any], full_text: str) -> bool:
-    return _runtime_runtime_check_output_has_success(
+    return _helper_runtime_check_output_has_success(
         payload,
         full_text,
         extract_json_payload=extract_json_payload,
     )
-
-def _estimate_tokens(text: str) -> int:
-    return _runtime_estimate_tokens(text)
 
 
 def _sample_data_file(p: Path, max_bytes: int = MAX_INPUT_FILE_SIZE) -> str:
@@ -395,28 +385,13 @@ def _summarize_input_file(p: Path) -> str:
     )
 
 # --- Project & Session Resolution ---
-def _count_words(text: str) -> int:
-    return _runtime_count_words(text)
-
-
-def _is_acceptance_feedback(request: str) -> bool:
-    return _runtime_is_acceptance_feedback(request)
-
-
-def _should_ignore_cached_project_for_new_request(
-    pending_resolution: dict[str, Any] | None,
-    request: str,
-) -> bool:
-    return _runtime_should_ignore_cached_project_for_new_request(pending_resolution, request)
-
-
 def resolve_active_project(
     request: str,
     projects: list[dict[str, Any]],
     *,
     allow_registry_fallback: bool = True,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    return _runtime_resolve_active_project(
+    return _helper_resolve_active_project(
         request,
         projects,
         allow_registry_fallback=allow_registry_fallback,
@@ -493,86 +468,7 @@ def close_project(project_id: str, agent_bin: str | None = None) -> int:
 
 
 def _extract_project_knowledge(project: dict, task_state: dict) -> None:
-    """Save a compact KB entry from the project's final worker artifact."""
-    artifacts_dir = Path(project["runtime_dir"]) / "artifacts"
-    if not artifacts_dir.exists():
-        return
-
-    # Find the most recent successful worker artifact
-    worker_artifacts = sorted(
-        artifacts_dir.glob("worker_result_*.json"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    if not worker_artifacts:
-        return
-
-    try:
-        artifact = load_json(worker_artifacts[0])
-    except (json.JSONDecodeError, OSError, ValueError):
-        return
-
-    # Only extract from successful runs
-    output = artifact if "status" in artifact else artifact.get("output", artifact)
-    if output.get("status") not in ("success",):
-        return
-
-    summary = output.get("summary", "").strip()
-    if not summary:
-        return
-
-    user_request = task_state.get("user_request", project.get("project_name", ""))
-    project_id = project["project_id"]
-    project_name = project.get("project_name", project_id)
-
-    # Derive a slug from the project name
-    slug = re.sub(r"[^\w]+", "-", project_name.lower()).strip("-")[:60]
-    entry_id = f"project-{project_id}-{slug}"
-    filename = f"{entry_id}.json"
-    kb_path = KNOWLEDGE_DIR / filename
-
-    # Build the entry
-    ts = now_iso()
-    entry_data = {
-        "id": entry_id,
-        "title": project_name,
-        "source_project_id": project_id,
-        "task": user_request,
-        "summary": summary,
-        "changes_made": output.get("changes_made", []),
-        "artifacts": output.get("artifacts", []),
-        "checks_run": output.get("checks_run", []),
-        "created": ts,
-        "last_verified": ts,
-    }
-
-    try:
-        KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
-        write_json(kb_path, entry_data)
-
-        # Update the manifest
-        manifest = load_json(KNOWLEDGE_MANIFEST_PATH) if KNOWLEDGE_MANIFEST_PATH.exists() else {"version": 1, "entries": []}
-        entries = manifest.setdefault("entries", [])
-        # Remove any prior entry for this project
-        entries[:] = [e for e in entries if e.get("id") != entry_id]
-        entries.append({
-            "id": entry_id,
-            "title": project_name,
-            "file": filename,
-            "tags": ["project-output"],
-            "source_family": "project",
-            "coverage_type": "output",
-            "source_project_id": project_id,
-            "created": ts,
-            "updated": ts,
-            "last_verified": ts,
-            "fresh_until": ts,  # immediately stale — treat as historical record
-            "summary": summary,
-        })
-        write_json(KNOWLEDGE_MANIFEST_PATH, manifest)
-        emit_progress(f"[engine] KB entry saved: {entry_id}")
-    except OSError:
-        pass  # KB write failure is non-fatal
+    _extract_project_knowledge_impl(project, task_state, emit_progress=emit_progress)
 
 
 def sync_registry_csv() -> None:
@@ -673,16 +569,7 @@ configure_capability_environment(
 
 
 # --- AI Binary Adapter ---
-def build_agent_command(
-    agent_bin: str,
-    prompt: str,
-    session: AgentSession | None = None,
-) -> tuple[list[str], str | None]:
-    return execution_work.build_agent_command(
-        agent_bin,
-        prompt,
-        session=session,
-    )
+build_agent_command = execution_work.build_agent_command
 
 
 # Context window budget constants (based on skills: context-fundamentals, context-degradation).
@@ -752,13 +639,13 @@ def _compact_prompt_sections(sections: list[str]) -> list[str]:
     effective = _effective_context_tokens()
     compaction_threshold = int(effective * 0.70)
     joined = "\n".join(sections)
-    if _estimate_tokens(joined) <= compaction_threshold:
+    if estimate_tokens(joined) <= compaction_threshold:
         return sections
 
     all_prefixes = set(_COMPACTABLE_SECTION_PREFIXES)
     result = list(sections)
     for header_prefix in _COMPACTABLE_SECTION_PREFIXES:
-        if _estimate_tokens("\n".join(result)) <= compaction_threshold:
+        if estimate_tokens("\n".join(result)) <= compaction_threshold:
             break
         compacted = []
         i = 0
@@ -898,7 +785,7 @@ def _build_knowledge_context(role: str, task: str = "", reason: str = "", projec
 
 def _build_skills_context(role: str, inputs: list[str]) -> list[str]:
     prompt_work.SKILLS_DIR = SKILLS_DIR
-    return prompt_work._build_skills_context(role, inputs, estimate_tokens=_estimate_tokens)
+    return prompt_work._build_skills_context(role, inputs, estimate_tokens=estimate_tokens)
 
 
 
@@ -1161,24 +1048,17 @@ def build_prompt(
     sections = _compact_prompt_sections(sections)
 
     recall_anchor_threshold = int(_effective_context_tokens() * 0.40)
-    if _estimate_tokens("\n".join(sections)) >= recall_anchor_threshold:
+    if estimate_tokens("\n".join(sections)) >= recall_anchor_threshold:
         sections.append(_AGENT_OUTPUT_REMINDER)
 
     return "\n".join(sections)
 
 # --- Execution & Persistence ---
-def extract_json_payload(text: str) -> dict[str, Any]:
-    return _runtime_extract_json_payload(text)
-
-
 def _extract_session_id_from_text(text: str) -> str | None:
-    return _runtime_extract_session_id_from_text(
+    return _helper_extract_session_id_from_text(
         text,
         extract_json_payload=extract_json_payload,
     )
-
-def _classify_error(error_msg: str) -> str:
-    return _runtime_classify_error(error_msg)
 
 
 def run_agent(
@@ -1217,13 +1097,13 @@ def run_agent(
         expected_result_shape=expected_result_shape,
         session=session,
         build_prompt=build_prompt,
-        estimate_tokens=_estimate_tokens,
+        estimate_tokens=estimate_tokens,
         build_agent_command=build_agent_command,
         is_toon_available=is_toon_available,
         emit_progress=emit_progress,
         repo_root=REPO_ROOT,
         spawn_timeout_seconds=SPAWN_TIMEOUT_SECONDS,
-        classify_error=_classify_error,
+        classify_error=classify_error,
         extract_session_id_from_text=_extract_session_id_from_text,
         extract_json_payload=extract_json_payload,
         resolve_backend=_resolve_backend,
@@ -1259,143 +1139,32 @@ configure_orchestrator_environment(
 
 # --- Delete Projects ---
 def delete_projects(project_ids: list[str], *, delete_all: bool = False) -> int:
-    """Delete one or more projects: remove folder and registry entry."""
-    import shutil as _shutil
-
-    registry = load_json_safe(REGISTRY_PATH)
-    projects = registry.get("projects", [])
-
-    if delete_all:
-        targets = list(projects)
-    else:
-        by_id = {p["project_id"]: p for p in projects}
-        missing = [pid for pid in project_ids if pid not in by_id]
-        if missing:
-            for pid in missing:
-                emit_progress(f"Error: Project '{pid}' not found in registry.")
-            return 1
-        targets = [by_id[pid] for pid in project_ids]
-
-    if not targets:
-        emit_progress("[engine] No projects to delete.")
-        return 0
-
-    last_active = registry.get("last_active_project") or {}
-    last_active_id = last_active.get("project_id")
-    cleared_last_active = False
-
-    for project in targets:
-        pid = project["project_id"]
-        try:
-            home = project.get("project_home") or str(Path(project["project_root"]).parent)
-        except KeyError:
-            emit_progress(f"[engine] Warning: project '{pid}' has no path in registry — removing entry only.")
-            if pid == last_active_id:
-                cleared_last_active = True
-            continue
-        home_path = Path(home)
-        if home_path.exists():
-            _shutil.rmtree(home_path)
-        emit_progress(f"[engine] Deleted project '{pid}'.")
-        if pid == last_active_id:
-            cleared_last_active = True
-
-    deleted_ids = {p["project_id"] for p in targets}
-    registry["projects"] = [p for p in projects if p["project_id"] not in deleted_ids]
-    if cleared_last_active:
-        registry.pop("last_active_project", None)
-    write_json(REGISTRY_PATH, registry)
-    sync_registry_csv()
-
-    emit_progress(f"[engine] {len(targets)} project(s) deleted.")
-    return 0
+    return project_state_work.delete_projects(
+        project_ids,
+        delete_all=delete_all,
+        registry_path=REGISTRY_PATH,
+        load_json_safe=load_json_safe,
+        write_json=write_json,
+        sync_registry_csv=sync_registry_csv,
+        emit_progress=emit_progress,
+    )
 
 
 def purge_project_knowledge(project_id: str) -> int:
-    """Remove knowledge entries owned by a specific project and scrub shared provenance."""
-    if not KNOWLEDGE_MANIFEST_PATH.exists():
-        emit_progress("[engine] No knowledge manifest found.")
-        return 0
-
-    manifest = load_json(KNOWLEDGE_MANIFEST_PATH)
-    entries = manifest.get("entries", [])
-    if not isinstance(entries, list):
-        emit_progress("[engine] Knowledge manifest is invalid: 'entries' must be a list.")
-        return 1
-
-    kept_entries: list[dict[str, Any]] = []
-    removed_files = 0
-    removed_entries = 0
-    scrubbed_files = 0
-
-    for entry in entries:
-        if not isinstance(entry, dict):
-            kept_entries.append(entry)
-            continue
-
-        entry_file = entry.get("file", "")
-        if entry_file:
-            candidate = (KNOWLEDGE_DIR / entry_file).resolve()
-            entry_path = candidate if candidate.is_relative_to(KNOWLEDGE_DIR.resolve()) else None
-        else:
-            entry_path = None
-        owns_entry = entry.get("source_project_id") == project_id
-
-        if owns_entry:
-            removed_entries += 1
-            if entry_path and entry_path.exists() and entry_path.is_file():
-                entry_path.unlink()
-                removed_files += 1
-            continue
-
-        if entry_path and entry_path.exists() and entry_path.is_file():
-            try:
-                entry_data = load_json(entry_path)
-            except (OSError, json.JSONDecodeError, ValueError):
-                # keep entry if its detail file is unreadable during knowledge purge
-                kept_entries.append(entry)
-                continue
-
-            source_projects = entry_data.get("source_projects")
-            if isinstance(source_projects, list) and project_id in source_projects:
-                updated_projects = [pid for pid in source_projects if pid != project_id]
-                if updated_projects != source_projects:
-                    entry_data["source_projects"] = updated_projects
-                    write_json(entry_path, entry_data)
-                    scrubbed_files += 1
-
-        kept_entries.append(entry)
-
-    manifest["entries"] = kept_entries
-    write_json(KNOWLEDGE_MANIFEST_PATH, manifest)
-
-    emit_progress(
-        f"[engine] Knowledge purge for project '{project_id}' complete. "
-        f"Removed {removed_entries} manifest entr{'y' if removed_entries == 1 else 'ies'}, "
-        f"deleted {removed_files} file{'s' if removed_files != 1 else ''}, "
-        f"scrubbed {scrubbed_files} shared file{'s' if scrubbed_files != 1 else ''}."
-    )
-    return 0
+    return _purge_project_knowledge_impl(project_id, emit_progress=emit_progress)
 
 
 # --- Main Orchestration ---
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Unified Agent Engine")
     parser.add_argument("request", nargs="*")
-    parser.add_argument("--agent-bin", help="The AI Parent binary to use (e.g., 'gemini', 'codex', 'claude')")
     parser.add_argument("--gemini", action="store_true", help="Explicitly use 'gemini' as the AI parent binary.")
     parser.add_argument("--claude", action="store_true", help="Explicitly use 'claude' as the AI parent binary.")
     parser.add_argument("--codex", action="store_true", help="Explicitly use 'codex' as the AI parent binary.")
     parser.add_argument("--check-runtime", action="store_true", help="Probe available AI backends and report whether they can complete a minimal request.")
     parser.add_argument("--debug-mode", action="store_true", help="Run the normal orchestration path, but capture orchestration faults in debug/tracker.json and stop instead of self-healing.")
-    parser.add_argument("--close-project", metavar="PROJECT_ID", dest="close_project_id", help="Close a project by ID and extract knowledge.")
-    parser.add_argument("--manual", dest="execute_agents", action="store_false", help="Skip agent execution and return immediately after project bootstrap.")
-    parser.set_defaults(execute_agents=True)
+    parser.set_defaults(execute_agents=True, agent_bin=None)
     args = parser.parse_args(argv)
-
-    if getattr(args, "close_project_id", None):
-        _agent_bin = args.agent_bin or ("gemini" if args.gemini else "claude" if args.claude else "codex" if args.codex else None)
-        return close_project(args.close_project_id, _agent_bin)
 
     if not args.check_runtime and not args.request:
         parser.error("request is required unless --check-runtime is used")
@@ -1415,7 +1184,7 @@ def main(argv: list[str] | None = None) -> int:
         load_json=load_json,
         registry_path=REGISTRY_PATH,
         detect_fork_intent=detect_fork_intent,
-        should_ignore_cached_project_for_new_request=_should_ignore_cached_project_for_new_request,
+        should_ignore_cached_project_for_new_request=should_ignore_cached_project_for_new_request,
         resolve_active_project=resolve_active_project,
         save_last_active_project=save_last_active_project,
         detect_secrets=detect_secrets,

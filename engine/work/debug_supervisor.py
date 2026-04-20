@@ -13,7 +13,8 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from engine.work.repo_paths import DEBUG_TRACKER_PATH, REPO_ROOT
-from engine.work.runtime_helpers import load_json, now_iso, write_json
+from engine.work.json_io import load_json, write_json
+from engine.work.runtime_helpers import now_iso
 
 VALID_ISSUE_STATUSES: frozenset[str] = frozenset({"open", "in_progress", "fixed", "regressed"})
 

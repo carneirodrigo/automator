@@ -256,6 +256,51 @@ def _parse_event_progress(role: str, line: str, emit_progress: Callable) -> None
         return
 
 
+def _count_native_tool_uses(raw_output: str) -> int:
+    """Count real tool invocations in a backend's streaming output.
+
+    Native tool_use events come from the provider SDK (Claude stream-json,
+    Codex item.completed, Gemini functionCall) — they represent real work
+    the agent performed. The review auto-demote uses this to distinguish
+    "pass without running any check" from "pass after using native Bash."
+    """
+    count = 0
+    for line in raw_output.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        etype = event.get("type", "")
+        if etype == "assistant":
+            msg = event.get("message") or {}
+            for block in msg.get("content") or []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    count += 1
+            continue
+        if etype == "tool_use":
+            count += 1
+            continue
+        if etype == "content_block_start":
+            cb = event.get("content_block", {}) or {}
+            if cb.get("type") == "tool_use":
+                count += 1
+            continue
+        if etype in ("functionCall", "function_call", "tool_call"):
+            count += 1
+            continue
+        if etype == "item.completed":
+            item = event.get("item") or {}
+            item_type = item.get("type", "")
+            if item_type and item_type != "agent_message":
+                # command_execution, file_read, etc. — real work
+                count += 1
+            continue
+    return count
+
+
 def _stream_process(
     proc: subprocess.Popen,
     stdin_input: str | None,
@@ -499,6 +544,7 @@ def run_agent(
             error_msg = f"Invalid JSON in final message: {full_text[:200]}..."
             return {"status": "failed", "error": error_msg, "error_category": "invalid_output"}
 
+        native_tool_uses = _count_native_tool_uses(raw_output) if is_jsonl else 0
         capability_requests = payload.get("capability_requests", [])
         if capability_requests:
             return {
@@ -506,9 +552,15 @@ def run_agent(
                 "output": payload,
                 "capability_requests": capability_requests,
                 "duration": duration,
+                "native_tool_uses": native_tool_uses,
             }
 
-        return {"status": "success", "output": payload, "duration": duration}
+        return {
+            "status": "success",
+            "output": payload,
+            "duration": duration,
+            "native_tool_uses": native_tool_uses,
+        }
     except OSError as exc:
         error_msg = str(exc)
         return {"status": "failed", "error": error_msg, "error_category": classify_error(error_msg)}
@@ -554,6 +606,7 @@ def run_agent_with_capabilities(
         session=session,
     )
     capability_round = 0
+    native_tool_uses_total = int(res.get("native_tool_uses", 0) or 0)
     # Each entry: (round_number, full_text, compact_summary)
     all_rounds: list[tuple[int, str, str]] = []
     # Number of recent rounds to keep in full detail; older rounds get compacted.
@@ -634,6 +687,7 @@ def run_agent_with_capabilities(
             expected_result_shape=expected_result_shape,
             session=session,
         )
+        native_tool_uses_total += int(res.get("native_tool_uses", 0) or 0)
     if res["status"] == "capability_requested":
         emit_progress(
             f"[engine] Capability re-invocation limit reached ({max_capability_rounds} rounds) for {role}. Treating as failure."
@@ -643,4 +697,11 @@ def run_agent_with_capabilities(
             "error": f"Specialist {role} kept requesting capabilities after {max_capability_rounds} rounds",
             "error_category": "capability_loop",
         }
+    # Expose the actual number of capability rounds executed so callers can
+    # distinguish "the agent ran real checks" from "the agent self-reported
+    # without running any capability" — used by the review auto-demote.
+    # native_tool_uses covers the path where the agent uses Claude's built-in
+    # Bash/Read tools instead of routing through the engine capability envelope.
+    res["capability_rounds_used"] = capability_round
+    res["native_tool_uses"] = native_tool_uses_total
     return res

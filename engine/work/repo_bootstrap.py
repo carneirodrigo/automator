@@ -12,6 +12,8 @@ from engine.work.repo_paths import (
     DEBUG_ISSUES_DIR,
     DEBUG_TRACKER_PATH,
     INPUTS_DIR,
+    PROJECTS_DIR,
+    REGISTRY_PATH,
     REPO_ROOT,
     SKILLS_CATALOG_PATH,
     SKILLS_DIR,
@@ -127,6 +129,21 @@ def ensure_repo_structure() -> None:
     gitignore_path = REPO_ROOT / ".gitignore"
     if not gitignore_path.exists():
         gitignore_path.write_text(_DEFAULT_GITIGNORE, encoding="utf-8")
+
+    # Reconcile registry.json against on-disk project folders — cheap, idempotent.
+    # Protects against a wiped registry leaving orphan project folders invisible to
+    # --project list / continue / fork.
+    try:
+        from engine.work.project_state import reconcile_registry
+        from engine.work.json_io import load_json, write_json
+        reconcile_registry(
+            projects_dir=PROJECTS_DIR,
+            registry_path=REGISTRY_PATH,
+            load_json=load_json,
+            write_json=write_json,
+        )
+    except Exception as exc:  # noqa: BLE001 — bootstrap must never hard-fail
+        print(f"[repo_bootstrap] registry reconcile skipped: {exc}", file=sys.stderr)
 
     # Repo-root symlinks: CLAUDE.md -> ORCHESTRATION.md, etc.
     for link_name, target in _REPO_ROOT_SYMLINKS.items():

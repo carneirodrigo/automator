@@ -7,6 +7,7 @@ import time as _time_module
 from pathlib import Path
 from typing import Any
 
+from engine.work.file_lock import LockUnavailable, locked
 from engine.work.task_state import TaskState
 
 _ENV: dict[str, Any] = {}
@@ -65,6 +66,11 @@ def _validate_agent_output(output: Any, role: str) -> str | None:
         return f"{role} returned empty output"
     if role in ("worker",) and not output.get("summary"):
         return f"{role} output is missing 'summary' field"
+    # Workers sometimes self-report failure without also setting the 'blocked'
+    # branch — treat that as a hard failure rather than silently advancing to
+    # review, which would ship broken work.
+    if role == "worker" and output.get("status") == "failed":
+        return f"worker reported status=failed: {output.get('summary', '(no summary)')}"
     if role == "review" and not output.get("status"):
         return f"review output is missing 'status' field — treating as fail"
     return None
@@ -203,30 +209,43 @@ def _capability_rounds_for_task(request: str, has_plan: bool) -> int:
 def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[str]:
     """Check that files the worker claims to have created actually exist.
 
-    Returns a list of missing file descriptions (empty if all OK).
-    Workers run from the repo root, so relative paths are tried from cwd first,
-    then from project_root as a fallback.
+    Returns a list of problem descriptions (empty if all OK). A path that
+    resolves to a directory, a zero-byte file, or is missing entirely is
+    reported — "wrote the file" is not the same as "wrote useful content."
+    Workers run from the repo root, so relative paths are tried from cwd
+    first, then from project_root as a fallback.
     """
     missing: list[str] = []
     root = Path(project_root) if project_root else None
 
-    def _exists(raw_path: str) -> bool:
+    def _resolve(raw_path: str) -> Path | None:
         p = Path(raw_path)
         if p.is_absolute():
-            return p.exists()
-        # Try from cwd (repo root) first — workers typically use repo-relative paths.
+            return p if p.exists() else None
         if p.exists():
-            return True
-        # Fallback: try relative to project_root.
+            return p
         if root and (root / raw_path).exists():
-            return True
-        return False
+            return root / raw_path
+        return None
+
+    def _check(raw_path: str, label: str) -> None:
+        resolved = _resolve(raw_path)
+        if resolved is None:
+            missing.append(f"{label} not found: {raw_path}")
+            return
+        if not resolved.is_file():
+            missing.append(f"{label} is not a regular file: {raw_path}")
+            return
+        try:
+            if resolved.stat().st_size == 0:
+                missing.append(f"{label} is empty (0 bytes): {raw_path}")
+        except OSError as exc:
+            missing.append(f"{label} stat failed: {raw_path} ({exc})")
 
     for entry in output.get("artifacts") or []:
         if not isinstance(entry, str) or not entry.strip():
             continue
-        if not _exists(entry):
-            missing.append(f"artifact not found: {entry}")
+        _check(entry, "artifact")
 
     for entry in output.get("changes_made") or []:
         if not isinstance(entry, str):
@@ -235,8 +254,7 @@ def _verify_delivery_files(output: dict[str, Any], project_root: str) -> list[st
         path_part = entry.split(":")[0].strip()
         if not path_part or path_part.startswith("("):
             continue
-        if not _exists(path_part):
-            missing.append(f"changed file not found: {path_part}")
+        _check(path_part, "changed file")
 
     return missing
 
@@ -745,6 +763,11 @@ def run_orchestration(
 
     # Persist final post-research worker output if research ran.
     if _research_cycles_used > 0 and not _resumed_worker and not _current_worker_output.get("needs_research"):
+        missing = _verify_delivery_files(_current_worker_output, active_project.get("project_root", ""))
+        if missing:
+            for m in missing:
+                emit_progress(f"[engine] Delivery verification: {m}")
+            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) not found. Review will catch this.")
         worker_artifact = persist_result(active_project, "worker", _current_worker_output)
         worker_summary  = _current_worker_output.get("summary", "Worker completed.")
         _record_step(task_state, "worker", "success", worker_artifact, worker_summary, now_iso)
@@ -783,18 +806,23 @@ def run_orchestration(
     review_status  = _normalize_review_status(review_output.get("status", "fail"))
     review_summary = review_output.get("summary", "Review completed.")
 
-    # Enforce review verification: a pass with no checks_run means the review
-    # didn't actually test anything — demote to fail.
-    if review_status == "pass" and not review_output.get("checks_run"):
+    # Enforce review verification: a pass with zero capability rounds AND zero
+    # native tool uses means the review didn't actually execute any check —
+    # demote to fail. Either counter being >0 is real work signal from the
+    # execution layer, not the agent's self-reported checks_run field (which
+    # would be trivially spoofable).
+    review_rounds_used = review_res.get("capability_rounds_used", 0)
+    review_native_tool_uses = review_res.get("native_tool_uses", 0)
+    if review_status == "pass" and review_rounds_used == 0 and review_native_tool_uses == 0:
         review_status = "fail"
-        review_summary = "Review passed without running any checks — demoted to fail."
+        review_summary = "Review passed without running any capability — demoted to fail."
         if not review_output.get("blocking"):
             review_output["blocking"] = []
         review_output["blocking"].append("Review must run at least one command or test before passing.")
         if not review_output.get("rework_requests"):
             review_output["rework_requests"] = []
         review_output["rework_requests"].append("Re-run review with actual test execution.")
-        emit_progress("[engine] Review passed without running checks — treating as fail.")
+        emit_progress("[engine] Review passed without running any capability — treating as fail.")
     _record_step(task_state, "review", review_status, review_artifact, review_summary, now_iso)
     task_state["last_updated"] = now_iso()
     write_json(task_state_path, task_state)
@@ -802,6 +830,21 @@ def run_orchestration(
 
     # ── One rework cycle if review failed ────────────────────────────────────
     if review_status == "fail":
+        # Enforce the "one rework" contract. The counter persists across
+        # --project continue invocations, so a fresh review after
+        # review_blocked must not dispatch another rework worker.
+        if task_state.get("rework_loop_count", 0) >= 1:
+            blocking_after_cap = review_output.get("blocking", [])
+            emit_progress("[engine] Rework budget exhausted — review still blocking.")
+            task_state["pending_resolution"] = {
+                "type":             "review_blocked",
+                "message":          f"Review blocked after rework. Issues: {blocking_after_cap}",
+                "original_request": request,
+            }
+            task_state["last_updated"] = now_iso()
+            write_json(task_state_path, task_state)
+            return 1
+
         blocking         = review_output.get("blocking", [])
         rework_requests  = review_output.get("rework_requests", [])
         blocking_lines   = "\n".join(f"- {r}" for r in blocking)
@@ -876,6 +919,11 @@ def run_orchestration(
             write_json(task_state_path, task_state)
             return 1
 
+        missing = _verify_delivery_files(rework_output, active_project.get("project_root", ""))
+        if missing:
+            for m in missing:
+                emit_progress(f"[engine] Delivery verification: {m}")
+            emit_progress(f"[engine] Warning: {len(missing)} claimed file(s) not found. Review will catch this.")
         worker_artifact2 = persist_result(active_project, "worker", rework_output)
         worker_summary2  = rework_output.get("summary", "Rework completed.")
         _record_step(task_state, "worker", "success", worker_artifact2, worker_summary2, now_iso)
@@ -909,6 +957,17 @@ def run_orchestration(
         # Same as first review: default to "fail" when status field is missing.
         review_status2  = _normalize_review_status(review_output2.get("status", "fail"))
         review_summary2 = review_output2.get("summary", "Final review completed.")
+        # Apply the same "no real work => auto-demote" check to the final
+        # review so rework can't be rubber-stamped without execution. Either
+        # capability rounds or native tool uses prove the review did something.
+        if (
+            review_status2 == "pass"
+            and review_res2.get("capability_rounds_used", 0) == 0
+            and review_res2.get("native_tool_uses", 0) == 0
+        ):
+            review_status2 = "fail"
+            review_summary2 = "Final review passed without running any capability — demoted to fail."
+            emit_progress("[engine] Final review passed without running any capability — treating as fail.")
         _record_step(task_state, "review", review_status2, review_artifact2, review_summary2, now_iso)
         task_state["last_updated"] = now_iso()
         write_json(task_state_path, task_state)

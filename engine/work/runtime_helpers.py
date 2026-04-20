@@ -9,16 +9,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-# Re-exports from focused modules — kept for backward-compat with existing importers.
-from engine.work.json_io import (  # noqa: F401
-    extract_json_payload,
-    load_json,
-    load_json_safe,
-    write_json,
-)
-from engine.work.tokenization import estimate_tokens  # noqa: F401
-from engine.work.error_classifier import classify_error  # noqa: F401
-
 # Compiled regex constants — built once at import, reused across calls.
 _RE_NEW_PROJECT = re.compile(
     r"\b(start|create|bootstrap|init(?:ialize)?)\s+(?:a\s+)?new\s+project\b",

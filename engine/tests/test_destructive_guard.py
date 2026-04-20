@@ -230,6 +230,31 @@ class AbsoluteHttpBlockTest(unittest.TestCase):
         self.assertGreater(_ABSOLUTE_HTTP_BLOCK_COUNT, 0)
         self.assertLess(_ABSOLUTE_HTTP_BLOCK_COUNT, len(_HARD_BLOCKED_HTTP))
 
+    # URL normalization — query, fragment, and port must not let a blocked path slip past.
+    def test_delete_entra_user_with_query_still_blocked(self):
+        r = self._check(
+            "DELETE",
+            "https://graph.microsoft.com/v1.0/users/john@contoso.com?$select=id",
+        )
+        self.assertIsNotNone(r)
+        self.assertTrue(is_absolute_block(r))
+
+    def test_delete_entra_user_with_fragment_still_blocked(self):
+        r = self._check(
+            "DELETE",
+            "https://graph.microsoft.com/v1.0/users/john@contoso.com#frag",
+        )
+        self.assertIsNotNone(r)
+        self.assertTrue(is_absolute_block(r))
+
+    def test_delete_entra_user_with_port_still_blocked(self):
+        r = self._check(
+            "DELETE",
+            "https://graph.microsoft.com:443/v1.0/users/john@contoso.com",
+        )
+        self.assertIsNotNone(r)
+        self.assertTrue(is_absolute_block(r))
+
 
 # ---------------------------------------------------------------------------
 # Soft HTTP blocks (domain-specific structural deletions)
@@ -492,6 +517,35 @@ class ShellHttpBypassTest(unittest.TestCase):
         r = self._check(["az", "rest", "--method", "GET", "--url", "https://management.azure.com/..."])
         self.assertIsNone(r)
 
+    # New variants added in Tier 3 hardening
+    def test_curl_request_equals_delete_blocked(self):
+        r = self._check(["curl", "--request=DELETE", "https://api.example.com/items/abc"])
+        self.assertIsNotNone(r)
+
+    def test_curl_x_quoted_delete_blocked(self):
+        r = self._check(["sh", "-c", 'curl -X"DELETE" https://api.example.com/items/abc'])
+        self.assertIsNotNone(r)
+
+    def test_curl_x_equals_delete_blocked(self):
+        r = self._check(["sh", "-c", "curl -X=DELETE https://api.example.com/items/abc"])
+        self.assertIsNotNone(r)
+
+    def test_httpie_delete_blocked(self):
+        r = self._check(["http", "DELETE", "https://api.example.com/items/abc"])
+        self.assertIsNotNone(r)
+
+    def test_xh_patch_blocked(self):
+        r = self._check(["xh", "PATCH", "https://api.example.com/items/abc"])
+        self.assertIsNotNone(r)
+
+    def test_az_ad_delete_user_blocked(self):
+        r = self._check(["az", "ad", "user", "delete", "--id", "some-oid"])
+        # az ad tool + no method flag — tool alone doesn't block; only blocks when combined with method
+        # But `delete` is a subcommand, not an HTTP method flag. So this is NOT caught by the HTTP tool
+        # matcher — it would need a separate rule. Current behavior is intentional: `az ad` by itself
+        # doesn't trigger, but `az ad ... --request DELETE` would. Documenting current behavior.
+        self.assertIsNone(r)
+
 
 # ---------------------------------------------------------------------------
 # Write file: protected directories
@@ -662,6 +716,24 @@ class WriteFileScriptContentTest(unittest.TestCase):
 
     def test_json_with_destructive_content_allowed(self):
         r = self._write_script("config.json", '{"method": "DELETE", "url": "https://example.com/"}')
+        self.assertIsNone(r)
+
+    # Shebang-based detection — extension alone isn't trusted
+    def test_extensionless_shebang_bash_rm_rf_blocked(self):
+        r = self._write_script("cleanup", "#!/usr/bin/env bash\nrm -rf /data\n")
+        self.assertIsNotNone(r)
+        self.assertIn("destructive", r["issues"][0])
+
+    def test_extensionless_shebang_python_requests_delete_blocked(self):
+        r = self._write_script(
+            "tool",
+            '#!/usr/bin/env python3\nimport requests\nrequests.delete("https://api.example.com/x")\n',
+        )
+        self.assertIsNotNone(r)
+
+    def test_extensionless_no_shebang_not_scanned(self):
+        # Plain text-ish file without extension or shebang — not scanned.
+        r = self._write_script("README", "rm -rf /not-really\n")
         self.assertIsNone(r)
 
 

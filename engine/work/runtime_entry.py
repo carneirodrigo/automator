@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
+from engine.work.file_lock import LockUnavailable, locked
+
 
 def execute_main_flow(
     args: Any,
@@ -54,7 +56,7 @@ def execute_main_flow(
         agent_bin = "codex"
 
     if not agent_bin:
-        agent_bin = args.agent_bin or os.environ.get("AGENT_BIN")
+        agent_bin = os.environ.get("AGENT_BIN")
 
     # API mode override: if config says mode=api, ignore --LLM flags and use
     # the provider from config as the agent_bin equivalent.
@@ -72,10 +74,10 @@ def execute_main_flow(
                 break
 
     if args.check_runtime:
-        explicit_backend = bool(args.gemini or args.claude or args.codex or args.agent_bin)
+        explicit_backend = bool(args.gemini or args.claude or args.codex)
         if explicit_backend:
             if not agent_bin:
-                emit_progress("Error: No AI Parent binary identified. Use --agent-bin or set AGENT_BIN env var.")
+                emit_progress("Error: No AI Parent binary identified. Pass --cli <llm> or set AGENT_BIN env var.")
                 return 1
             backends = [agent_bin]
         else:
@@ -95,7 +97,7 @@ def execute_main_flow(
         return 0 if all(result["ok"] for result in results) else 1
 
     if not agent_bin:
-        emit_progress("Error: No AI Parent binary identified. Use --agent-bin or set AGENT_BIN env var.")
+        emit_progress("Error: No AI Parent binary identified. Pass --cli <llm> or set AGENT_BIN env var.")
         if debug_mode:
             record_debug_issue(
                 issue_type="startup_configuration_error",
@@ -244,15 +246,36 @@ def execute_main_flow(
         task_state_path = state_template_path
         task_state = load_json(task_state_path)
 
-    return run_orchestration(
-        request=request,
-        agent_bin=agent_bin,
-        debug_mode=debug_mode,
-        execute_agents=args.execute_agents,
-        active_project=active_project,
-        task_state=task_state,
-        task_state_path=task_state_path,
-        fork_hint=fork_hint,
-        pending_secrets=pending_secrets,
-        pending_input_files=pending_input_files,
-    )
+    # Serialize concurrent runs on the same project. Only hold the lock once
+    # a real project is resolved — the template path is shared and read-only.
+    should_lock = bool(active_project) and task_state_path != state_template_path
+    try:
+        if should_lock:
+            with locked(task_state_path, non_blocking=True):
+                return run_orchestration(
+                    request=request,
+                    agent_bin=agent_bin,
+                    debug_mode=debug_mode,
+                    execute_agents=args.execute_agents,
+                    active_project=active_project,
+                    task_state=task_state,
+                    task_state_path=task_state_path,
+                    fork_hint=fork_hint,
+                    pending_secrets=pending_secrets,
+                    pending_input_files=pending_input_files,
+                )
+        return run_orchestration(
+            request=request,
+            agent_bin=agent_bin,
+            debug_mode=debug_mode,
+            execute_agents=args.execute_agents,
+            active_project=active_project,
+            task_state=task_state,
+            task_state_path=task_state_path,
+            fork_hint=fork_hint,
+            pending_secrets=pending_secrets,
+            pending_input_files=pending_input_files,
+        )
+    except LockUnavailable as exc:
+        emit_progress(f"[engine] {exc}")
+        return 1

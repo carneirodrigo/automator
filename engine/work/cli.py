@@ -6,20 +6,34 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from engine.work import agent_admin
 from engine.work import config_wizard
 from engine.work import debug_supervisor
 from engine.work import engine_runtime
 from engine.work import skill_sync
-from engine.work.repo_paths import REGISTRY_PATH
+from engine.work.json_io import load_json as _load_json, write_json as _write_json
+from engine.work.project_state import reconcile_registry as _reconcile_registry
+from engine.work.repo_paths import PROJECTS_DIR, REGISTRY_PATH
 
-_LEGACY_FLAGS = {
-    "--claude", "--gemini", "--codex", "--agent-bin",
-    "--debug-open", "--debug-analyse", "--debug-list", "--debug-verify",
-    "--skills-catalog", "--skills-fetch", "--skills-check", "--skills-list",
-    "--skills-rebuild-manifest", "--debug-mode", "--deliverable", "--manual",
-}
+
+def _ensure_registry_reconciled() -> None:
+    """Reconcile registry.json against on-disk folders before local-only reads.
+
+    Engine-backed commands reconcile via ensure_repo_structure(); this covers
+    the local-only paths (--project list, --project continue/fork id validation,
+    --project delete) so users never see a stale registry.
+    """
+    try:
+        _reconcile_registry(
+            projects_dir=PROJECTS_DIR,
+            registry_path=REGISTRY_PATH,
+            load_json=_load_json,
+            write_json=_write_json,
+        )
+    except Exception:  # noqa: BLE001 — best-effort
+        pass
 
 _VALID_DEBUG_ACTIONS = {"list", "open", "analyse", "verify"}
 
@@ -73,6 +87,16 @@ def _first_id(args: argparse.Namespace) -> str | None:
     return ids[0] if isinstance(ids, list) and ids else None
 
 
+def _require(value: Any, command: str, flag_desc: str) -> None:
+    """Raise SystemExit with ``<command> requires <flag_desc>`` when value is falsy.
+
+    Consolidates the repeated ``if not x: raise SystemExit(f"{cmd} requires {flag}")``
+    pattern across subcommand handlers so the phrasing stays consistent.
+    """
+    if not value:
+        raise SystemExit(f"{command} requires {flag_desc}")
+
+
 def _cmd_project(args: argparse.Namespace) -> int:
     action = args.project
     task = " ".join(args.task or []).strip()
@@ -80,23 +104,22 @@ def _cmd_project(args: argparse.Namespace) -> int:
     capture_mode = getattr(args, "debug", None) is not None
 
     if action == "close":
-        if not project_id:
-            raise SystemExit("--project close requires --id <project-id>")
+        _require(project_id, "--project close", "--id <project-id>")
         agent_bin = getattr(args, "cli", None) or ("api" if getattr(args, "api", False) else None)
         return engine_runtime.close_project(project_id, agent_bin)
 
     if action == "delete":
         id_all = getattr(args, "id_all", False)
         ids = getattr(args, "id", None) or []
-        if not id_all and not ids:
-            raise SystemExit("--project delete requires --id <project-id> (repeat for multiple) or --all")
+        _require(id_all or ids, "--project delete", "--id <project-id> (repeat for multiple) or --all")
         return engine_runtime.delete_projects(ids, delete_all=id_all)
 
-    if action in ("continue", "fork") and not project_id:
-        raise SystemExit(f"--project {action} requires --id <project-id>")
+    if action in ("continue", "fork"):
+        _require(project_id, f"--project {action}", "--id <project-id>")
 
     if action in ("continue", "fork") and project_id:
         # Validate that the project exists before proceeding
+        _ensure_registry_reconciled()
         try:
             registry = json.loads(REGISTRY_PATH.read_text(encoding="utf-8")) if REGISTRY_PATH.exists() else {}
         except (json.JSONDecodeError, OSError):
@@ -108,14 +131,15 @@ def _cmd_project(args: argparse.Namespace) -> int:
                 f"Run: ./automator --project list   to see available projects."
             )
 
-    if action in ("new", "fork") and not task:
-        raise SystemExit(f"--project {action} requires --task <description>")
+    if action in ("new", "fork"):
+        _require(task, f"--project {action}", "--task <description>")
 
     request = _compose_project_request(action, task, project_id)
     return _run_engine(request, args, force_debug=capture_mode)
 
 
 def _cmd_project_list() -> int:
+    _ensure_registry_reconciled()
     if not REGISTRY_PATH.exists():
         print("No projects found.")
         return 0
@@ -167,14 +191,11 @@ def _cmd_debug(args: argparse.Namespace) -> int:
 
     if action == "verify":
         issue_id = _first_id(args)
-        if not issue_id:
-            raise SystemExit("--debug verify requires --id <issue-id>")
+        _require(issue_id, "--debug verify", "--id <issue-id>")
         verify_commands = getattr(args, "verify_command", None) or []
-        if not verify_commands:
-            raise SystemExit("--debug verify requires --verify-command <cmd>")
+        _require(verify_commands, "--debug verify", "--verify-command <cmd>")
         summary = getattr(args, "summary", None)
-        if not summary:
-            raise SystemExit("--debug verify requires --summary <text>")
+        _require(summary, "--debug verify", "--summary <text>")
         forwarded = ["verify", issue_id]
         for cmd in verify_commands:
             forwarded.extend(["--verify-command", cmd])
@@ -219,8 +240,7 @@ def _cmd_skill(args: argparse.Namespace) -> int:
         return int(skill_sync.main(forwarded))
     if action == "fetch":
         skill_id = _first_id(args)
-        if not skill_id:
-            raise SystemExit("--skill fetch requires --id <skill-id>")
+        _require(skill_id, "--skill fetch", "--id <skill-id>")
         return int(skill_sync.main(["--skill", skill_id]))
     if action == "rebuild-manifest":
         return int(skill_sync.main(["--rebuild-manifest"]))
@@ -231,8 +251,7 @@ def _cmd_knowledge(args: argparse.Namespace) -> int:
     action = args.knowledge
     if action == "purge":
         project_id = _first_id(args)
-        if not project_id:
-            raise SystemExit("--knowledge purge requires --id <project-id>")
+        _require(project_id, "--knowledge purge", "--id <project-id>")
         return engine_runtime.purge_project_knowledge(project_id)
     raise SystemExit(f"Unknown --knowledge action: {action}")
 
@@ -244,10 +263,8 @@ def _cmd_agent(args: argparse.Namespace) -> int:
     if action == "add":
         role = _first_id(args)
         purpose = getattr(args, "purpose", None)
-        if not role:
-            raise SystemExit("--agent add requires --id <role-slug>")
-        if not purpose:
-            raise SystemExit("--agent add requires --purpose <text>")
+        _require(role, "--agent add", "--id <role-slug>")
+        _require(purpose, "--agent add", "--purpose <text>")
         forwarded: list[str] = ["add", role, "--purpose", purpose]
         if getattr(args, "title", None):
             forwarded.extend(["--title", args.title])
@@ -535,155 +552,6 @@ def build_cli_parser() -> argparse.ArgumentParser:
 
 
 # ---------------------------------------------------------------------------
-# Legacy support (old positional / flag style)
-# ---------------------------------------------------------------------------
-
-def build_legacy_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Unified Automator entrypoint for project runs, debug supervision, and skill management.",
-    )
-
-    backend = parser.add_argument_group("project backend selection")
-    backend.add_argument("--agent-bin", help="AI parent binary to use (e.g. gemini, claude, codex)")
-    backend.add_argument("--gemini", action="store_true", help="Use gemini backend")
-    backend.add_argument("--claude", action="store_true", help="Use claude backend")
-    backend.add_argument("--codex", action="store_true", help="Use codex backend")
-
-    project = parser.add_argument_group("project execution")
-    project.add_argument("--check-runtime", action="store_true", help="Probe available backends before running work")
-    project.add_argument("--debug-mode", action="store_true", help="Capture orchestration faults and stop instead of self-healing")
-    project.add_argument("--manual", action="store_true", help="Stop after master's decision instead of running specialists")
-
-    debug = parser.add_argument_group("debug supervisor")
-    debug.add_argument("--debug-open", action="store_true", help="List open debug issues with summaries")
-    debug.add_argument("--debug-analyse", action="store_true", help="Analyse open/regressed debug issues")
-    debug.add_argument("--debug-list", action="store_true", help="List tracked debug issues")
-    debug.add_argument("--debug-verify", metavar="ISSUE_ID", help="Verify a specific debug issue and update status")
-    debug.add_argument(
-        "--debug-status",
-        action="append",
-        choices=["open", "in_progress", "fixed", "regressed"],
-        help="Status filter for debug list/analyse. Repeat for multiple statuses.",
-    )
-    debug.add_argument(
-        "--verify-command",
-        action="append",
-        help="Verification command for --debug-verify. Repeat for multiple commands.",
-    )
-    debug.add_argument("--summary", help="Verification summary for --debug-verify")
-    debug.add_argument("--supervisor", default="codex", help="Supervisor/backend name for --debug-verify")
-
-    skills = parser.add_argument_group("skills")
-    skills.add_argument("--skills-catalog", action="store_true", help="Refresh the skills catalog")
-    skills.add_argument("--skills-repo", help="Limit --skills-catalog to one repo id")
-    skills.add_argument("--skills-fetch", metavar="SKILL_ID", help="Fetch a specific skill into the local cache")
-    skills.add_argument("--skills-check", action="store_true", help="Check cached skills for staleness")
-    skills.add_argument("--skills-list", action="store_true", help="List cached skills")
-    skills.add_argument("--skills-rebuild-manifest", action="store_true", help="Rebuild the local skill manifest")
-    skills.add_argument("--dry-run", action="store_true", help="Preview catalog changes without writing them")
-    skills.add_argument(
-        "--deliverable",
-        choices=["code", "guide", "mixed"],
-        default="code",
-        help="What kind of final delivery you want.",
-    )
-    skills.add_argument(
-        "--platform",
-        help="Optional target platform or environment.",
-    )
-
-    parser.add_argument("request", nargs="*", help="Project request when running orchestration")
-    return parser
-
-
-_NEW_STYLE_FLAGS = {"--project", "--config", "--skill", "--knowledge", "--agent"}
-
-
-def _has_legacy_mode(argv: list[str]) -> bool:
-    argv_set = set(argv)
-    legacy_found = argv_set & _LEGACY_FLAGS
-    if not legacy_found:
-        return False
-    # If new-style flags are also present, the user likely meant the new CLI
-    # but accidentally used a bare backend flag (e.g. --claude instead of --cli claude).
-    new_found = argv_set & _NEW_STYLE_FLAGS
-    if new_found:
-        hint = next(iter(legacy_found))
-        bare = hint.lstrip("-")
-        raise SystemExit(
-            f"Error: '{hint}' is a legacy flag. Use '--cli {bare}' instead.\n"
-            f"Example: ./automator --cli {bare} {next(iter(new_found))} ..."
-        )
-    return True
-
-
-def _run_legacy(argv: list[str]) -> int:
-    parser = build_legacy_parser()
-    args = parser.parse_args(argv)
-
-    debug_flags = any([args.debug_open, args.debug_analyse, args.debug_list, args.debug_verify])
-    skill_flags = any([args.skills_catalog, args.skills_fetch, args.skills_check, args.skills_list, args.skills_rebuild_manifest])
-    if debug_flags and skill_flags:
-        parser.error("debug supervisor flags cannot be combined with skills flags")
-
-    if args.debug_open:
-        return int(debug_supervisor.main(["open"]))
-    if args.debug_analyse:
-        forwarded = ["analyse"]
-        for status in args.debug_status or []:
-            forwarded.extend(["--status", status])
-        return int(debug_supervisor.main(forwarded))
-    if args.debug_list:
-        forwarded = ["list"]
-        for status in args.debug_status or []:
-            forwarded.extend(["--status", status])
-        return int(debug_supervisor.main(forwarded))
-    if args.debug_verify:
-        if not args.verify_command or not args.summary:
-            parser.error("--debug-verify requires --verify-command and --summary")
-        forwarded = ["verify", args.debug_verify]
-        for command in args.verify_command:
-            forwarded.extend(["--verify-command", command])
-        forwarded.extend(["--summary", args.summary, "--supervisor", args.supervisor])
-        return int(debug_supervisor.main(forwarded))
-
-    if args.skills_catalog:
-        forwarded = ["--catalog"]
-        if args.skills_repo:
-            forwarded.extend(["--repo", args.skills_repo])
-        if args.dry_run:
-            forwarded.append("--dry-run")
-        return int(skill_sync.main(forwarded))
-    if args.skills_fetch:
-        return int(skill_sync.main(["--skill", args.skills_fetch]))
-    if args.skills_check:
-        return int(skill_sync.main(["--check"]))
-    if args.skills_list:
-        return int(skill_sync.main(["--list"]))
-    if args.skills_rebuild_manifest:
-        return int(skill_sync.main(["--rebuild-manifest"]))
-
-    forwarded: list[str] = []
-    if getattr(args, "agent_bin", None):
-        forwarded.extend(["--agent-bin", args.agent_bin])
-    if getattr(args, "gemini", False):
-        forwarded.append("--gemini")
-    if getattr(args, "claude", False):
-        forwarded.append("--claude")
-    if getattr(args, "codex", False):
-        forwarded.append("--codex")
-    if args.check_runtime:
-        forwarded.append("--check-runtime")
-    if args.debug_mode:
-        forwarded.append("--debug-mode")
-    if args.manual:
-        forwarded.append("--manual")
-    if args.request:
-        forwarded.append(" ".join(args.request))
-    return int(engine_runtime.main(forwarded))
-
-
-# ---------------------------------------------------------------------------
 # Main dispatch
 # ---------------------------------------------------------------------------
 
@@ -695,8 +563,6 @@ def main(argv: list[str] | None = None) -> int:
     if argv in (["-h"], ["--help"]):
         build_cli_parser().print_help()
         return 0
-    if _has_legacy_mode(argv):
-        return _run_legacy(argv)
 
     parser = build_cli_parser()
     args = parser.parse_args(argv)

@@ -462,17 +462,27 @@ _BLOCKED_COMMANDS: list[tuple[re.Pattern[str], str]] = [
 
 _SHELL_HTTP_TOOLS: re.Pattern[str] = re.compile(
     r"\b(curl|wget|Invoke-RestMethod|Invoke-WebRequest|iwr|irm"
-    r"|az\s+rest\b|az\s+resource\b)\b",
+    r"|az\s+rest\b|az\s+resource\b|az\s+ad\b"
+    r"|http|xh)\b",
     re.IGNORECASE,
 )
 
-# Matches the method flag + method value for common HTTP CLI styles:
-#   curl: -X DELETE, -XDELETE, --request DELETE
-#   wget: --method DELETE
-#   az rest: --method DELETE
-#   PowerShell: -Method DELETE
+# Matches the method flag + method value for common HTTP CLI styles. The value
+# may be separated by space, '=', or quoted. Handled forms:
+#   curl:        -X DELETE, -XDELETE, -X"DELETE", -X'DELETE', -X=DELETE, --request DELETE, --request=DELETE
+#   wget:        --method DELETE, --method=DELETE
+#   az rest:     --method DELETE, --method=DELETE
+#   PowerShell:  -Method DELETE
+#   HTTPie/xh:   http DELETE https://..., xh DELETE https://...
 _SHELL_HTTP_MUTATING: re.Pattern[str] = re.compile(
-    r"(?:-X\s*|-X(?=DELETE|PATCH|PUT)|--request\s+|--method\s+|-Method\s+)"
+    r"(?:"
+    r"-X\s*=?\s*[\"']?"               # -X, -X=, -X ", -X '
+    r"|-X(?=DELETE|PATCH|PUT)"        # -XDELETE (no separator)
+    r"|--request[\s=]+[\"']?"         # --request DELETE or --request=DELETE
+    r"|--method[\s=]+[\"']?"          # --method DELETE or --method=DELETE
+    r"|-Method\s+[\"']?"              # PowerShell -Method DELETE
+    r"|\b(?:http|xh)\s+"              # HTTPie / xh bare method: http DELETE url
+    r")"
     r"(DELETE|PATCH|PUT)\b",
     re.IGNORECASE,
 )
@@ -641,6 +651,29 @@ def is_absolute_block(blocked_result: dict[str, Any]) -> bool:
     return bool(blocked_result.get("absolute", False))
 
 
+_URL_PORT_STRIP: re.Pattern[str] = re.compile(r"(//[^/:?#]+):\d+(?=[/?#]|$)")
+
+
+def _normalize_url_for_match(url: str) -> str:
+    """Strip fragment, query, and :port so patterns match the endpoint shape.
+
+    A URL like ``https://graph.microsoft.com:443/v1.0/users/id?foo=bar#frag``
+    becomes ``https://graph.microsoft.com/v1.0/users/id`` before pattern
+    matching, so attackers can't smuggle a blocked path past the regex by
+    tacking on a query string or port. ``$ref`` suffixes are preserved — those
+    are separate endpoints for unlinking relationships and are handled by the
+    catch-all mutating-method prompt.
+    """
+    if not url:
+        return url
+    if "#" in url:
+        url = url.split("#", 1)[0]
+    if "?" in url:
+        url = url.split("?", 1)[0]
+    url = _URL_PORT_STRIP.sub(r"\1", url)
+    return url
+
+
 def _check_http_request(
     capability: str,
     arguments: dict[str, Any],
@@ -648,10 +681,11 @@ def _check_http_request(
 ) -> dict[str, Any] | None:
     method = str(arguments.get("method", "GET")).upper()
     url = str(arguments.get("url", ""))
+    match_url = _normalize_url_for_match(url)
 
     # Absolute blocks — SharePoint sites + Entra ID users/SPs; never promptable
     for pattern, blocked_methods, description in _HARD_BLOCKED_HTTP[:_ABSOLUTE_HTTP_BLOCK_COUNT]:
-        if method in blocked_methods and pattern.search(url):
+        if method in blocked_methods and pattern.search(match_url):
             return _blocked(
                 capability,
                 f"{description} is permanently prohibited. "
@@ -661,7 +695,7 @@ def _check_http_request(
 
     # Soft blocks — promptable by the operator
     for pattern, blocked_methods, description in _HARD_BLOCKED_HTTP[_ABSOLUTE_HTTP_BLOCK_COUNT:]:
-        if method in blocked_methods and pattern.search(url):
+        if method in blocked_methods and pattern.search(match_url):
             return _blocked(
                 capability,
                 f"{description} requires operator approval. "
@@ -829,16 +863,20 @@ def _check_write_file(
             )
 
         # 3. Script content scan — detect destructive operations in scripts being written.
-        if path.suffix.lower() in _SCRIPT_EXTENSIONS:
-            content = str(arguments.get("content", ""))
-            if content:
-                issue = _scan_script_content(content)
-                if issue:
-                    return _blocked(
-                        capability,
-                        f"Script '{path.name}' contains a destructive pattern: {issue}. "
-                        f"Review the script before writing.",
-                    )
+        # Trigger on either a recognized script extension OR a shebang, so an
+        # extensionless `bin/cleanup` with `#!/bin/bash` still gets scanned.
+        content = str(arguments.get("content", ""))
+        if content and (
+            path.suffix.lower() in _SCRIPT_EXTENSIONS
+            or content.lstrip().startswith("#!")
+        ):
+            issue = _scan_script_content(content)
+            if issue:
+                return _blocked(
+                    capability,
+                    f"Script '{path.name}' contains a destructive pattern: {issue}. "
+                    f"Review the script before writing.",
+                )
 
     except Exception as exc:  # noqa: BLE001
         # Guard must fail closed — deny when guard logic itself errors.

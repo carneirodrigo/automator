@@ -60,7 +60,10 @@ def tearDownModule():
 # ---------------------------------------------------------------------------
 
 def _make_agent_result(output: dict[str, Any], status: str = "success") -> dict[str, Any]:
-    return {"status": status, "output": output}
+    # capability_rounds_used defaults to 1 so test mocks look like a real
+    # agent that ran at least one capability before producing its result.
+    # Tests that specifically need a zero-round mock can override the field.
+    return {"status": status, "output": output, "capability_rounds_used": 1}
 
 
 def _worker_pass(summary: str = "Done.") -> dict[str, Any]:
@@ -937,7 +940,8 @@ class TestReviewEnforcement(unittest.TestCase):
 
     def test_review_pass_no_checks_triggers_rework(self):
         task_state = [_make_task_state()]
-        # Review passes but with empty checks_run — should be demoted to fail.
+        # Review passes but never ran any capability — should be demoted to fail.
+        # capability_rounds_used=0 is the hard signal; it's what the engine trusts.
         review_no_checks = _make_agent_result({
             "status": "pass",
             "summary": "Looks fine.",
@@ -945,6 +949,7 @@ class TestReviewEnforcement(unittest.TestCase):
             "checks_run": [],
             "blocking": [],
         })
+        review_no_checks["capability_rounds_used"] = 0
         run_agent = MagicMock(side_effect=[
             _worker_pass(),
             review_no_checks,       # first review: pass but no checks → demoted to fail
