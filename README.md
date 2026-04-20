@@ -188,14 +188,97 @@ POST (resource creation) is not blocked. If you want to prevent agents from crea
 | **API** | Calls vendor HTTP APIs directly | `--api` (provider from `config/backends.json`) |
 
 ```text
-./automator --config setup      # Interactive wizard
+./automator --config setup      # Interactive wizard — recommended
 ./automator --config show       # Display current config (keys redacted)
 ./automator --config validate   # Check API keys are reachable
 ```
 
-In API mode you set a default provider and model, with optional per-role overrides (e.g., a stronger model for coding). Configuration lives in `config/` (git-ignored). If no config exists, the engine defaults to CLI mode.
+The wizard handles everything interactively. If you prefer editing the JSON files yourself, configuration lives in `config/` (git-ignored):
 
-You can also set a custom `base_url` to point the `openai` provider at any OpenAI-compatible endpoint — OpenRouter (100+ models including DeepSeek, Qwen, Grok, Mistral, Llama), DeepSeek direct, or local servers like Ollama and LM Studio. See [docs/backend-and-runtime.md](docs/backend-and-runtime.md#openai-compatible-endpoints) for concrete examples.
+- `config/backends.json` — mode, provider, default model, optional `base_url`, per-role overrides
+- `config/secrets.json` — API keys
+
+### Examples
+
+**Claude via API** (pay-per-token, uses your Anthropic key — separate from a Claude Max subscription, which only covers the Claude Code CLI):
+
+```json
+// config/backends.json
+{ "version": 2, "mode": "api", "provider": "anthropic",
+  "default_model": "claude-sonnet-4-6" }
+
+// config/secrets.json
+{ "version": 1, "anthropic_api_key": "sk-ant-..." }
+```
+
+**OpenAI / GPT**:
+
+```json
+// config/backends.json
+{ "version": 2, "mode": "api", "provider": "openai",
+  "default_model": "gpt-4.1" }
+
+// config/secrets.json
+{ "version": 1, "openai_api_key": "sk-..." }
+```
+
+**DeepSeek via OpenRouter** (one key unlocks DeepSeek, Qwen, Grok, Mistral, Llama, and still Claude/GPT/Gemini — roughly 10–20× cheaper than Claude Sonnet):
+
+```json
+// config/backends.json
+{ "version": 2, "mode": "api", "provider": "openai",
+  "default_model": "deepseek/deepseek-chat",
+  "base_url": "https://openrouter.ai/api/v1" }
+
+// config/secrets.json
+{ "version": 1, "openai_api_key": "sk-or-v1-..." }
+```
+
+**DeepSeek direct** (cheapest; get a key from platform.deepseek.com):
+
+```json
+// config/backends.json
+{ "version": 2, "mode": "api", "provider": "openai",
+  "default_model": "deepseek-chat",
+  "base_url": "https://api.deepseek.com/v1" }
+
+// config/secrets.json
+{ "version": 1, "openai_api_key": "sk-..." }
+```
+
+**Fully local via Ollama** (free, no network — expect a capability drop on hard tasks; start Ollama first with `ollama serve`):
+
+```json
+// config/backends.json
+{ "version": 2, "mode": "api", "provider": "openai",
+  "default_model": "qwen3-coder",
+  "base_url": "http://localhost:11434/v1" }
+
+// config/secrets.json
+{ "version": 1, "openai_api_key": "ollama" }
+```
+
+**Per-role overrides** (e.g., cheap model for review, strong model for coding):
+
+```json
+{ "version": 2, "mode": "api", "provider": "openai",
+  "default_model": "gpt-4.1",
+  "role_overrides": {
+    "worker":   { "model": "claude-opus-4-6", "provider": "anthropic" },
+    "research": { "model": "deepseek/deepseek-chat",
+                  "base_url": "https://openrouter.ai/api/v1" }
+  }
+}
+```
+
+After editing, run:
+
+```text
+./automator --api --check-runtime    # Verify reachability
+./automator --api --project new --task <your task>
+```
+
+If no config exists, the engine defaults to CLI mode. See [docs/backend-and-runtime.md](docs/backend-and-runtime.md) for full schema, resolution order, and the endpoints table.
 
 ## Command Reference
 
